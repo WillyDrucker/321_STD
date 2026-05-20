@@ -255,6 +255,13 @@ function insertIntoDecisionsSubsection(lines, sectionSlug, bulletLine) {
 
 // Fill an empty MEMORY static section. body_md becomes the section body.
 // decisions_md, if provided, becomes the `### <Section> Decisions` sub-section body.
+//
+// The last static section (conventions) is bounded by `## LIFO`, so its region
+// includes the `---` divider that sits before LIFO. Split that divider (and the
+// blanks around it) off as a tail: the emptiness check then reads only the real
+// body, the rewrite re-emits the divider instead of swallowing it, and the
+// Decisions block lands before it. Mirrors the trailing-divider strip in
+// doctor.mjs checkBig6Decisions. Non-last sections have an empty tail.
 function gapFillSection(content, targetSection, bodyMd, decisionsMd) {
   if (!STATIC_SECTIONS.includes(targetSection)) {
     throw new Error(`gap_fill_section target "${targetSection}" not a valid static section (allowed: ${STATIC_SECTIONS.join(", ")})`);
@@ -266,34 +273,32 @@ function gapFillSection(content, targetSection, bodyMd, decisionsMd) {
     throw new Error(`gap_fill_section: target section "${targetSection}" not found`);
   }
 
-  const bodyText = lines.slice(bounds.startIdx + 1, bounds.endIdx).join("\n").trim();
+  // Find the real body end by walking back past trailing blanks and a `---`.
+  let bodyEnd = bounds.endIdx;
+  while (bodyEnd > bounds.startIdx + 1 && lines[bodyEnd - 1].trim() === "") bodyEnd--;
+  if (bodyEnd > bounds.startIdx + 1 && lines[bodyEnd - 1].trim() === "---") {
+    bodyEnd--;
+    while (bodyEnd > bounds.startIdx + 1 && lines[bodyEnd - 1].trim() === "") bodyEnd--;
+  }
+  const tail = lines.slice(bodyEnd, bounds.endIdx);
+  while (tail.length && tail[0].trim() === "") tail.shift(); // the block below supplies the separating blank
+
+  const bodyText = lines.slice(bounds.startIdx + 1, bodyEnd).join("\n").trim();
   if (!isPlaceholderBody(bodyText) && bodyText.length > 0) {
     throw new Error(`gap_fill_section: target section "${targetSection}" is not empty. Use a different op for non-empty sections.`);
   }
 
-  const bodyBlock = ["", bodyMd.trim(), ""];
-  let updated = [
-    ...lines.slice(0, bounds.startIdx + 1),
-    ...bodyBlock,
-    ...lines.slice(bounds.endIdx),
-  ].join("\n");
-
+  const block = ["", bodyMd.trim(), ""];
   if (decisionsMd?.trim()) {
-    const decisionsHeading = decisionsHeadingFor(targetSection);
-    const newLines = updated.split("\n");
-    const refreshedBounds = findSectionBounds(newLines, targetSection);
-    if (!refreshedBounds) throw new Error(`gap_fill_section: target section "${targetSection}" lost after body write`);
-    const block = ["", `### ${decisionsHeading}`, "", decisionsMd.trim(), ""];
-    let insertIdx = refreshedBounds.endIdx;
-    while (insertIdx > refreshedBounds.startIdx + 1 && newLines[insertIdx - 1].trim() === "") insertIdx--;
-    updated = [
-      ...newLines.slice(0, insertIdx),
-      ...block,
-      ...newLines.slice(insertIdx),
-    ].join("\n");
+    block.push(`### ${decisionsHeadingFor(targetSection)}`, "", decisionsMd.trim(), "");
   }
 
-  return updated;
+  return [
+    ...lines.slice(0, bounds.startIdx + 1),
+    ...block,
+    ...tail,
+    ...lines.slice(bounds.endIdx),
+  ].join("\n");
 }
 
 // ---------- update_section_text ----------
