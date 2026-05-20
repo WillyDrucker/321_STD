@@ -12,7 +12,7 @@ Install from 321done.ai/std as MY_PROJECT
 
 Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321done.ai/std` and runs the install. The project is usable immediately. Restart Claude, then `/321 -Setup` fills the Big 6.
 
-**Existing project?** Same prompt. Your files are preserved, and `/321 -Setup` migrates what is already there, including a legacy 321 install.
+**Existing project?** Same prompt. Your files are preserved, and `/321 -Setup` migrates what is already there, including a legacy 321 install. It captures everything first, then `/321 -Update` reconciles it into final shape.
 
 ### No AI
 
