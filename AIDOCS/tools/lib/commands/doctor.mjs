@@ -16,15 +16,26 @@ import { findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, pa
 import { decisionsHeadingFor, REPO_ROOT, STATIC_SECTIONS } from "../paths.mjs";
 import { loadState } from "../state.mjs";
 
-export async function cmdDoctor(index) {
+// `structuralOnly` runs only the wiring checks (paths, state, skill bodies,
+// auto-memory pointers, router quick-ref, manifests) and skips the content /
+// prose checks (lint, Big-6 Decisions, migration markers, banned prose).
+// Install uses it: a migration over an existing project inherits that project's
+// lint debt (legacy CHANGELOG, WDDOCS docs), which is not an install fault and
+// is reconciled later by /321 -Setup then -Update. Full doctor (the default)
+// still gates everything. Buckets build in fixed order so output stays stable.
+export async function cmdDoctor(index, opts = {}) {
+  const structuralOnly = opts.structuralOnly === true;
+
   const buckets = {
-    "Lint":                    await runLint(index),
+    ...(structuralOnly ? {} : { "Lint": await runLint(index) }),
     "Paths":                   checkPaths(index),
     "State":                   await checkState(),
     "Skill bodies":            await checkSkills(index),
-    "Big-6 Decisions":         await checkBig6Decisions(index),
-    "Migration markers":       await checkMigrationMarkers(index),
-    "Banned prose":            await checkBannedProse(index),
+    ...(structuralOnly ? {} : {
+      "Big-6 Decisions":       await checkBig6Decisions(index),
+      "Migration markers":     await checkMigrationMarkers(index),
+      "Banned prose":          await checkBannedProse(index),
+    }),
     "Auto-memory pointers":    await checkAutoMemoryPointers(index),
     "Router quick-ref":        await checkRouterQuickRef(index),
     "Customization manifest":  checkCustomizations(index),
@@ -42,7 +53,8 @@ export async function cmdDoctor(index) {
     }
   }
 
-  console.log(`\ndoctor: ${total === 0 ? "all checks passed." : `${total} issue(s) found.`}`);
+  const mode = structuralOnly ? " (structural-only)" : "";
+  console.log(`\ndoctor${mode}: ${total === 0 ? "all checks passed." : `${total} issue(s) found.`}`);
   if (total > 0) process.exit(20);
 }
 

@@ -72,7 +72,11 @@ async function main() {
     case "commit":   await cmdCommit(index, args);   break;
     case "clear":    await cmdClear(args);           break;
     case "state":    await cmdState(args);           break;
-    case "doctor":   await cmdDoctor(index);         break;
+    case "doctor": {
+      const dopts = parseFlags(args, ["structural-only"]);
+      await cmdDoctor(index, { structuralOnly: dopts["structural-only"] === true });
+      break;
+    }
   }
 }
 
@@ -241,6 +245,10 @@ Commands:
   doctor    Health check across the standards system. Runs lint + path / state /
             skill / banned-prose / migration-markers / auto-memory /
             router-quick-ref / manifests.
+            [--structural-only]  Skip the content / prose checks (lint, Big-6
+            Decisions, migration markers, banned prose) and verify only wiring.
+            Install uses this so a migration over an existing project is not
+            failed by that project's inherited lint debt.
 
   init      Scaffold a new project from this template. Copies engine + skills,
             generates project-specific AGENTS / MEMORY / SESSION / _index.json.

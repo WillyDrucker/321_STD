@@ -154,7 +154,7 @@ export async function cmdInit(_index, args) {
   console.log(`Next steps:`);
   console.log(`  cd "${target}"`);
   console.log(`  node AIDOCS/tools/memory.mjs sync      # populate skills.dispatch`);
-  console.log(`  node AIDOCS/tools/memory.mjs doctor    # verify the scaffold`);
+  console.log(`  node AIDOCS/tools/memory.mjs doctor --structural-only   # verify the scaffold`);
   console.log(`  Open in your editor and run /321 -Setup (optional - first-run wizard or migration, auto-detected).`);
 }
 

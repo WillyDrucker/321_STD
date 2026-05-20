@@ -115,7 +115,7 @@ try {
 
   Write-Host ""
   Write-Host "Health check..."
-  & node "AIDOCS/tools/memory.mjs" doctor
+  & node "AIDOCS/tools/memory.mjs" doctor --structural-only
   if ($LASTEXITCODE -ne 0) { throw "doctor failed" }
 
   if (-not (Test-Path ".git")) {

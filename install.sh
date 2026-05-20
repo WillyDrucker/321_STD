@@ -111,7 +111,7 @@ node AIDOCS/tools/memory.mjs sync
 
 echo ""
 echo "Health check..."
-node AIDOCS/tools/memory.mjs doctor
+node AIDOCS/tools/memory.mjs doctor --structural-only
 
 if [[ ! -d ".git" ]]; then
   echo ""
