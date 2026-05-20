@@ -1,0 +1,38 @@
+{
+  "skill": "session-update",
+  "mode": "incremental",
+
+  "actions": [
+    {
+      "op": "overwrite_section",
+      "section": "current_state",
+      "bullets": [
+        "Branch <branch-name>, working tree <clean|dirty>.",
+        "Deploy: <live|awaiting|manual-only|blocked>.",
+        "Gates: <lint|typecheck|tests> <pass|fail|pending>.",
+        "Active focus: <one-line description>.",
+        "Local dev: <one-line of how to run>."
+      ]
+    },
+    {
+      "op": "lifo_insert",
+      "section": "lifo",
+      "bullet": "<one-line project-significant event - change, decision, finding, friction, milestone, failed attempt>"
+    },
+    {
+      "op": "lifo_insert",
+      "section": "lifo",
+      "bullet": "<event with extended technical detail>",
+      "extended_anchor": "observation-slug"
+    }
+  ],
+
+  "extended_actions": [
+    {
+      "op": "add",
+      "anchor": "observation-slug",
+      "heading": "Observation detail",
+      "body_md": "Longer context for the observation. Up to 10 prose lines.\n\n**Why:** <root cause or motivation>\n**How to apply:** <when this kicks in>"
+    }
+  ]
+}

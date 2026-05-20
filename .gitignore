@@ -1,0 +1,56 @@
+# Scratch / temp
+TEMP/
+*.tmp
+*.log
+
+# Setup migration archive: keep the empty folder for reference, ignore captured contents (transient, deleted after review)
+AIDOCS/*_SETUP_ARCHIVE/*
+!AIDOCS/*_SETUP_ARCHIVE/.gitkeep
+
+# Environment docs: keep the folder, ignore contents (may hold secrets / setup notes - local-only)
+AIDOCS/ENV/*
+!AIDOCS/ENV/.gitkeep
+
+# Staging files (transient, cleared on commit). SCHEMA.json and *.example.json are committed.
+AIDOCS/tools/staging/*.json
+!AIDOCS/tools/staging/SCHEMA.json
+!AIDOCS/tools/staging/session-update.example.json
+!AIDOCS/tools/staging/memory-update.example.json
+AIDOCS/tools/staging/.lock
+
+# Persistent script state (machine-local). Auto-bootstrapped on first run.
+AIDOCS/tools/state.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (if tooling grows)
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Local MCP server config (machine-local paths / IDs / tokens, written by Claude Code or external MCP tooling). Never commit.
+.mcp.json
+.claude/settings.local.json
+
+# Session handoff scratch (local-only between sessions)
+WDDOCS/SESSION_HANDOFF.md
+
+# Build artifacts (none yet, reserved)
+dist/
+out/
+build/

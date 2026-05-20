@@ -1,0 +1,15 @@
+# Force LF line endings on checkout, regardless of git autocrlf settings.
+#
+# The engine reads frontmatter and section headers via regex that work cleanly
+# on LF. CRLF survives the major regex patterns but blew up parseFrontmatter's
+# kv pattern (`.` does not match `\r`, `$` does not tolerate `\r`). Locking
+# checkout to LF eliminates that class of bug entirely. parseFrontmatter also
+# normalizes CRLF internally as belt-and-suspenders.
+*               text=auto eol=lf
+
+# Binary files (none today, but reserved).
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary

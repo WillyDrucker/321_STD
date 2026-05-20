@@ -1,0 +1,114 @@
+{
+  "project_name": "<PROJECT>",
+  "project_type": "project",
+  "release_profile": "standards",
+  "paths": {
+    "root": ".",
+    "claude_md": "./CLAUDE.md",
+    "agents_md": "./AGENTS.md",
+    "aidocs": "./AIDOCS",
+    "automemory": "./AIDOCS/automemory",
+    "wddocs": "./WDDOCS",
+    "skills_router": "./.claude/skills/321/SKILL.md",
+    "skills_bodies": "./AIDOCS/SKILL",
+    "changelog": "./CHANGELOG.md",
+    "temp": "./TEMP",
+    "tools": "./AIDOCS/tools"
+  },
+  "files": {
+    "memory": "./AIDOCS/_PROJECT_MEMORY.md",
+    "memory_extended": "./AIDOCS/_PROJECT_MEMORY_EXTENDED.md",
+    "session": "./AIDOCS/_PROJECT_SESSION.md",
+    "session_extended": "./AIDOCS/_PROJECT_SESSION_EXTENDED.md",
+    "backlog": "./AIDOCS/_PROJECT_BACKLOG.md",
+    "dev_audit": "./AIDOCS/_PROJECT_DEV-AUDIT.md",
+    "changelog": "./CHANGELOG.md",
+    "memory_archive": "./AIDOCS/_PROJECT_MEMORY_ARCHIVE",
+    "session_archive": "./AIDOCS/_PROJECT_SESSION_ARCHIVE",
+    "backlog_archive": "./AIDOCS/_PROJECT_BACKLOG_ARCHIVE",
+    "env": "./AIDOCS/ENV"
+  },
+  "buckets": {
+    "memory": [
+      "lifo"
+    ],
+    "session": [
+      "lifo"
+    ],
+    "backlog": [
+      "features",
+      "ideas"
+    ]
+  },
+  "sizes": {
+    "memory": {
+      "cap": 150,
+      "prune_to": 75
+    },
+    "memory_extended": {
+      "cap": 400,
+      "prune_to": 200
+    },
+    "session": {
+      "cap": 100,
+      "prune_to": 50
+    },
+    "session_extended": {
+      "cap": 400,
+      "prune_to": 200
+    },
+    "backlog": {
+      "cap": 100,
+      "prune_to": 50
+    }
+  },
+  "auto_memory": {
+    "path": "C:\\Users\\<USER>\\.claude\\projects\\c--Dev-<PROJECT>\\memory",
+    "sync_from_template": false
+  },
+  "skills": {
+    "router": "/321",
+    "installed": [
+      "auto-push",
+      "dev-audit",
+      "memory-update",
+      "session-update",
+      "update",
+      "setup"
+    ],
+    "dispatch": {
+      "auto-push": {
+        "flag": "-AutoPush",
+        "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
+        "description": "Project release pipeline. Delegates to SessionUpdate, runs pre-flight, commits, composes CHANGELOG entry from git + SESSION_EXTENDED, builds, pushes, tags, creates GitHub release, deploys (project-specific), verifies, rolls over."
+      },
+      "dev-audit": {
+        "flag": "-DevAudit",
+        "body": "./AIDOCS/SKILL/SKILL_DEV-AUDIT.md",
+        "description": "Code audit against <PROJECT>_DEV-AUDIT.md. Modes - default, -READ, -FULL. No build / test gates here. AutoPush owns those."
+      },
+      "memory-update": {
+        "flag": "-MemoryUpdate",
+        "body": "./AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md",
+        "description": "Capture durable observations into MEMORY LIFO + BACKLOG. Auto-invokes SessionUpdate first. -FULL auto-applies Big 6 maintenance (gap-fill / refine / replace) + LIFO-to-static promotion. AGENTS / auto-memory candidates surface as suggestive LIFO bullets."
+      },
+      "session-update": {
+        "flag": "-SessionUpdate",
+        "body": "./AIDOCS/SKILL/SKILL_SESSION-UPDATE.md",
+        "description": "Refresh SESSION (Current State + LIFO) and SESSION_EXTENDED. Project-history backbone log. Auto-applies. BACKLOG and CHANGELOG belong to other skills."
+      },
+      "update": {
+        "flag": "-Update",
+        "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
+        "description": "Optimized chain of session-track + memory-track in one shared-context pass. Mode passes through. -FULL: SessionUpdate verifies project state, MemoryUpdate auto-applies Big 6 maintenance + promotion."
+      },
+      "setup": {
+        "flag": "-Setup",
+        "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
+        "description": "First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (321-shaped, or a standard project's scattered AI artifacts via a confidence-graded discovery sweep), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent."
+      }
+    },
+    "local_additions": []
+  },
+  "customizations": []
+}

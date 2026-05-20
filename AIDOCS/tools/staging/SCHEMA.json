@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Memory.mjs Staging Schema",
+  "description": "Pre-script staging file shape for /321 -SessionUpdate, /321 -MemoryUpdate, and /321 -Update. Claude writes this; `node AIDOCS/tools/memory.mjs commit --skill <skill>` consumes and applies it. Routine ops target only LIFO (and Current State for SESSION, or features/ideas for BACKLOG). The static six MEMORY sections are only reachable via promote_to_section, gap_fill_section, and update_section_text - all mode=full only. CHANGELOG is owned by /321 -AutoPush, not this pipeline.",
+
+  "type": "object",
+  "required": ["skill", "mode", "actions"],
+  "additionalProperties": false,
+
+  "properties": {
+    "skill": {
+      "type": "string",
+      "enum": ["session-update", "memory-update"],
+      "description": "Which skill produced this staging file. Script uses this to pick the right target files and rules."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["skim", "incremental", "full"],
+      "description": "Mode the skill ran in. promote_to_section, gap_fill_section, and update_section_text all require mode=full."
+    },
+    "actions": {
+      "type": "array",
+      "description": "Ordered mutations on the main file (SESSION.md or MEMORY.md). Applied in order.",
+      "items": { "$ref": "#/definitions/action" }
+    },
+    "extended_actions": {
+      "type": "array",
+      "description": "Ordered mutations on the EXTENDED file (SESSION_EXTENDED.md or MEMORY_EXTENDED.md). All entries are `### sub-section`s under the `## LIFO` heading.",
+      "items": { "$ref": "#/definitions/extended_action" }
+    },
+    "backlog_actions": {
+      "type": "array",
+      "description": "Mutations on BACKLOG.md (Features / Ideas LIFO sections). memory-update only. Empty / absent for session-update - the validator rejects backlog ops on the session lane.",
+      "items": { "$ref": "#/definitions/backlog_action" }
+    }
+  },
+
+  "definitions": {
+
+    "action": {
+      "type": "object",
+      "required": ["op"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["overwrite_section", "lifo_insert", "remove", "replace", "promote_to_section", "gap_fill_section", "update_section_text"],
+          "description": "overwrite_section: replace SESSION/Current State body entirely. lifo_insert: new bullet at top of LIFO. remove: drop matching LIFO bullet. replace: edit an existing LIFO bullet (remove + lifo_insert). The updated bullet lands at the top of LIFO, signaling recent progress on the underlying thread. promote_to_section: move LIFO bullet to a static MEMORY section (mode=full only). gap_fill_section: draft content into an empty static MEMORY section (mode=full only). update_section_text: surgical substring replace inside an existing MEMORY static section (mode=full only). Used for refine (e.g. 'Astro 4' -> 'Astro 5') or replace (e.g. 'uses Astro' -> 'uses React') of named facts surfaced by SESSION/conversation. Requires rationale."
+        },
+        "section": {
+          "type": "string",
+          "enum": ["current_state", "lifo"],
+          "description": "Routine-op target slug. current_state=SESSION/Current State (overwrite). lifo=SESSION/LIFO or MEMORY/LIFO. The static six are NOT in this enum - use promote_to_section, gap_fill_section, or update_section_text instead. BACKLOG sections live on backlog_actions."
+        },
+        "bullets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Used by overwrite_section. Each string becomes one bullet."
+        },
+        "bullet": {
+          "type": "string",
+          "description": "Used by lifo_insert and replace. Must be <= 2 physical lines."
+        },
+        "match": {
+          "type": "string",
+          "description": "Used by remove, replace, and promote_to_section. Substring (case-insensitive) of the target bullet. Script requires EXACTLY ONE matching bullet - errors with location hints when 0 or multiple bullets match."
+        },
+        "extended_anchor": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Optional. Lowercase-kebab slug. If set, the bullet renders with a `[+]` marker and NO link (`- [+] <bullet text>`); the engine derives the anchor by slugifying the bullet text, so the bullet text must slugify to this value. Must resolve to a staged extended_action or an existing sub-section anchor under the EXTENDED file's `## LIFO` heading. Legacy `[text](file#slug)` links are still recognized on read."
+        },
+        "target_section": {
+          "type": "string",
+          "enum": ["overview", "stack", "architecture", "environment", "pipeline", "conventions"],
+          "description": "Required for promote_to_section, gap_fill_section, and update_section_text. The MEMORY static section to write into. All three ops require mode=full."
+        },
+        "target_decisions": {
+          "type": "boolean",
+          "description": "Optional for promote_to_section. If true, content lands under the qualified `### <Section> Decisions` sub-section instead of the section's main body."
+        },
+        "body_md": {
+          "type": "string",
+          "description": "Required for gap_fill_section. Bullets / prose for the MEMORY static section body."
+        },
+        "decisions_md": {
+          "type": "string",
+          "description": "Optional for gap_fill_section. Content for the `### <Section> Decisions` sub-section."
+        },
+        "extended_body_md": {
+          "type": "string",
+          "description": "Optional for gap_fill_section. Longer-form prose for the MEMORY_EXTENDED mirror H2 section body."
+        },
+        "extended_decisions_md": {
+          "type": "string",
+          "description": "Optional for gap_fill_section. Longer-form prose for the MEMORY_EXTENDED `### <Section> Decisions` sub-section."
+        },
+        "find": {
+          "type": "string",
+          "description": "Required for update_section_text. Substring to locate inside the target Big 6 section body. Strict uniqueness - script errors when 0 or >1 matches. Add surrounding context if needed."
+        },
+        "replace": {
+          "type": "string",
+          "description": "Required for update_section_text. Replacement text. Can be empty string (deletes the matched substring)."
+        },
+        "extended_find": {
+          "type": "string",
+          "description": "Optional for update_section_text. Substring to locate inside the MEMORY_EXTENDED mirror H2 section body. If set, extended_replace must also be set. Same strict-uniqueness rule applies."
+        },
+        "extended_replace": {
+          "type": "string",
+          "description": "Optional for update_section_text. Replacement text for the MEMORY_EXTENDED mirror. Pairs with extended_find."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Required for update_section_text. One-line explanation of WHY this update applies (e.g., 'package.json shows astro@^5.1.0; SESSION confirms migration'). Surfaces in the commit summary so the user has a clear review trail."
+        }
+      },
+      "oneOf": [
+        { "properties": { "op": { "const": "overwrite_section" } }, "required": ["section", "bullets"] },
+        { "properties": { "op": { "const": "lifo_insert" } }, "required": ["section", "bullet"] },
+        { "properties": { "op": { "const": "remove" } }, "required": ["section", "match"] },
+        { "properties": { "op": { "const": "replace" } }, "required": ["section", "match", "bullet"] },
+        { "properties": { "op": { "const": "promote_to_section" } }, "required": ["match", "target_section"] },
+        { "properties": { "op": { "const": "gap_fill_section" } }, "required": ["target_section", "body_md"] },
+        { "properties": { "op": { "const": "update_section_text" } }, "required": ["target_section", "find", "replace", "rationale"] }
+      ]
+    },
+
+    "extended_action": {
+      "type": "object",
+      "required": ["op", "anchor"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["add", "drop", "replace", "replace_text"],
+          "description": "add: new `### sub-section` under `## LIFO`. drop: remove sub-section. replace: rewrite body of existing sub-section. replace_text: substring swap inside a sub-section body."
+        },
+        "anchor": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Lowercase-kebab slug of the sub-section heading under `## LIFO`."
+        },
+        "heading": {
+          "type": "string",
+          "description": "Optional. Pretty sub-section heading text. If absent, derived from anchor (kebab-to-title-case)."
+        },
+        "body_md": {
+          "type": "string",
+          "description": "Markdown body. Required for add and replace. No fenced code - the validator REJECTS a staged body containing a ``` fence (commit aborts pre-write). Summarize the takeaway in prose, the code lives in the source. Aim ~10 lines, over-length only when the entry is genuinely important."
+        },
+        "find": {
+          "type": "string",
+          "description": "Required for replace_text. Substring to locate within the anchor's body. Must match exactly once - commit errors with all location hints when it doesn't."
+        },
+        "replace": {
+          "type": "string",
+          "description": "Required for replace_text. Replacement text. Can be empty string (effectively removes the matched text)."
+        }
+      },
+      "oneOf": [
+        { "properties": { "op": { "const": "add" } }, "required": ["body_md"] },
+        { "properties": { "op": { "const": "replace" } }, "required": ["body_md"] },
+        { "properties": { "op": { "const": "replace_text" } }, "required": ["find", "replace"] },
+        { "properties": { "op": { "const": "drop" } } }
+      ]
+    },
+
+    "backlog_action": {
+      "type": "object",
+      "required": ["op", "section"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["lifo_insert", "remove", "replace"],
+          "description": "lifo_insert: new bullet at top of the section. remove: drop matching bullet. replace: edit an existing bullet (remove + lifo_insert). The updated bullet lands at the top of its section, signaling recent activity. No overwrite_section - both BACKLOG sections are LIFO, never overwritten wholesale."
+        },
+        "section": {
+          "type": "string",
+          "enum": ["features", "ideas"],
+          "description": "Which BACKLOG section to mutate. features=specific, ready-to-implement-when-committed. ideas=everything-else-future (exploratory, refactor candidates, polish notes)."
+        },
+        "bullet": {
+          "type": "string",
+          "description": "Used by lifo_insert and replace. Format: `**<title>.** <description> _(source: user|ai-surfaced)_`. Two physical lines max."
+        },
+        "match": {
+          "type": "string",
+          "description": "Used by remove and replace. Substring (case-insensitive) of the target bullet. Must match exactly one bullet."
+        }
+      },
+      "oneOf": [
+        { "properties": { "op": { "const": "lifo_insert" } }, "required": ["bullet"] },
+        { "properties": { "op": { "const": "remove" } }, "required": ["match"] },
+        { "properties": { "op": { "const": "replace" } }, "required": ["match", "bullet"] }
+      ]
+    }
+  }
+}

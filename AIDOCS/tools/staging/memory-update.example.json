@@ -1,0 +1,73 @@
+{
+  "skill": "memory-update",
+  "mode": "full",
+
+  "actions": [
+    {
+      "op": "lifo_insert",
+      "section": "lifo",
+      "bullet": "<one-line durable observation - architecture shift, sticky rule, decision, pitfall>"
+    },
+    {
+      "op": "lifo_insert",
+      "section": "lifo",
+      "bullet": "<one-line durable observation with extended detail>",
+      "extended_anchor": "observation-slug"
+    },
+    {
+      "op": "lifo_insert",
+      "section": "lifo",
+      "bullet": "**Suggested for auto-memory:** `feedback_<name>.md` - <one-line rationale for why this pattern earns persistence across sessions>"
+    },
+    {
+      "op": "promote_to_section",
+      "match": "<substring of an existing LIFO bullet to promote>",
+      "target_section": "stack"
+    },
+    {
+      "op": "promote_to_section",
+      "match": "<substring of a rationale-shaped LIFO bullet>",
+      "target_section": "architecture",
+      "target_decisions": true
+    },
+    {
+      "op": "gap_fill_section",
+      "target_section": "environment",
+      "body_md": "Local dev runs at `localhost:<PORT>`. Env config lives in `.env` (gitignored).\n\nRequired keys:\n- `<KEY_NAME>` - <purpose>",
+      "decisions_md": "**Why .env vs platform secrets locally:** <one-line rationale>",
+      "extended_body_md": "Longer-form environment narrative for MEMORY_EXTENDED. Setup steps, OS-specific notes, gotchas.",
+      "extended_decisions_md": "Deeper rationale for environment decisions."
+    },
+    {
+      "op": "update_section_text",
+      "target_section": "stack",
+      "find": "<exact substring inside MEMORY.stack to replace>",
+      "replace": "<new text>",
+      "extended_find": "<optional matching substring inside MEMORY_EXTENDED.stack>",
+      "extended_replace": "<optional new text for the EXTENDED mirror>",
+      "rationale": "<one-line decision why this update applies, e.g., package.json shows X@Y; SESSION confirms migration>"
+    }
+  ],
+
+  "extended_actions": [
+    {
+      "op": "add",
+      "anchor": "observation-slug",
+      "heading": "Observation detail",
+      "body_md": "Longer durable narrative. Up to 10 prose lines.\n\n**Why:** <durable rationale>\n**How to apply:** <when this kicks in for a future session>"
+    }
+  ],
+
+  "backlog_actions": [
+    {
+      "op": "lifo_insert",
+      "section": "features",
+      "bullet": "**<Specific feature title.>** <One-line description of the user-facing capability.> _(source: user)_"
+    },
+    {
+      "op": "lifo_insert",
+      "section": "ideas",
+      "bullet": "**<Idea title.>** <One-line description of a refactor, polish note, or what-if direction.> _(source: ai-surfaced)_"
+    }
+  ]
+}
