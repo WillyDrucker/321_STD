@@ -42,19 +42,30 @@ export async function cmdDoctor(index, opts = {}) {
     "Release profile":         checkReleaseProfile(index),
   };
 
-  let total = 0;
+  // Content / prose checks vs structural wiring checks. Splitting the count lets
+  // the summary tell a reader (or a lower-capability driver) that a non-zero exit
+  // is pre-existing prose lint, not broken wiring. Same set as --structural-only.
+  const CONTENT = new Set(["Lint", "Big-6 Decisions", "Migration markers", "Banned prose"]);
+  let structuralCount = 0;
+  let contentCount = 0;
   for (const [name, issues] of Object.entries(buckets)) {
     console.log(`\n[${name}]`);
-    if (issues.length === 0) {
-      console.log("  ok");
-    } else {
-      total += issues.length;
-      for (const issue of issues) console.log(`  - ${issue}`);
+    if (issues.length === 0) { console.log("  ok"); continue; }
+    if (CONTENT.has(name)) contentCount += issues.length; else structuralCount += issues.length;
+    for (const issue of issues) console.log(`  - ${issue}`);
+  }
+  const total = structuralCount + contentCount;
+
+  if (structuralOnly) {
+    console.log(`\ndoctor (structural-only): ${total === 0 ? "all checks passed." : `${total} structural issue(s) found.`}`);
+  } else if (total === 0) {
+    console.log(`\ndoctor: all checks passed.`);
+  } else {
+    console.log(`\ndoctor: ${total} issue(s) found - ${structuralCount} structural, ${contentCount} content/prose.`);
+    if (structuralCount === 0) {
+      console.log(`  Structural wiring is clean. The rest is content/prose lint, often pre-existing user content. Use --structural-only to gate on wiring alone.`);
     }
   }
-
-  const mode = structuralOnly ? " (structural-only)" : "";
-  console.log(`\ndoctor${mode}: ${total === 0 ? "all checks passed." : `${total} issue(s) found.`}`);
   if (total > 0) process.exit(20);
 }
 
