@@ -33,7 +33,7 @@ import { REPO_ROOT } from "../paths.mjs";
 import {
   agentsTemplate, backlogTemplate, changelogTemplate, devAuditStarter,
   gitignoreTemplate, indexTemplate, memoryExtendedTemplate, memoryTemplate,
-  sessionExtendedTemplate, sessionTemplate, skillLocalReadme,
+  sessionExtendedTemplate, sessionTemplate,
 } from "../scaffoldTemplates.mjs";
 
 const VALID_PROFILES = ["standards", "npm-package", "vscode-extension", "cloudflare-worker", "cloudflare-pages", "static-site", "none"];
@@ -81,10 +81,11 @@ export async function cmdInit(_index, args) {
   console.log(`  release_profile: ${profile}${explicitProfile ? "" : " (auto-detected)"}`);
   console.log(`  auto_memory.path: ${autoMemoryPath}`);
 
-  // Engine: always overwrite. Defines how 321_STD operates.
+  // Engine: always overwrite. Defines how 321_STD operates. Skill bodies
+  // (AIDOCS/SKILL) are handled separately below - engine-class, but preserving
+  // any body a project has flagged in customizations[].
   const engineCopies = [
     ".claude/skills/321/SKILL.md",
-    "AIDOCS/SKILL",
     "AIDOCS/tools/memory.mjs",
     "AIDOCS/tools/lib",
     "AIDOCS/tools/staging/SCHEMA.json",
@@ -111,6 +112,30 @@ export async function cmdInit(_index, args) {
     console.log(`  [engine] ${verb}${replacing ? "replace" : "write"}: ${rel}`);
   }
 
+  // Skill bodies: engine-class, but a body flagged in the target's customizations[]
+  // is preserved - a project's customized pipeline (its SKILL_AUTO-PUSH, say) must
+  // survive an engine update. Fresh install has no customizations, so all write.
+  const srcSkillDir = join(REPO_ROOT, "AIDOCS", "SKILL");
+  const preservedSkills = repoIsTarget ? new Set() : await readPreservedSkills(target);
+  if (repoIsTarget) {
+    console.log(`  [skill] in-place: AIDOCS/SKILL`);
+  } else if (existsSync(srcSkillDir)) {
+    for (const file of await readdir(srcSkillDir)) {
+      const rel = `AIDOCS/SKILL/${file}`;
+      const dstPath = join(target, rel);
+      if (preservedSkills.has(rel) && existsSync(dstPath)) {
+        console.log(`  [skill] ${verb}preserve: ${rel} (customized, in customizations[])`);
+        continue;
+      }
+      const replacing = existsSync(dstPath);
+      if (!dryRun) {
+        await mkdir(join(dstPath, ".."), { recursive: true });
+        await cp(join(srcSkillDir, file), dstPath, { force: true });
+      }
+      console.log(`  [skill] ${verb}${replacing ? "replace" : "write"}: ${rel}`);
+    }
+  }
+
   // Scaffold: write if missing (or always if --force). User content protected.
   const scaffolds = [
     { dst: "CLAUDE.md", content: () => readFile(join(REPO_ROOT, "CLAUDE.md"), "utf8") },
@@ -124,9 +149,6 @@ export async function cmdInit(_index, args) {
     { dst: `AIDOCS/${project}_BACKLOG.md`, content: () => backlogTemplate(project) },
     { dst: "CHANGELOG.md", content: () => changelogTemplate(project) },
     { dst: ".gitignore", content: () => gitignoreTemplate() },
-    // Creates AIDOCS/SKILL_LOCAL/ (the override home) and documents it. Written
-    // as a scaffold so the dir survives reinstall and any local overrides with it.
-    { dst: "AIDOCS/SKILL_LOCAL/README.md", content: () => skillLocalReadme() },
   ];
   for (const { dst, content } of scaffolds) {
     const dstPath = join(target, dst);
@@ -262,10 +284,32 @@ function printInstallContract(target, autoMemoryPath) {
   console.log(`  - Scope: writes land only inside ${target} and the per-machine`);
   console.log(`    auto-memory dir (${autoMemoryPath}). Nothing else on the machine is touched.`);
   console.log(`  - Auto-memory is merge-copy: an existing file there is never overwritten.`);
-  console.log(`  - Engine files (the /321 router, AIDOCS/SKILL, AIDOCS/tools) are always replaced.`);
-  console.log(`  - AIDOCS/SKILL_LOCAL is never touched: project-local skill overrides survive reinstall.`);
+  console.log(`  - Engine files (the /321 router, AIDOCS/tools) are always replaced.`);
+  console.log(`  - Skill bodies (AIDOCS/SKILL) are replaced too, EXCEPT any body listed in`);
+  console.log(`    _index.json customizations[] - a project's customized skill is preserved.`);
   console.log(`  - Scaffold files (CLAUDE.md, AGENTS.md, CHANGELOG.md, .gitignore, the project`);
   console.log(`    docs) are kept if they already exist - your content is preserved.`);
   console.log(`  - No network calls and no execution of fetched code. init is local and offline.`);
   console.log(`  Re-run without --dry-run to apply.`);
+}
+
+// Read the target's existing _index.json customizations[] and return the set of
+// skill-body paths (AIDOCS/SKILL/SKILL_*.md, forward-slash) flagged "do not
+// overwrite". A customized skill body is preserved across an engine update; a
+// fresh target (or a malformed index) yields an empty set, so all generics write.
+async function readPreservedSkills(target) {
+  const set = new Set();
+  const idxPath = join(target, "AIDOCS", "_index.json");
+  if (!existsSync(idxPath)) return set;
+  try {
+    const idx = JSON.parse(await readFile(idxPath, "utf8"));
+    const customs = Array.isArray(idx.customizations) ? idx.customizations : [];
+    for (const c of customs) {
+      for (const p of (Array.isArray(c?.applies_to) ? c.applies_to : [])) {
+        const norm = String(p).replace(/^\.\//, "").replace(/\\/g, "/");
+        if (/^AIDOCS\/SKILL\/SKILL_.+\.md$/.test(norm)) set.add(norm);
+      }
+    }
+  } catch { /* malformed index: preserve nothing, init writes fresh generics */ }
+  return set;
 }

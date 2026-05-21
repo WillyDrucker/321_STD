@@ -16,7 +16,7 @@ Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321do
 
 ### What the install writes
 
-The install is local and offline - no network calls, no fetched code executed. `init` writes only inside the target folder plus a merge-copy to the per-machine auto-memory dir (`<home>/.claude/projects/<key>/memory`), which never overwrites a file already there. Engine files (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`) are always replaced, except `AIDOCS/SKILL_LOCAL`, which holds project-local skill overrides and is never touched. Your `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore`, and project docs are kept if they already exist. Preview the exact plan for your folder, writing nothing, by adding `--dry-run`:
+The install is local and offline - no network calls, no fetched code executed. `init` writes only inside the target folder plus a merge-copy to the per-machine auto-memory dir (`<home>/.claude/projects/<key>/memory`), which never overwrites a file already there. Engine files (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`) are always replaced, except a skill body you have listed in `_index.json customizations[]`, which is preserved. Your `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore`, and project docs are kept if they already exist. Preview the exact plan for your folder, writing nothing, by adding `--dry-run`:
 
 ```bash
 node AIDOCS/tools/memory.mjs init <target> --name <NAME> --dry-run

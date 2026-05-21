@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 
 import { lintFile, scanBannedProse } from "../lint.mjs";
-import { filenameToFlag, findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, parseFrontmatter } from "../markdown.mjs";
+import { findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, parseFrontmatter } from "../markdown.mjs";
 import { decisionsHeadingFor, REPO_ROOT, STATIC_SECTIONS } from "../paths.mjs";
 import { loadState, scanReconcileResidue } from "../state.mjs";
 
@@ -31,7 +31,6 @@ export async function cmdDoctor(index, opts = {}) {
     "Paths":                   checkPaths(index),
     "State":                   await checkState(),
     "Skill bodies":            await checkSkills(index),
-    "Local overrides":         await checkLocalOverrides(index),
     "Reconcile residue":       await checkReconcileResidue(index),
     ...(structuralOnly ? {} : {
       "Big-6 Decisions":       await checkBig6Decisions(index),
@@ -128,67 +127,6 @@ async function checkSkills(index) {
     if (!fm.name) issues.push(`${file}: missing frontmatter name`);
     if (!fm.description) issues.push(`${file}: missing frontmatter description`);
     if (!/^\*\*Purpose:\*\*/m.test(content)) issues.push(`${file}: missing **Purpose:** callout under H1`);
-  }
-  return issues;
-}
-
-// Project-local skill overrides (AIDOCS/SKILL_LOCAL) must stay wired: each body
-// parses, an override shares its generic's dispatch key, dispatch points at the
-// local body, and skills.local_additions records it. Catches "added an override
-// but never ran sync" and stale local_additions. No dir -> nothing to check.
-async function checkLocalOverrides(index) {
-  const issues = [];
-  // Default the path so the check engages even on an _index.json predating
-  // skills_local (matches sync). No dir on disk -> nothing to validate.
-  const localRel = index.paths?.skills_local || "./AIDOCS/SKILL_LOCAL";
-  const localDir = resolve(REPO_ROOT, localRel);
-  if (!existsSync(localDir)) return issues;
-
-  const dispatch = index.skills?.dispatch || {};
-  const localAdditions = Array.isArray(index.skills?.local_additions) ? index.skills.local_additions : [];
-
-  // Generic flag -> name, to validate that an override shares its key.
-  const genericByFlag = new Map();
-  const bodiesRel = index.paths?.skills_bodies;
-  if (bodiesRel) {
-    const bodiesDir = resolve(REPO_ROOT, bodiesRel);
-    if (existsSync(bodiesDir)) {
-      for (const file of (await readdir(bodiesDir)).filter(f => /^SKILL_.+\.md$/.test(f))) {
-        const fm = parseFrontmatter(await readFile(join(bodiesDir, file), "utf8"));
-        if (fm.kind !== "reference" && fm.name) genericByFlag.set(filenameToFlag(file), fm.name);
-      }
-    }
-  }
-
-  const seenKeys = new Set();
-  for (const file of (await readdir(localDir)).filter(f => /^SKILL_.+\.md$/.test(f))) {
-    const content = await readFile(join(localDir, file), "utf8");
-    const fm = parseFrontmatter(content);
-    if (fm.kind === "reference") continue;
-    if (!fm.name) { issues.push(`SKILL_LOCAL/${file}: missing frontmatter name`); continue; }
-    if (!fm.description) issues.push(`SKILL_LOCAL/${file}: missing frontmatter description`);
-    if (!/^\*\*Purpose:\*\*/m.test(content)) issues.push(`SKILL_LOCAL/${file}: missing **Purpose:** callout under H1`);
-
-    const genericName = genericByFlag.get(filenameToFlag(file));
-    if (genericName && fm.name !== genericName) {
-      issues.push(`SKILL_LOCAL/${file}: overrides ${filenameToFlag(file)} so name must be "${genericName}", found "${fm.name}" (sync would refuse)`);
-      continue;
-    }
-    seenKeys.add(fm.name);
-
-    const entry = dispatch[fm.name];
-    if (!entry) {
-      issues.push(`SKILL_LOCAL/${file}: not in skills.dispatch - run sync`);
-    } else if (!entry.body || resolve(REPO_ROOT, entry.body) !== resolve(localDir, file)) {
-      issues.push(`SKILL_LOCAL/${file}: dispatch.${fm.name}.body is not the local override (${entry.body || "unset"}) - run sync`);
-    }
-    if (!localAdditions.includes(fm.name)) {
-      issues.push(`SKILL_LOCAL/${file}: ${fm.name} missing from skills.local_additions - run sync`);
-    }
-  }
-
-  for (const key of localAdditions) {
-    if (!seenKeys.has(key)) issues.push(`skills.local_additions lists "${key}" but no SKILL_LOCAL body provides it - run sync`);
   }
   return issues;
 }
@@ -394,6 +332,12 @@ function checkCustomizations(index) {
     if (c.applies_to !== undefined) {
       if (!Array.isArray(c.applies_to) || c.applies_to.some(s => typeof s !== "string")) {
         issues.push(`${prefix}.applies_to must be an array of strings if present`);
+      } else {
+        // applies_to is the preserve signal for a customized skill body (init
+        // skips it on update), so a stale path silently drops that protection.
+        for (const p of c.applies_to) {
+          if (!existsSync(resolve(REPO_ROOT, p))) issues.push(`${prefix}.applies_to path not found: ${p}`);
+        }
       }
     }
     if (c.reason !== undefined && typeof c.reason !== "string") {

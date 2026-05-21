@@ -125,7 +125,7 @@ Otherwise re-detect using the same rules `init` uses and offer the result for co
 
 Show suggestion plus full list. Ask user to confirm or override. Write via direct Edit to `_index.json -> release_profile`.
 
-**Non-standard release?** The profile gives the project the generic `/321 -AutoPush`, whose Step 7 runs that profile's canonical publish / deploy. If this project diverges - a different publish target, extra release gates, a project version invariant, or (common for `vscode-extension`) a manual marketplace upload instead of `vsce publish` - capture it as a project-local override at `AIDOCS/SKILL_LOCAL/SKILL_AUTO-PUSH.md` (frontmatter `name: auto-push`), not an inline edit to the generic body, which `init` overwrites on the next engine update. Run `sync` to repoint, and see `AIDOCS/SKILL_LOCAL/README.md`. The same mechanism overrides any skill whose procedure is irreducibly project-specific. Mention this only when the project's pipeline actually diverges - most projects use the profile default as-is. (A migration needs no mention here: its `/321 -Update` skills-lane builds these overrides automatically from the archived bodies.)
+**Non-standard release?** The profile gives the project the generic `/321 -AutoPush`, whose Step 7 runs that profile's canonical publish / deploy. If this project diverges - a different publish target, extra release gates, a project version invariant, or (common for `vscode-extension`) a manual marketplace upload instead of `vsce publish` - customize the body directly: edit `AIDOCS/SKILL/SKILL_AUTO-PUSH.md` with the project's pipeline and add a `customizations[]` entry in `_index.json` (`applies_to: ["AIDOCS/SKILL/SKILL_AUTO-PUSH.md"]`). That entry is what makes `init` preserve the body on a future engine update instead of overwriting it - without it, the next update reverts the pipeline to generic. The same approach customizes any skill. Mention this only when the project's pipeline actually diverges - most projects use the profile default as-is. (A migration needs no mention here: its `/321 -Update` skills-lane does this automatically from the archived bodies.)
 
 ### Step 4: auto_memory.path
 
@@ -179,8 +179,8 @@ Next:
 - Start working. Drop /321 -SessionUpdate at the first checkpoint.
 - Fill remaining Big 6 by re-running /321 -Setup or /321 -MemoryUpdate -FULL.
 - Edit AIDOCS/<PROJECT>_DEV-AUDIT.md to add your Stack / Commands / Language conventions.
-- Non-standard release pipeline (or any skill needing project-specific steps)? Add a
-  project-local override in AIDOCS/SKILL_LOCAL/ (see its README), not an inline edit.
+- Non-standard release pipeline (or any skill needing project-specific steps)? Edit the
+  body in AIDOCS/SKILL/ and add a customizations[] entry so init preserves it on updates.
 ```
 
 ## Migration path
@@ -203,7 +203,7 @@ Read the borderline list. Judge each by **content, not filename** (open it if un
 node AIDOCS/tools/memory.mjs migrate-archive <target> --name <X> --move <csv> --copy <csv>
 ```
 
-**Read legacy SKILLS content before executing.** If the scan lists `AIDOCS/SKILLS/` (plural), `.claude/skills/321/SKILLS.md`, or any project-customized `SKILL_*.md` bodies, read each in full first - they hold project-specific procedural customizations (custom publish or deploy steps, release invariants, audit rules, embedded Hard Rules) with no other home. The command archives them verbatim. **Capture only here, do NOT distill them into prose** - an executable pipeline scavenged into docs loses its executability. Their fate is decided by the reconcile skills-lane in `/321 -Update` (deferred surface below): an irreducibly project-specific pipeline becomes an executable override in `AIDOCS/SKILL_LOCAL/`, one the generic engine now supersedes folds into `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`. Count them for the loud Step 11 flag.
+**Read legacy SKILLS content before executing.** If the scan lists `AIDOCS/SKILLS/` (plural), `.claude/skills/321/SKILLS.md`, or any project-customized `SKILL_*.md` bodies, read each in full first - they hold project-specific procedural customizations (custom publish or deploy steps, release invariants, audit rules, embedded Hard Rules) with no other home. The command archives them verbatim. **Capture only here, do NOT distill them into prose** - an executable pipeline scavenged into docs loses its executability. Their fate is decided by the reconcile skills-lane in `/321 -Update` (deferred surface below): an irreducibly project-specific pipeline is merged into its `AIDOCS/SKILL/SKILL_*.md` body and flagged in `customizations[]` (so `init` preserves it), one the generic engine now supersedes folds into `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`. Count them for the loud Step 11 flag.
 
 Archive preserves old filenames verbatim - legacy normalization (`DEV-STANDARDS` -> `DEV-AUDIT`, `<OLD>_*` -> `<X>_*`) happens at capture (Step 4 / `migrate-import --old/--new`), not here. A legacy `OldName_*.md` and a fresh `NewName_*.md` can coexist - both move aside so reinstall lands clean, and the archive keeps the legacy file as the migration source.
 
@@ -424,8 +424,8 @@ import is over-split, over-cap, with raw [+] bullets and the source project's
 migration trail intact. /321 -Update reads the gate and runs the distillation
 pass (merge over-split, drop duplicates / dead code, rewrite to descriptive [+]
 bullets, strip the trail, sweep BACKLOG against WDDOCS), then clears the gate.
-It also runs the skills-lane (archived custom /321 bodies -> AIDOCS/SKILL_LOCAL/
-override or fold), the AGENTS / CLAUDE classification lane (archived orchestrator
+It also runs the skills-lane (archived custom /321 bodies -> customized AIDOCS/SKILL/
+body + customizations[] entry, or fold), the AGENTS / CLAUDE classification lane (archived orchestrator
 content -> lean AGENTS / MEMORY / DEV-AUDIT), and the DEV-AUDIT Project-specifics
 dedup. Until then the generic profile applies, so a custom release pipeline is not
 yet in effect. Migration is NOT complete until it runs.
@@ -443,7 +443,7 @@ right. The archive is the safety net - keep it until the project does.
 The migration defers all distillation to the gated `/321 -Update` pass, which reconciles everything it captured. Nothing is a manual follow-up:
 
 - **SESSION / MEMORY / BACKLOG distillation** - the raw import distilled to a steady state. Mechanics in `SKILL_UPDATE.md` (the reconciliation gate) and `SKILL_MEMORY-UPDATE.md` (the record conventions).
-- **Custom `/321` skill bodies** (skills-lane) - each archived custom body becomes an executable override at `AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md` (recorded in `customizations[]`) or folds its genuine deviations into `<X>_DEV-AUDIT.md` / `<X>_MEMORY.md`.
+- **Custom `/321` skill bodies** (skills-lane) - each archived custom body is merged into its `AIDOCS/SKILL/SKILL_<NAME>.md` and flagged in `customizations[]` (so `init` preserves it on updates) or folds its genuine deviations into `<X>_DEV-AUDIT.md` / `<X>_MEMORY.md`.
 - **AGENTS / CLAUDE classification + DEV-AUDIT Project-specifics dedup** - archived orchestrator content folds into a lean `AGENTS.md` / MEMORY / DEV-AUDIT, and the restored DEV-AUDIT Project specifics dedup against the canonical baseline.
 
 Setup only sets the gate. The full per-lane mechanics - the reconciliation principle (canonical scan wins on overlap, contradictions surface, complements keep), the DEV-AUDIT scope guard (only `## Project specifics`, never the baseline), and the AGENTS lean targets - all live in `SKILL_UPDATE.md`.

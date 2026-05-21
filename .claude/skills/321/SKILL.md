@@ -45,7 +45,7 @@ Unknown flag -> list available sub-skills and exit. Do not guess.
 | `-DevAudit` | `AIDOCS/SKILL/SKILL_DEV-AUDIT.md` | default, `-READ`, `-FULL` |
 | `-AutoPush` | `AIDOCS/SKILL/SKILL_AUTO-PUSH.md` | default, `-SKIM`, `-FULL` |
 
-Downstream projects override a skill by dropping a `SKILL_<NAME>.md` into `AIDOCS/SKILL_LOCAL/` (same filename + frontmatter `name` as the generic). `sync` repoints `dispatch.<name>.body` to it and `init` never overwrites that folder, so the override survives engine updates. See `AIDOCS/SKILL_LOCAL/README.md`.
+Downstream projects customize a skill by editing its `AIDOCS/SKILL/SKILL_<NAME>.md` body and recording it in `_index.json customizations[]` (with `applies_to` naming the body). That entry tells `init` to preserve the customized body on an engine update instead of overwriting it.
 
 ## Rules (router operation)
 

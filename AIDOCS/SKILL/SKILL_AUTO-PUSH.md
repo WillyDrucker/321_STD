@@ -9,7 +9,7 @@ description: Project release pipeline. Delegates to SessionUpdate, runs pre-flig
 
 **Invocation:** end of a working session when work is ship-ready. Use `-SKIM` or `-FULL` to control Step 1 (SessionUpdate).
 
-**Project-specific deploy.** Step 7 is the only step that varies meaningfully. `AIDOCS/_index.json -> release_profile` names the shape (doctor validates). Supported: `standards` (GitHub release only), `npm-package`, `vscode-extension`, `cloudflare-worker`, `cloudflare-pages`, `static-site`, `none`. Step 7 below names the canonical command per profile. It is also the one irreversible, outward-facing step (it publishes or deploys), so a project whose publish or deploy diverges from the profile default must capture that as a project-local override, not lean on the generic command. Drop a `SKILL_AUTO-PUSH.md` into `AIDOCS/SKILL_LOCAL/` (`name: auto-push`, same filename), run `sync`, and the router loads your body instead - it survives engine reinstall, where an inline edit to this generic body would not. See `AIDOCS/SKILL_LOCAL/README.md`.
+**Project-specific deploy.** Step 7 is the only step that varies meaningfully. `AIDOCS/_index.json -> release_profile` names the shape (doctor validates). Supported: `standards` (GitHub release only), `npm-package`, `vscode-extension`, `cloudflare-worker`, `cloudflare-pages`, `static-site`, `none`. Step 7 below names the canonical command per profile. It is also the one irreversible, outward-facing step (it publishes or deploys), so a project whose publish or deploy diverges from the profile default must customize this body, not lean on the generic command. To do that safely: edit `AIDOCS/SKILL/SKILL_AUTO-PUSH.md` with the project's pipeline and add a `customizations[]` entry in `_index.json` whose `applies_to` names that body. That entry is what tells `init` to preserve the body on an engine update instead of overwriting it - without it, the next update reverts the pipeline to generic.
 
 ## You orchestrate the pipeline
 
@@ -169,7 +169,7 @@ Create a GitHub release for the tag with release notes drawn from the new CHANGE
 | `static-site` | platform-specific (Astro, Next, etc.) - project-local body specifies |
 | `none` | no deploy step |
 
-A project whose release flow needs more than the profile command (non-standard publish, extra gates, a project version invariant) keeps its full pipeline as a local override at `AIDOCS/SKILL_LOCAL/SKILL_AUTO-PUSH.md` rather than editing this generic body, which a reinstall overwrites. `sync` repoints the router to it. See `AIDOCS/SKILL_LOCAL/README.md`.
+A project whose release flow needs more than the profile command (non-standard publish, extra gates, a project version invariant) edits this body in place at `AIDOCS/SKILL/SKILL_AUTO-PUSH.md` and records it in `_index.json customizations[]`. That entry preserves the customized body across engine updates - `init` skips a flagged body instead of overwriting it.
 
 ## Step 8: Verify + rollover
 
