@@ -543,15 +543,25 @@ Migration is NOT complete until it runs.
 
 Deferred manual follow-ups (outside the /321 -Update lane):
 
-1. AGENTS.md / CLAUDE.md classification. Archived AGENTS.md (<N> bytes, <M> sections)
-   and CLAUDE.md (<bytes> bytes, substantive=<Y/N>) hold orchestrator-level content
-   Setup did NOT auto-classify. Open them side-by-side with the new AGENTS.md and route
-   each substantive block:
+1. AGENTS.md / CLAUDE.md classification (keep it an index, aim for ~50 lines).
+   Archived AGENTS.md (<N> bytes, <M> sections) and CLAUDE.md (<bytes> bytes,
+   substantive=<Y/N>) hold orchestrator-level content Setup did NOT auto-classify.
+   AGENTS.md is an index that orients a cold start in under a minute and points into
+   deeper docs, NOT a container. The canonical skeleton init wrote is ~50 lines, so the
+   filled file aims for ~50 lines, with 80 a hard ceiling you do not cross. Open the archived files side-by-side with the
+   new AGENTS.md and route each substantive block:
    - Already captured by Steps 5/6? Skip.
-   - Orchestrator-level fact (cold-start hint, project quirk)? -> new AGENTS.md > Project Specifics (lean).
+   - Orchestrator-level fact (cold-start hint, project quirk)? -> new AGENTS.md > Project
+     Specifics, as a one-line pointer. No routed block over ~10 lines - if it needs more,
+     it belongs in a lower doc and AGENTS.md keeps only the pointer to it.
    - Custom Permissions config? -> new AGENTS.md > Permissions.
    - Project-specific code rule / language convention? -> <X>_DEV-AUDIT.md > Project specifics.
    - History the skills missed? -> /321 -SessionUpdate or /321 -MemoryUpdate -FULL.
+   Never drop or bloat the canonical skeleton - the Purpose header, the Cold-start load
+   order (the read order), and the Layout section (the AIDOCS/_index.json pointer) are the
+   index spine. Judge each section for leanness, defaulting to a pointer. Aim for ~50, and
+   past ~80 lines total or any block past ~10 you over-imported: push the weakest blocks
+   down to DEV-AUDIT / MEMORY until it fits.
 2. DEV-AUDIT Project specifics dedup. Walk the restored Project specifics against the
    canonical baseline using the reconciliation principle (deferred surface below).
 
@@ -584,7 +594,7 @@ For each sub-section Step 7 inserted into DEV-AUDIT Project specifics:
 - Restates something already in MEMORY (Architecture Decisions, Conventions) -> DROP (MEMORY is the home for project-anchored rules).
 - Contradicts canonical -> SURFACE for review, do not auto-resolve.
 
-For AGENTS.md: verify every preserved feedback file in auto-memory has a Hard Rules pointer (Step 7 layer 8 should have added it), alphabetize the block, and remove pointers for files no longer present. Apply the lean test to any restored Project Specifics block - if a cold-start session would not be confused without it in the first 60 seconds, move it down the chain (DEV-AUDIT Project specifics for code rules, MEMORY Conventions for project conventions).
+For AGENTS.md: verify every preserved feedback file in auto-memory has a Hard Rules pointer (Step 7 layer 8 should have added it), alphabetize the block, and remove pointers for files no longer present. Aim to hold the whole file at ~50 lines (the canonical skeleton size), 80 a hard ceiling, with no single routed block over ~10 lines - prefer a one-line pointer over an inlined block. Apply the lean test to any restored Project Specifics block - if a cold-start session would not be confused without it in the first 60 seconds, move it down the chain (DEV-AUDIT Project specifics for code rules, MEMORY Conventions for project conventions). The Purpose header, Cold-start load order, and Layout /_index.json pointer stay - they are the index spine.
 
 ## Rules (skill operation)
 
