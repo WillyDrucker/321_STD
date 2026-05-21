@@ -290,6 +290,9 @@ AIDOCS/tools/staging/.lock
 # Persistent script state (machine-local). Auto-bootstrapped on first run.
 AIDOCS/tools/state.json
 
+# Local-only AI session handoff (working state, not committed project content)
+WDDOCS/SESSION_HANDOFF.md
+
 # Node (if tooling grows)
 node_modules/
 

@@ -19,17 +19,10 @@ export function lintFile(key, content, index) {
     }
   }
 
-  // Gate: em-dash + semicolon scan in prose. Both banned per auto-memory
-  // feedback_no_em_dashes. Inline code spans and fenced blocks excluded.
-  let inFence = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^```/.test(line)) { inFence = !inFence; continue; }
-    if (inFence) continue;
-    const stripped = line.replace(/`[^`]*`/g, "");
-    if (stripped.includes("—")) issues.push(`line ${i + 1}: em dash in prose`);
-    if (stripped.includes(";")) issues.push(`line ${i + 1}: semicolon in prose`);
-  }
+  // Gate: em-dash + semicolon scan in prose, via the canonical scanBannedProse
+  // below. doctor's banned-prose check calls the same function, so the AIDOCS
+  // files and the skill / doc surface apply the rule the same way.
+  for (const v of scanBannedProse(content)) issues.push(`line ${v.line}: ${v.char} in prose`);
 
   // Gate: local anchor links resolve to a heading in the same file.
   // Cross-file anchors warn but don't fail - commit's orphan check covers those.
@@ -147,4 +140,29 @@ function countProseLines(sectionLines) {
     count++;
   }
   return count;
+}
+
+// Canonical banned-character prose scan. Em dashes and semicolons are banned in
+// authored prose (auto-memory feedback_no_em_dashes). Skips fenced code blocks,
+// indented code (4+ leading spaces), and inline code spans. Returns one entry
+// per hit ({ line, char, snippet }). Single home for the rule so `lint` (AIDOCS
+// files) and `doctor` (skill bodies / docs / WDDOCS) scan identically.
+export function scanBannedProse(content) {
+  const out = [];
+  const lines = content.split("\n");
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^ {0,3}```/.test(line)) { inFence = !inFence; continue; }
+    if (inFence) continue;
+    if (/^ {4,}\S/.test(line)) continue;
+    // Mask inline code spans with same-length blanks, so a hit's index still
+    // lines up with the original line for the reported snippet.
+    const masked = line.replace(/`[^`]*`/g, m => " ".repeat(m.length));
+    for (const [char, glyph] of [["em dash", "—"], ["semicolon", ";"]]) {
+      const idx = masked.indexOf(glyph);
+      if (idx !== -1) out.push({ line: i + 1, char, snippet: line.slice(Math.max(0, idx - 20), idx + 20) });
+    }
+  }
+  return out;
 }

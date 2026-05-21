@@ -25,12 +25,12 @@ import {
   applyExtendedAction, findOrphanLinks, gapFillSectionExtended,
 } from "../mutatorsExtended.mjs";
 import { LOCK_PATH, STAGING_DIR, VALID_SKILLS } from "../paths.mjs";
+import { runPairedPrune, runStandalonePrune } from "../pruneRunners.mjs";
 import {
   loadStaging, loadState, nowIsoUtc, resolveIndexFile,
   saveState, stagingPath,
 } from "../state.mjs";
 import { validateStaging } from "../validator.mjs";
-import { runPairedPrune, runStandalonePrune } from "./prune.mjs";
 
 export async function cmdCommit(index, args) {
   const opts = parseFlags(args, ["skill", "preview", "no-prune"]);

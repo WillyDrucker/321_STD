@@ -11,7 +11,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
-import { lintFile } from "../lint.mjs";
+import { lintFile, scanBannedProse } from "../lint.mjs";
 import { findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, parseFrontmatter } from "../markdown.mjs";
 import { decisionsHeadingFor, REPO_ROOT, STATIC_SECTIONS } from "../paths.mjs";
 import { loadState, scanReconcileResidue } from "../state.mjs";
@@ -260,38 +260,12 @@ async function checkBannedProse(index) {
   for (const path of targets) {
     if (!existsSync(path)) continue;
     const content = await readFile(path, "utf8");
-    const violations = scanProseForBanned(content);
+    const violations = scanBannedProse(content);
     for (const v of violations) {
       issues.push(`${path.split(/[\\/]/).slice(-2).join("/")}:${v.line} ${v.char} in prose: "${v.snippet}"`);
     }
   }
   return issues;
-}
-
-function scanProseForBanned(content) {
-  // Walk lines, skip fenced code blocks, skip indented code (4+ leading spaces)
-  // and inline code spans (between backticks). Report em dashes and semicolons
-  // in remaining prose.
-  const out = [];
-  const lines = content.split("\n");
-  let inFence = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^```/.test(line)) { inFence = !inFence; continue; }
-    if (inFence) continue;
-    if (/^ {4,}\S/.test(line)) continue;
-
-    const stripped = line.replace(/`[^`]*`/g, "");
-    const emIdx = stripped.indexOf("—");
-    if (emIdx !== -1) {
-      out.push({ line: i + 1, char: "em dash", snippet: line.slice(Math.max(0, emIdx - 20), emIdx + 20) });
-    }
-    const semiIdx = stripped.indexOf(";");
-    if (semiIdx !== -1) {
-      out.push({ line: i + 1, char: "semicolon", snippet: line.slice(Math.max(0, semiIdx - 20), semiIdx + 20) });
-    }
-  }
-  return out;
 }
 
 async function checkRouterQuickRef(index) {

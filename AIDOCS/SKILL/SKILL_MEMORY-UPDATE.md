@@ -66,9 +66,9 @@ A section that doesn't meet its threshold is "empty" for gap-fill purposes.
 
 ## Structural rules
 
-- **LIFO bullets: 2 physical lines max.** A bullet with EXTENDED detail leads with the `[+]` marker (`- [+] <descriptive headline>`) and NO link - the headline text must match its `### heading` in `<PROJECT>_MEMORY_EXTENDED.md` (the engine derives the anchor by slugify). A bullet with no EXTENDED detail is plain `- <text>`.
+- **LIFO bullets: 2 physical lines.** A bullet with EXTENDED detail leads with the `[+]` marker (`- [+] <headline>`) and NO link - the headline must match its `### heading` in `<PROJECT>_MEMORY_EXTENDED.md` (the engine derives the anchor by slugify). A bullet with no EXTENDED detail is plain `- <text>`.
 - **Big 6 static sections** are mechanically protected. Only `promote_to_section`, `gap_fill_section`, and `update_section_text` write them, all requiring `-FULL`. Every FILLED Big 6 section keeps a `### <Section> Decisions` sub-section (the why), even when the answer is "(none yet)". doctor flags a filled section that lacks one.
-- **EXTENDED `### sub-section`s:** identify the PAINPOINT, not the process - a thing fought multiple times to fix earns a note, standard procedure does not (the code shows the what, EXTENDED carries the why). NO code snippets - the validator REJECTS a `` ``` `` fence in any EXTENDED body, so commit aborts pre-write. Summarize the takeaway in prose, the code lives in the source. Aim ~10 lines, over-length only when genuinely important. Each entry carries a `Decision:` line (the resolution) when there is one. Commit simulation also enforces forward orphan checks.
+- **EXTENDED `### sub-section`s:** identify the PAINPOINT, not the process - a thing fought multiple times to fix earns a note, standard procedure does not. NO code snippets - the validator REJECTS a `` ``` `` fence in any EXTENDED body (commit aborts pre-write), so summarize the takeaway in prose, the code lives in the source. Aim ~10 lines, over-length only when genuinely important. Each entry carries a `Decision:` line (the resolution) when there is one. Commit simulation enforces forward orphan checks.
 - File size limits live in `_index.json -> sizes.memory` / `sizes.memory_extended` / `sizes.backlog` as `cap` + `prune_to`. **Auto-prune fires after every commit** when memory, memory_extended, or backlog exceeds its `cap`. Memory pair runs paired (bullets + anchored sub-sections together), backlog runs standalone. Fresh-content protection skips this commit's just-inserted bullets / sub-sections so new entries never archive on landing.
 
 ## Roles (AI vs script)
@@ -86,7 +86,7 @@ Always invoke `/321 -SessionUpdate` first (with pass-through `-FULL` if set). En
 
 If SessionUpdate fails: chain stops, MemoryUpdate reports the failure and exits. User fixes, re-invokes.
 
-**Migration exception:** when Setup migration capture (`SKILL_SETUP.md` Step 6) drives this skill, skip this Step 1. Setup Step 5 already captured SESSION in the same migration run, so re-invoking SessionUpdate here would re-walk the conversation and demote the just-written Current State. In that path this lane also appends its ops to the migrate-import staging Setup Step 6 Part A produced, rather than building a fresh staging file.
+**Migration exception:** when Setup migration capture (`SKILL_SETUP.md`) drives this skill, skip this Step 1. Setup's SESSION capture already ran in the same migration run, so re-invoking SessionUpdate here would re-walk the conversation and demote the just-written Current State. In that path this lane also appends its ops to the migrate-import staging Setup's memory-capture step produced, rather than building a fresh staging file.
 
 ## Step 2: Detect mode + bootstrap state
 

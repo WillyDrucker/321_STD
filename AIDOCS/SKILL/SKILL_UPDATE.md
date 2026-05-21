@@ -5,7 +5,7 @@ description: Optimized chain of session-track + memory-track in one shared-conte
 
 # /321 -Update
 
-**Purpose:** Update both tracks in a single pass when the session moved both. Shares the conversation walk, context gather, and mode detection across the two lanes (vs naive sub-skill re-invocation which would pay 2x reads). Sub-skill specs: `SKILL_SESSION-UPDATE.md` (session lane) and `SKILL_MEMORY-UPDATE.md` (memory lane + BACKLOG). Engine spec: `AIDOCS/tools/staging/SCHEMA.json` + `AIDOCS/tools/lib/README.md`.
+**Purpose:** Update both tracks in a single pass when the session moved both. Shares the conversation walk, context gather, and mode detection across the two lanes (vs naive sub-skill re-invocation which would pay 2x reads). This is the one intentional composition skill in the `/321` set: it reads the two lane bodies for their per-item allocation rules rather than restating them. Lane specs: `SKILL_SESSION-UPDATE.md` (session) and `SKILL_MEMORY-UPDATE.md` (memory + BACKLOG). Engine spec: `AIDOCS/tools/staging/SCHEMA.json` + `AIDOCS/tools/lib/README.md`.
 
 **When to use which:**
 
@@ -98,8 +98,8 @@ In `-FULL`, also gather project context (`package.json`, `_index.json`, framewor
 
 Walk the conversation since `min(session_update.last_committed_at, memory_update.last_committed_at)` (whichever is older). If either watermark is null, walk the full conversation - that lane is bootstrapping. Classify each finding per the sub-skill allocation tables:
 
-- Session lane: see `SKILL_SESSION-UPDATE.md` Step 2.
-- Memory lane (including BACKLOG): see `SKILL_MEMORY-UPDATE.md` Step 4.
+- Session lane: see the allocation step in `SKILL_SESSION-UPDATE.md`.
+- Memory lane (including BACKLOG): see the routing step in `SKILL_MEMORY-UPDATE.md`.
 
 A finding can produce entries in both lanes when the rules call for it (rare). Findings matching neither lane drop here. Code-applicable patterns are DevAudit's lane.
 

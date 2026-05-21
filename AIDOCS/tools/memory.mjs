@@ -5,7 +5,7 @@
 // diff/lint and the long commands (sync, commit, prune, archive, doctor). This
 // file is intentionally small so the CLI surface is visible in one read.
 //
-// Subcommands: prune / lint / archive / sync / validate / commit / clear / state / doctor / init / migrate-import / help.
+// Subcommands: prune / lint / archive / sync / validate / commit / clear / state / doctor / init / migrate-archive / migrate-import / migrate-restore / help.
 // Routine writes go through the staging pipeline (validate -> commit) so the
 // static-section protection rules apply. The legacy `add` subcommand was
 // removed because it bypassed staging.
