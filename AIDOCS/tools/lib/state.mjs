@@ -7,6 +7,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 
 import { err } from "./cli.mjs";
+import { findLifoResidue } from "./markdown.mjs";
 import { INDEX_PATH, REPO_ROOT, STAGING_DIR, STATE_PATH } from "./paths.mjs";
 
 export async function loadIndex() {
@@ -89,6 +90,24 @@ export function bootstrapState() {
 
 export async function saveState(state) {
   await writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+// Scan the MAIN memory / session LIFO for migrate-import residue (a surviving
+// `{#anchor}` or leading date - see findLifoResidue). Returns
+// [{ key, line, kind, snippet }]. Shared by doctor (reports it as a structural
+// bucket) and the clear-reconcile gate (refuses to close on a no-op reconcile).
+// Only meaningful once reconcile_pending is false - callers own that gate check.
+export async function scanLifoResidue(index) {
+  const out = [];
+  for (const key of ["memory", "session"]) {
+    const rel = index?.files?.[key];
+    if (!rel) continue;
+    const abs = resolve(REPO_ROOT, rel);
+    if (!existsSync(abs)) continue;
+    const lines = (await readFile(abs, "utf8")).split("\n");
+    for (const hit of findLifoResidue(lines)) out.push({ key, ...hit });
+  }
+  return out;
 }
 
 export function nowIsoUtc() {

@@ -14,7 +14,7 @@ import process from "node:process";
 import { lintFile } from "../lint.mjs";
 import { findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, parseFrontmatter } from "../markdown.mjs";
 import { decisionsHeadingFor, REPO_ROOT, STATIC_SECTIONS } from "../paths.mjs";
-import { loadState } from "../state.mjs";
+import { loadState, scanLifoResidue } from "../state.mjs";
 
 // `structuralOnly` runs only the wiring checks (paths, state, skill bodies,
 // auto-memory pointers, router quick-ref, manifests) and skips the content /
@@ -31,6 +31,7 @@ export async function cmdDoctor(index, opts = {}) {
     "Paths":                   checkPaths(index),
     "State":                   await checkState(),
     "Skill bodies":            await checkSkills(index),
+    "Reconcile residue":       await checkReconcileResidue(index),
     ...(structuralOnly ? {} : {
       "Big-6 Decisions":       await checkBig6Decisions(index),
       "Migration markers":     await checkMigrationMarkers(index),
@@ -65,6 +66,10 @@ export async function cmdDoctor(index, opts = {}) {
     if (structuralCount === 0) {
       console.log(`  Structural wiring is clean. The rest is content/prose lint, often pre-existing user content. Use --structural-only to gate on wiring alone.`);
     }
+  }
+  const reconcileResidue = buckets["Reconcile residue"]?.length || 0;
+  if (reconcileResidue > 0) {
+    console.log(`  Reconcile incomplete: ${reconcileResidue} LIFO bullet(s) still carry migrate-import anchors or dates. The gate is closed but distillation did not run - re-run /321 -Update to distill, then the residue clears.`);
   }
   if (total > 0) process.exit(20);
 }
@@ -177,6 +182,25 @@ async function checkMigrationMarkers(index) {
     if (hits.length) {
       issues.push(`${key}: ${hits.length} residual migrate-import marker(s) at line(s) ${hits.join(", ")} - reconciliation should summarize each to one-line prose`);
     }
+  }
+  return issues;
+}
+
+// LIFO bullets in the MAIN memory / session files must be distilled prose once the
+// reconcile gate clears. A surviving migrate-import `{#anchor}` or leading date
+// means -Update closed the gate without distilling - the no-op reconcile a
+// lower-capability driver falls into (clears the gate, leaves the raw capture).
+// Expected while reconcile_pending is set (the capture window), so gate on it,
+// same lifecycle as checkMigrationMarkers. Tallies as structural, not content:
+// a real "reconcile did not run" signal must suppress the "wiring is clean"
+// all-clear, not hide among dismissible WDDOCS prose lint.
+async function checkReconcileResidue(index) {
+  const issues = [];
+  let state;
+  try { state = await loadState(); } catch { return issues; }
+  if (state?.reconcile_pending === true) return issues;
+  for (const hit of await scanLifoResidue(index)) {
+    issues.push(`${hit.key}: LIFO bullet at line ${hit.line} still carries a migrate-import ${hit.kind}, distill to plain prose: "${hit.snippet}"`);
   }
   return issues;
 }

@@ -155,6 +155,31 @@ export function findLifoSubsectionBounds(lines, anchor) {
   return null;
 }
 
+// Scan the `## LIFO` bullets of a MAIN memory / session file for migrate-import
+// residue. A clean reconciled bullet is plain prose: pairing to the EXTENDED file
+// is by slugified headline (see bulletExtendedAnchor), not an explicit `{#anchor}`,
+// and dates are banned in memory / session (LIFO order carries the time signal).
+// So a surviving `{#anchor}`, or a leading `YYYY-MM-DD`, is raw capture the
+// reconcile pass failed to distill. Returns [{ line, kind, snippet }], one entry
+// per bullet (anchor takes precedence); empty when distilled. Pure - callers own
+// I/O and the reconcile_pending gate.
+export function findLifoResidue(lines) {
+  const bounds = findSectionBounds(lines, "lifo");
+  if (!bounds) return [];
+  const out = [];
+  for (let i = bounds.startIdx + 1; i < bounds.endIdx; i++) {
+    const line = lines[i];
+    if (!/^\s*-\s+/.test(line)) continue;
+    const snippet = line.trim().slice(0, 70);
+    if (/\{#[^}]+\}/.test(line)) {
+      out.push({ line: i + 1, kind: "anchor", snippet });
+    } else if (/^\s*-\s+(?:\[\+\]\s+)?\d{4}-\d{2}-\d{2}\b/.test(line)) {
+      out.push({ line: i + 1, kind: "date", snippet });
+    }
+  }
+  return out;
+}
+
 // Find `### <decisionsHeading>` sub-section inside the named static section. Used by
 // promote_to_section when target_decisions is true and by gap_fill_section
 // when decisions_md is provided. update_section_text edits section bodies
