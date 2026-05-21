@@ -21,7 +21,9 @@ import { cmdArchive } from "./lib/commands/archive.mjs";
 import { cmdCommit } from "./lib/commands/commit.mjs";
 import { cmdDoctor } from "./lib/commands/doctor.mjs";
 import { cmdInit } from "./lib/commands/init.mjs";
+import { cmdMigrateArchive } from "./lib/commands/migrate-archive.mjs";
 import { cmdMigrateImport } from "./lib/commands/migrate-import.mjs";
+import { cmdMigrateRestore } from "./lib/commands/migrate-restore.mjs";
 import { cmdPrune } from "./lib/commands/prune.mjs";
 import { cmdSync } from "./lib/commands/sync.mjs";
 import { lintFile } from "./lib/lint.mjs";
@@ -32,7 +34,7 @@ import {
 } from "./lib/state.mjs";
 import { validateStaging } from "./lib/validator.mjs";
 
-const COMMANDS = ["prune", "lint", "archive", "sync", "validate", "commit", "clear", "state", "doctor", "init", "migrate-import", "help"];
+const COMMANDS = ["prune", "lint", "archive", "sync", "validate", "commit", "clear", "state", "doctor", "init", "migrate-archive", "migrate-import", "migrate-restore", "help"];
 
 async function main() {
   const [, , cmd, ...args] = process.argv;
@@ -54,10 +56,25 @@ async function main() {
     return;
   }
 
+  // migrate-archive moves project content to SETUP_ARCHIVE before init runs, so it
+  // globs the tree and runs pre-index like init.
+  if (cmd === "migrate-archive") {
+    await cmdMigrateArchive(args);
+    return;
+  }
+
   // migrate-import operates on a --from path and writes a staging file. It does
   // not read _index.json, so it runs pre-index like init.
   if (cmd === "migrate-import") {
     await cmdMigrateImport(args);
+    return;
+  }
+
+  // migrate-restore moves user content back out of SETUP_ARCHIVE after init has
+  // reinstalled the engine. It globs the archive dir, not _index.json, so it runs
+  // pre-index like its archive sibling.
+  if (cmd === "migrate-restore") {
+    await cmdMigrateRestore(args);
     return;
   }
 
@@ -277,6 +294,13 @@ Commands:
             Profiles: standards | npm-package | vscode-extension |
                       cloudflare-worker | cloudflare-pages | static-site | none
 
+  migrate-archive  Step 1 of a Setup migration: move project content to
+            AIDOCS/<X>_SETUP_ARCHIVE/ (move, never delete). Known 321-shape paths and
+            clearly-stale swept AI-state move automatically. Borderline swept docs
+            are reported for the AI to adjudicate (--move / --copy, default leave).
+            Pre-index (runs before init).
+            <target> --name <X> [--scan] [--move <csv>] [--copy <csv>]
+
   migrate-import  Lossless structural import of an archived EXTENDED file into a
             staging file. One ### sub-section per bold-lead entry, plus a matching
             anchored MAIN bullet. Migration capture step - distillation deferred
@@ -286,6 +310,13 @@ Commands:
             --append merges into an existing lane staging (anchor-deduped) instead
             of refusing - used to pile swept scavenge docs onto the 321 import. A
             doc with no headings / bold-leads imports as a single entry.
+
+  migrate-restore  Step 7 of a Setup migration: move user-owned content back out of
+            AIDOCS/<X>_SETUP_ARCHIVE/ after init reinstalls the engine. WDDOCS verbatim,
+            the *_ARCHIVE history dirs, and ENV (renaming <OLD>_ENV_* on a project
+            rename). Move, so the archive shrinks as content returns. The judgment /
+            network layers stay in the skill. Pre-index.
+            <target> --name <X> [--old <OLD_NAME>]
 
   help      Print this message.
 

@@ -185,58 +185,23 @@ The target already holds content worth preserving. Two shapes hit this path: a *
 
 ### Step 1: Archive existing content
 
-Create `AIDOCS/<X>_SETUP_ARCHIVE/` in the target. **Move** (not copy) the project-owned content into it. Engine files stay put - they get refreshed in migration Step 2.
+`migrate-archive` does the deterministic find + move - it is what keeps the path lists and sweep patterns out of this prose. It moves (never deletes) project-owned content into `AIDOCS/<X>_SETUP_ARCHIVE/` in two tiers. **Known 321-shape paths** move automatically: the `<X>_MEMORY/SESSION/BACKLOG/DEV-AUDIT` files (and EXTENDED), the `_MEMORY/SESSION/BACKLOG_ARCHIVE/` dirs, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, `.gitignore`, `AIDOCS/_index.json`, `AIDOCS/ENV/`, `WDDOCS/`, plus legacy `AIDOCS/SKILLS/` and `.claude/skills/321/SKILLS.md`. **Clearly-stale swept AI-state** (handoff / rename / `_dump/` docs anywhere in the tree) moves automatically too. **Borderline swept docs** (a loose memory / notes file that might be live user content) are reported for you to adjudicate. Engine dirs (`AIDOCS/tools`, `AIDOCS/SKILL`, `automemory`), source, config, build artifacts, and `README.md` are never touched. Nothing is deleted - the archive is the reversible safety net. `<X>` was resolved in Step 0.
 
-**Archive these paths** (move from source -> `AIDOCS/<X>_SETUP_ARCHIVE/<same-relative-path>`):
+**Scan first, adjudicate, then execute:**
 
-- `AGENTS.md`
-- `CLAUDE.md`
-- `CHANGELOG.md`
-- `.gitignore`
-- `AIDOCS/_index.json`
-- `AIDOCS/<X>_MEMORY.md`, `AIDOCS/<X>_MEMORY_EXTENDED.md`
-- `AIDOCS/<X>_SESSION.md`, `AIDOCS/<X>_SESSION_EXTENDED.md`
-- `AIDOCS/<X>_BACKLOG.md`
-- `AIDOCS/<X>_DEV-AUDIT.md` OR `AIDOCS/<X>_DEV-STANDARDS.md` (legacy name)
-- `AIDOCS/<X>_MEMORY_ARCHIVE/`, `AIDOCS/<X>_SESSION_ARCHIVE/`, `AIDOCS/<X>_BACKLOG_ARCHIVE/`
-- `AIDOCS/ENV/`
-- `WDDOCS/`
+```bash
+node AIDOCS/tools/memory.mjs migrate-archive <target> --name <X> --scan
+```
 
-`<X>` was resolved in Step 0 (basename wins, identity gate already fired). Archive preserves old names verbatim - legacy name normalization happens in Step 4 (`migrate-import --old/--new` for the EXTENDED files, inline rename for the rest).
+Read the borderline list. Judge each by **content, not filename** (open it if unsure): clear AI working state -> `--move`, possibly-live user content -> `--copy` (the original stays in place), nothing worth keeping -> leave it (the default). Then execute with your decisions (omit both flags to leave every borderline):
 
-**Dual-pattern AIDOCS state** (legacy `OldName_*.md` alongside fresh `NewName_*.md` from a prior install): archive the legacy files (the migration source - they hold the content). The fresh `NewName_*.md` scaffolds only need to move aside so the reinstall in migration Step 2 lands cleanly. Delete any that are byte-identical to the init template - they are regenerable, hold nothing to preserve, and archiving empty scaffolds just clutters the safety net by reading as migrated content when they are not. Archive a `NewName_*` scaffold only when it carries real content (the prior install was worked on before the re-run). After reinstall, only the fresh `<X>_*.md` scaffolds remain at the project root.
+```bash
+node AIDOCS/tools/memory.mjs migrate-archive <target> --name <X> --move <csv> --copy <csv>
+```
 
-**Do NOT archive** (these are 321_STD engine, replaced wholesale in migration Step 2):
+**Read legacy SKILLS content before executing.** If the scan lists `AIDOCS/SKILLS/` (plural) or `.claude/skills/321/SKILLS.md`, read each `SKILLS_<NAME>/<X>_SKILLS_<NAME>.md` in full first - they hold project-specific procedural customizations (custom publish steps, audit rules, embedded Hard Rules) with no other home. The command archives them. You scavenge that content in Step 4 (procedural overrides route to `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`).
 
-- `AIDOCS/SKILL/` (or `AIDOCS/SKILLS/` for legacy projects - delete after archive note below)
-- `AIDOCS/tools/`
-- `.claude/skills/321/SKILL.md` (or `SKILLS.md` for legacy)
-- `AIDOCS/automemory/` (template - new install merge-copies. User's per-machine rules elsewhere preserved)
-
-**Do NOT archive and never touch** (user owns these, 321_STD has no opinion):
-
-- `README.md` (project's README - we ship no template, never replace)
-- Any source code directories (`src/`, `lib/`, etc.)
-- Build / dependency artifacts (`node_modules/`, `dist/`, `.next/`, etc.)
-- Project config (`package.json`, `tsconfig.json`, `wrangler.toml`, `astro.config.*`, etc.)
-
-**Artifact discovery sweep (runs on every migration, both shapes).** The known-path list above covers a canonical 321 layout. Prior AI state also lands off that layout - a `TEMP/` legacy dump, a `.claude/` note, loose memory files - in 321-shaped and standard projects alike, so this sweep ALWAYS runs alongside the known-path archive. Scan the tree and route each find by confidence. Judgment work - the lists are "including but not limited to," judge by content, not filename alone.
-
-Where to look (scan the whole tree, exclude build noise):
-
-- **Scope:** every `.md` file in the tree (plus bare config dotfiles like `.cursorrules`), EXCLUDING dependency / build / VCS dirs (`node_modules/`, `.git/`, `dist/`, `build/`, `.next/`, `.cxx/`, `.gradle/`, `Pods/`, `ios/`, `android/build/`). The `.md` restriction keeps source and build files out - a `SessionTypeSelector.tsx` or a `*-generated.cpp` is code, not memory.
-- Folders that collect AI state: `docs/`, `notes/`, `TEMP/`, `tmp/`, `temp/`, `.ai/`, `ai/`, `memory/`, `context/`, `.claude/`, `.cursor/`, `.windsurf/`, `.aider*`, `.github/`. **`TEMP/` especially** - it is the canonical disposable-file home (feedback_temp_folder_usage), so prior projects and legacy systems get parked there and forgotten (e.g. a `TEMP/APD_DUMP/` of `CLAUDE_*.md` files).
-- Names that signal memory / session / handoff / notes, anywhere in the tree: `MEMORY*.md`, `*_MEMORY.md`, `SESSION*.md`, `*HANDOFF*.md`, `CONTEXT*.md`, `NOTES.md`, `*_NOTES.md`, `PROJECT*.md`, `TODO.md`, `SCRATCH*`, `*_log.md`, `*RENAME*.md`
-- Claude / assistant memory docs, anywhere: `CLAUDE*.md`, `USERPROMPT*.md`, `.clauderc`, `.cursorrules`, `*.mdc`, plus auto-memory-shaped files (`feedback_*.md`, `user_*.md`, `reference_*.md`) sitting outside the canonical auto-memory path
-- Hand-rolled assistant config at root: `AGENTS.md`, `CLAUDE.md`
-- The project's auto-memory directory, if one exists
-
-Classify each find by who owns it (user doc vs AI working state) and confidence it is stale. Route: **move when sure** (clear AI state - session-handoff files, named memory/session logs - becomes migration source), **copy when unsure** (might be user content, leave the original in place), archive is the safety net since nothing is deleted. Auto-memory dir: move most, but leave its `MEMORY.md` index and `user_*.md` profiles. `CLAUDE.md` / `AGENTS.md` are archived above but classified in the Step 11 deferred review, not discarded. Never sweep source, config, build artifacts, or `README.md`. Record moved-vs-copied for the Step 11 summary.
-
-**Legacy cleanup before init:**
-
-- If `AIDOCS/SKILLS/` (plural) exists: **read each `SKILLS_<NAME>/<X>_SKILLS_<NAME>.md` in full, then move (do not delete) to `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/SKILLS/`** before init runs. These hold project-specific procedural customizations (custom publish steps, project audit rules, embedded Hard Rules) with no other home. Scavenge that content during Step 4 context loading: procedural skill overrides route to `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`, path refs normalize in flight. After init writes canonical `AIDOCS/SKILL/` (singular), the archived plural dir is gone from the project root.
-- If `.claude/skills/321/SKILLS.md` exists (plural): read it (may hold a custom router), then move to `AIDOCS/<X>_SETUP_ARCHIVE/.claude/skills/321/SKILLS.md`. Init writes the canonical singular `SKILL.md`.
+Archive preserves old filenames verbatim - legacy normalization (`DEV-STANDARDS` -> `DEV-AUDIT`, `<OLD>_*` -> `<X>_*`) happens at capture (Step 4 / `migrate-import --old/--new`), not here. A legacy `OldName_*.md` and a fresh `NewName_*.md` can coexist - both move aside so reinstall lands clean, and the archive keeps the legacy file as the migration source.
 
 ### Step 2: Reinstall canonical 321_STD
 
@@ -367,45 +332,27 @@ The import lands MEMORY oversized (dozens of anchored entries is the raw layer b
 
 ### Step 7: Restore verbatim user content
 
-The skill pipeline owns MEMORY / SESSION / BACKLOG. The remaining archive contents are user-owned and restore in place. No skill flow for these.
+The skill pipeline owns MEMORY / SESSION / BACKLOG. The rest of the archive is user-owned. `migrate-restore` moves the **deterministic** layers back out of `AIDOCS/<X>_SETUP_ARCHIVE/`: `WDDOCS/` verbatim, the `_MEMORY/SESSION/BACKLOG_ARCHIVE/` history dirs, and `AIDOCS/ENV/` (renaming `<OLD>_ENV_*` filenames on a rename). Pass `--old <OLD>` only when the project was renamed.
 
-1. **`WDDOCS/`.** Restore the entire archived `WDDOCS/` tree verbatim. Design docs, archives, plans are user-owned.
+```bash
+node AIDOCS/tools/memory.mjs migrate-restore <target> --name <X> [--old <OLD>]
+```
 
-2. **`AIDOCS/<X>_MEMORY_ARCHIVE/`, `_SESSION_ARCHIVE/`, `_BACKLOG_ARCHIVE/`.** Restore archived contents. Historical snapshots stay frozen.
+The remaining layers need judgment or network, so they stay manual:
 
-3. **`AIDOCS/ENV/`.** Restore archived contents. If the project was renamed (target basename differs from archived `_index.json -> project_name`), rename `<OLD>_ENV_*.md` files to `<NEW>_ENV_*.md` during the restore. File content stays verbatim - only the filename prefix gets updated to match the new project name.
+1. **`.gitignore`.** Restore archived verbatim, then append a `# 321_STD additions` block with any entries the new install needs that the archive lacks (TEMP/, staging files, state.json). Conservative on dedup - a false positive is safer than dropping a real entry.
 
-4. **`.gitignore`.** Restore archived verbatim. Append a `# 321_STD additions` block at the bottom with any entries the new install needs that the archive lacks (TEMP/, staging files, state.json). Conservative on dedup - false positives are safer than dropping a real entry.
+2. **DEV-AUDIT Project specifics.** Extract `## Project specifics` from archived `<X>_DEV-AUDIT.md` (or DEV-STANDARDS legacy) and insert into the new DEV-AUDIT's Project specifics verbatim. The canonical baseline (anchor principles, Hard Rules) is untouched. **Do not dedup here** - the deferred manual pass (reconciliation surface below) walks it against the baseline. Bias: preserve everything.
 
-5. **DEV-AUDIT Project specifics.** Extract the `## Project specifics` section from archived `<X>_DEV-AUDIT.md` (or DEV-STANDARDS legacy). Insert into the new DEV-AUDIT's Project specifics section verbatim. The new DEV-AUDIT baseline (anchor principles, canonical Hard Rules) is untouched. **Do not dedup here.** The deferred manual DEV-AUDIT pass (see the deferred reconciliation surface) walks Project specifics against the canonical baseline and drops duplicates / surfaces contradictions then. Bias here is "preserve everything from archive". Reconciliation is the next pass's job.
+3. **`CHANGELOG.md`.** Reformat archived entries to canonical structure and voice per `SKILL_AUTO-PUSH.md` Step 4 (`## [<VERSION>] - <YYYY-MM-DD>`, `### Added / Changed / Fixed / Removed`). Two distinct operations: **content fidelity** (reformatting invents no facts - sparse stays sparse, a missing date marks `<unknown>`) and **voice scrub** (mechanical: semicolon -> period/comma, em dash -> space-dash-space, applied even if the source skipped it). The archive keeps originals, so the user reviews after the run.
 
-6. **`CHANGELOG.md`.** Reformat archived entries to canonical structure and voice per `SKILL_AUTO-PUSH.md` Step 4 (Keep a Changelog + Semantic Versioning: `## [<VERSION>] - <YYYY-MM-DD>`, `### Added / Changed / Fixed / Removed`, standard preamble). AutoPush carries the voice cadence and canonical reference. Two operations, do not conflate them:
+4. **Auto-memory dir (per-machine, network).** Init merge-copied it (existing preserved). Refresh the shared canonical feedback rules to current, plus AI-judged near-matches (e.g. `feedback_no_dashes` -> `feedback_no_em_dashes`): `feedback_code_comments`, `_doc_purpose_header`, `_lean_docs`, `_no_subagents_for_review`, `_no_versions_in_code`, `_temp_folder_usage`, `_no_em_dashes`, `_no_dates_in_memory`. For each: back up to `_SETUP_ARCHIVE/automemory_pre_migrate/`, fetch from `https://raw.githubusercontent.com/WillyDrucker/321_STD/main/AIDOCS/automemory/<file>` (`gh api repos/WillyDrucker/321_STD/contents/...` fallback), overwrite (byte-identical -> skip). Fetch failure -> keep the archived copy, mark unresolved, never fail the migration. **Preserve, never overwrite:** the `MEMORY.md` index (append a pointer if canonical added one), `user_*.md` profiles (rename `user_name.md` -> `user_<actual>.md`), `reference_*.md`, and any project-specific `feedback_*.md` not in the canonical list.
 
-   - **Content fidelity.** Reformatting does NOT mean inventing facts. Sparse entries stay sparse. A missing date marks `<unknown>` for the user.
-   - **Voice scrub (mechanical).** Strip em dashes and semicolons (`feedback_no_em_dashes.md`): semicolon to period (or comma for list continuations), em dash to space-dash-space. Deterministic substitution, not fact invention. Apply it even when the source skipped it - a voice template is not a license to inherit its violations.
-
-   Reformat and move on - the voice scrub is deterministic and the archive keeps the originals, so the user reviews the reformatted CHANGELOG after the run rather than confirming each entry mid-migration.
-
-7. **Auto-memory dir (per-machine).** Init merge-copied it (existing files preserved). Refresh the shared canonical feedback rules to current (plus AI-judged near-matches, e.g. `feedback_no_dashes.md` -> `feedback_no_em_dashes.md`): `feedback_code_comments`, `_doc_purpose_header`, `_lean_docs`, `_no_subagents_for_review`, `_no_versions_in_code`, `_temp_folder_usage`, `_no_em_dashes`, `_no_dates_in_memory`. For each: back up to `_SETUP_ARCHIVE/automemory_pre_migrate/`, then fetch from `https://raw.githubusercontent.com/WillyDrucker/321_STD/main/AIDOCS/automemory/<file>` (`gh api repos/WillyDrucker/321_STD/contents/...` fallback) and overwrite (byte-identical -> skip). Fetch failure (network / 404) -> keep the archived copy, mark unresolved, never fail the migration.
-
-    **Preserve, never overwrite:** the `MEMORY.md` index (append a pointer if canonical added one, never replace it wholesale), `user_*.md` profiles (rename `user_name.md` -> `user_<actual>.md`), `reference_*.md`, and any project-specific `feedback_*.md` not in the canonical list. Report: N refreshed, index preserved, M profiles + K project-specific preserved, J unresolved.
-
-8. **AGENTS.md Hard Rules extension.** When the auto-memory dir has project-specific `feedback_*.md` files preserved in step 7 (not canonical, not user profiles), append pointers for them to the new AGENTS.md Hard Rules block so they are surfaced at the orchestrator level. Without this, the rules exist on disk but aren't visible at cold-start.
-
-    **Procedure:**
-    1. List preserved `feedback_*.md` files (the ones NOT in the canonical filename list and NOT replaced).
-    2. Read each file's first heading or frontmatter `description` for a one-line summary.
-    3. Insert into AGENTS.md Hard Rules block as additional bullets (just before the `[User profile]` bullet at the end):
-
-       ```markdown
-       - [<filename without extension>](<filename>) - <one-line description from the file>
-       ```
-
-    4. Maintain alphabetical order within the inserted block. Doctor will then pass the "Auto-memory pointers" check on the next run.
+5. **AGENTS.md Hard Rules extension.** For each project-specific `feedback_*.md` preserved above (not canonical, not a user profile), append a pointer to the new AGENTS.md Hard Rules block just before the `[User profile]` bullet, alphabetized, so it surfaces at cold-start: `- [<filename without .md>](<filename>) - <one-line summary from the file's first heading or frontmatter description>`. Doctor's "Auto-memory pointers" check then passes.
 
 ### Step 8: Voice scrub on migration-written files
 
-Steps 5-7 transfer archive prose into the canonical voice, and judgment can let banned characters (em dashes `—`, semicolons `;`) through. Scrub them in place across the migration-written files - `<X>_MEMORY(_EXTENDED)`, `<X>_SESSION(_EXTENDED)`, `<X>_BACKLOG`, `CHANGELOG`, and `AGENTS.md` if extended in 7.8 - skipping fenced code and inline-code spans:
+Steps 5-7 transfer archive prose into the canonical voice, and judgment can let banned characters (em dashes `—`, semicolons `;`) through. Scrub them in place across the migration-written files - `<X>_MEMORY(_EXTENDED)`, `<X>_SESSION(_EXTENDED)`, `<X>_BACKLOG`, `CHANGELOG`, and `AGENTS.md` if extended in Step 7 - skipping fenced code and inline-code spans:
 
 - Em dash -> ` - ` (space-dash-space), trim double spaces.
 - Semicolon -> `.` (or `,` for a list continuation), capitalize the next word if it starts a sentence.

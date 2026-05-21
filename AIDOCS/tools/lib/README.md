@@ -42,7 +42,9 @@ Each lives in `AIDOCS/tools/lib/commands/<name>.mjs` and exports a `cmd*` entryp
 | `archive.mjs` | Surgical archive of a single EXTENDED anchor. Slug-based matching via `findExtendedBounds`. |
 | `doctor.mjs` | Health check: a battery of independent checks (lint, paths, state, skill shapes, reconcile residue, Big-6 Decisions, banned prose, auto-memory pointers, router quick-ref, customization manifest, release profile). The `buckets` map in `cmdDoctor` is the live list. Reconcile residue flags `{#anchor}` / leading-date survivors in MAIN LIFO bullets and un-renamed cross-project doc-file refs (`<old>_MEMORY.md`) once the gate clears (the incomplete-reconcile failure) and tallies as structural, not content, so it cannot hide among pre-existing prose lint. `--structural-only` skips the content / prose checks so install can verify wiring without failing on a migrated project's inherited lint debt. |
 | `init.mjs` | Scaffolds a new project from this template at `<target-dir>`. Copies the router / engine / skill bodies / schema verbatim. Generates project-named MEMORY / SESSION / EXTENDED / DEV-AUDIT / AGENTS / `_index.json` from canonical sources. |
+| `migrate-archive.mjs` | Deterministic Step 1 of a Setup migration. Moves project-owned content into `AIDOCS/<X>_SETUP_ARCHIVE/` (move, never delete): known 321-shape paths and clearly-stale swept AI-state automatically, borderline swept docs reported for the AI to adjudicate (`--move` / `--copy`, default leave). `--scan` reports both tiers without moving. Owns the find + move so the path lists and sweep patterns stay out of the skill prose. Exports `cmdMigrateArchive(args)` (no index). |
 | `migrate-import.mjs` | Lossless structural import of an archived EXTENDED file into a staging file. One `### sub-section` per entry (bold-leads under an `## H2` split per-entry, `### H3` narratives kept whole) plus one anchored MAIN bullet each. Used by Setup migration Steps 5/6 to capture depth verbatim - distillation is deferred to the reconciliation pass (the gated `/321 -Update`). Exports `cmdMigrateImport(args)` (no index). |
+| `migrate-restore.mjs` | Deterministic Step 7 of a Setup migration. Moves user-owned content back out of `AIDOCS/<X>_SETUP_ARCHIVE/`: `WDDOCS/` verbatim, the `*_ARCHIVE` history dirs, and `AIDOCS/ENV/` (renaming `<OLD>_ENV_*` basenames on a project rename). Move, so the archive drains as content returns. The judgment / network layers (`.gitignore` merge, DEV-AUDIT, CHANGELOG, auto-memory, AGENTS) stay in the skill. Exports `cmdMigrateRestore(args)` (no index). |
 
 ## Contract between modules
 
@@ -55,7 +57,7 @@ Each lives in `AIDOCS/tools/lib/commands/<name>.mjs` and exports a `cmd*` entryp
 
 ## Command interface convention
 
-Most commands take the loaded index: `cmdName(index, args)`. Pre-index commands that run before (or instead of) reading `_index.json` take args only: `cmdInit(_index, args)` (called with a null index) and `cmdMigrateImport(args)`. `memory.mjs` dispatches those two ahead of `loadIndex`.
+Most commands take the loaded index: `cmdName(index, args)`. Pre-index commands that run before (or instead of) reading `_index.json` take args only: `cmdInit(_index, args)` (called with a null index), `cmdMigrateArchive(args)`, `cmdMigrateImport(args)`, and `cmdMigrateRestore(args)`. `memory.mjs` dispatches those ahead of `loadIndex`.
 
 ```js
 export async function cmdName(index, args) {
