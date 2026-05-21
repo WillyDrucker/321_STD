@@ -10,10 +10,10 @@
 //     skill shares a function with a canonical one, e.g. auto-push) is REPORTED with
 //     the canonical body's hash, not applied - /321 -Update resolves it as
 //     canonical-base + project delta and records that hash in customizations[].base.
-//   - Net-new bodies (no canonical equivalent) are copied verbatim. They keep their
-//     legacy frontmatter for now. /321 -Update normalizes names and records every
-//     project skill in customizations[]. A body missing name/description is copied
-//     but flagged - sync skips it until the frontmatter is fixed.
+//   - Net-new bodies (no canonical equivalent) are copied verbatim AND recorded in
+//     customizations[] (provenance), so the no-conflict path is fully mechanical with
+//     no AI edit of the body. A body missing name/description is copied but flagged -
+//     sync skips it and it gets no provenance entry until the frontmatter is fixed.
 //   - Non-destructive: the source is never moved or deleted. The migration archive
 //     and git are the safety net. Reconcile removes the legacy tree once locked.
 //
@@ -23,12 +23,12 @@
 // scan (no --from) is the live legacy AIDOCS/SKILLS/ dir.
 
 import { existsSync } from "node:fs";
-import { cp, mkdir, readdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { parseFlags } from "../cli.mjs";
 import { parseFrontmatter, skillBodyHash, toRelativePosix } from "../markdown.mjs";
-import { REPO_ROOT } from "../paths.mjs";
+import { INDEX_PATH, REPO_ROOT } from "../paths.mjs";
 
 export async function cmdImportSkills(index, args) {
   const opts = parseFlags(args, ["from", "dry-run"]);
@@ -78,7 +78,7 @@ export async function cmdImportSkills(index, args) {
       await mkdir(targetDir, { recursive: true });
       await cp(src, destPath, { force: false });
     }
-    imported.push({ destRel, srcRel, fmOk });
+    imported.push({ destRel, srcRel, fmOk, func, description: fm.description });
     if (!fmOk) malformed.push({ destRel });
   }
 
@@ -93,16 +93,52 @@ export async function cmdImportSkills(index, args) {
     console.log(`  [already] identical: ${a.destRel} (no-op)`);
   }
 
+  // Provenance: record each net-new (well-formed) import in customizations[] so the
+  // project keeps one list of every skill it added, and the no-conflict path is fully
+  // mechanical - the body is copied verbatim and registered with no AI edit. Idempotent
+  // (skip a path already flagged), net-new only - a collision gets its base-bearing
+  // entry from the /321 -Update merge, not here.
+  let provenance = 0;
+  if (!dryRun) {
+    const customs = Array.isArray(index.customizations) ? index.customizations : [];
+    const flagged = new Set();
+    for (const c of customs) {
+      for (const p of (Array.isArray(c?.applies_to) ? c.applies_to : [])) {
+        flagged.add(String(p).replace(/^\.\//, "").replace(/\\/g, "/"));
+      }
+    }
+    for (const i of imported) {
+      if (!i.fmOk) continue;
+      const rel = i.destRel.replace(/^\.\//, "");
+      if (flagged.has(rel)) continue;
+      customs.push({
+        id: `skill-${i.func.toLowerCase()}`,
+        description: i.description,
+        rule: "Project-authored /321 skill with no canonical 321_STD equivalent.",
+        applies_to: [rel],
+      });
+      flagged.add(rel);
+      provenance++;
+    }
+    if (provenance > 0) {
+      index.customizations = customs;
+      await writeFile(INDEX_PATH, `${JSON.stringify(index, null, 2)}\n`, "utf8");
+    }
+  }
+
   console.log(`\nimport-skills: ${imported.length} imported, ${collisions.length} collision(s), ${already.length} already present, ${malformed.length} malformed.`);
   if (dryRun) {
     console.log("import-skills: --dry-run, nothing written.");
     return;
   }
+  if (provenance > 0) {
+    console.log(`  recorded ${provenance} customizations[] provenance entr${provenance === 1 ? "y" : "ies"} (net-new, no base).`);
+  }
   if (imported.length > 0) {
     console.log(`Next: node AIDOCS/tools/memory.mjs sync   (register the imported skill[s])`);
   }
-  if (imported.length > 0 || collisions.length > 0) {
-    console.log(`Then: /321 -Update   (normalize names, merge collisions as canonical-base + delta, record customizations[])`);
+  if (collisions.length > 0) {
+    console.log(`Then: /321 -Update   (merge each collision as canonical base + delta, with its base hash)`);
   }
 }
 

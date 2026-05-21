@@ -260,9 +260,10 @@ Commands:
 
   import-skills  Copy a project's own skill bodies into AIDOCS/SKILL/ under the
             canonical SKILL_<FUNC>.md name so sync can register them with the
-            router. Never overwrites a canonical body - a collision is reported
-            (with the canonical hash) for /321 -Update to merge as canonical-base
-            + delta. Non-destructive. Run sync afterwards to register imports.
+            router, recording each net-new body in customizations[] (provenance).
+            Never overwrites a canonical body - a collision is reported (with the
+            canonical hash) for /321 -Update to merge as canonical-base + delta.
+            Non-destructive. Run sync afterwards to register imports.
             [--from <dir>]  default scans AIDOCS/SKILLS/ (the legacy tree). The
             migration points it at the setup archive, the -Update late-scan at
             specific candidate dirs outside AIDOCS/SKILL/.

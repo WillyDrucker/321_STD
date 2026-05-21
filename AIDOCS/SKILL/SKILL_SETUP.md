@@ -237,7 +237,7 @@ node AIDOCS/tools/memory.mjs sync
 node AIDOCS/tools/memory.mjs doctor
 ```
 
-The imported net-new skills register on this sync. They keep their legacy frontmatter for now (the `/321 -Update` skills-lane normalizes the dispatch names and records every project skill in `customizations[]`). Collisions and any malformed-frontmatter bodies are reported, not applied. A project with no legacy skills gets a clean no-op (`import-skills` reports nothing to import).
+The imported net-new skills register on this sync, and `import-skills` records each one's `customizations[]` provenance entry - the body is copied verbatim, no rewrite. Collisions and any malformed-frontmatter bodies are reported, not applied (the `/321 -Update` skills-lane merges the collisions and handles any role-dedup). A project with no legacy skills gets a clean no-op (`import-skills` reports nothing to import).
 
 Categorize doctor output (same split as Step 9). Structural / engine checks (Paths, State, Skill bodies, Big-6 Decisions, Auto-memory pointers, Router quick-ref, Customization manifest, Release profile) must pass - a failure there is real, so surface and bail. Migration is reversible at this point: the archive is intact, the user can restore from `AIDOCS/<X>_SETUP_ARCHIVE/`. Banned-prose lint in a user-owned file still in the tree (notably `README.md`, which migration never touches) is a WARNING, not a bail - it predates the install and is the user's to scrub. Sync must succeed.
 
