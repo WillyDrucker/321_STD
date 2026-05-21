@@ -30,7 +30,11 @@ const AI_DIRS = new Set(["TEMP", "tmp", "temp", ".claude", ".ai", "ai", "memory"
 // Basenames that read as AI working state anywhere in the tree.
 const AI_NAME = /^(CLAUDE.*|USERPROMPT.*|.*HANDOFF.*|.*RENAME.*|.*_MEMORY.*|MEMORY.*|.*_SESSION.*|SESSION.*|CONTEXT.*|.*_NOTES|NOTES|PROJECT.*|TODO|SCRATCH.*|.*_log)\.md$/i;
 // Strong signals -> clearly stale AI state, safe to auto-move (vs borderline).
-const AI_STRONG = /^(CLAUDE.*|USERPROMPT.*|.*HANDOFF.*|.*RENAME.*)\.md$/i;
+// Bare CLAUDE.md is a known path (not swept), and the CLAUDE_* variants are
+// ambiguous (CLAUDE_PROJECT_NOTES is AI state, CLAUDE_USAGE_..._DESIGN is a
+// feature doc), so CLAUDE is NOT strong - those fall to borderline for the AI to
+// adjudicate, unless they sit in a *_dump dir (the inDump tier auto-moves those).
+const AI_STRONG = /^(USERPROMPT.*|.*HANDOFF.*|.*RENAME.*)\.md$/i;
 
 export async function cmdMigrateArchive(args) {
   const opts = parseFlags(args, ["name", "scan", "move", "copy", "target"]);
@@ -63,15 +67,16 @@ export async function cmdMigrateArchive(args) {
   const moveDecided = csv(opts.move).filter(r => assertBorderline(r, borderSet));
   const copyDecided = csv(opts.copy).filter(r => assertBorderline(r, borderSet));
 
-  let moved = 0, copied = 0;
-  for (const k of known) { await moveInto(root, archiveDir, k.rel); moved++; }
-  for (const rel of autoSwept) { await moveInto(root, archiveDir, rel); moved++; }
-  for (const rel of moveDecided) { await moveInto(root, archiveDir, rel); moved++; }
-  for (const rel of copyDecided) { await copyInto(root, archiveDir, rel); copied++; }
+  let moved = 0, copied = 0, skipped = 0;
+  for (const k of known) { if (await moveInto(root, archiveDir, k.rel)) moved++; else skipped++; }
+  for (const rel of autoSwept) { if (await moveInto(root, archiveDir, rel)) moved++; else skipped++; }
+  for (const rel of moveDecided) { if (await moveInto(root, archiveDir, rel)) moved++; else skipped++; }
+  for (const rel of copyDecided) { if (await copyInto(root, archiveDir, rel)) copied++; else skipped++; }
 
   const left = borderline.filter(r => !moveDecided.includes(r) && !copyDecided.includes(r));
   console.log(`migrate-archive: ${moved} moved, ${copied} copied -> ${archiveRel}/`);
   console.log(`  known-path: ${known.length}, clear AI-state: ${autoSwept.length}, borderline moved: ${moveDecided.length}, copied: ${copied}, left in place: ${left.length}`);
+  if (skipped) console.log(`  skipped ${skipped} already-moved path(s) (moved with a parent dir).`);
   if (left.length) console.log(`  left (not adjudicated): ${left.join(", ")}`);
 }
 
@@ -112,7 +117,11 @@ async function walkSweep(root, archiveRel, knownSet) {
     for (const e of entries) {
       const rel = relDir ? `${relDir}/${e.name}` : e.name;
       if (e.isDirectory()) {
-        if (EXCLUDE_DIRS.has(e.name) || EXCLUDE_RELS.has(rel) || rel === archiveRel) continue;
+        // Skip known-path dirs (WDDOCS, AIDOCS/ENV, legacy SKILLS, the _ARCHIVE
+        // dirs): they move wholesale in the known-path pass, so descending here
+        // would queue their children for an individual move that then ENOENTs
+        // once the parent is gone.
+        if (EXCLUDE_DIRS.has(e.name) || EXCLUDE_RELS.has(rel) || knownSet.has(rel) || rel === archiveRel) continue;
         await walk(join(absDir, e.name), rel);
       } else if (e.isFile() && e.name.toLowerCase().endsWith(".md") && !knownSet.has(rel)) {
         const segs = rel.split("/");
@@ -140,16 +149,21 @@ function safeWithin(root, rel) {
 
 async function moveInto(root, archiveDir, rel) {
   const src = safeWithin(root, rel);
+  // Already gone (e.g. moved with a parent dir): skip, never crash the run.
+  if (!existsSync(src)) return false;
   const dest = join(archiveDir, rel);
   await mkdir(dirname(dest), { recursive: true });
   await rename(src, dest);
+  return true;
 }
 
 async function copyInto(root, archiveDir, rel) {
   const src = safeWithin(root, rel);
+  if (!existsSync(src)) return false;
   const dest = join(archiveDir, rel);
   await mkdir(dirname(dest), { recursive: true });
   await copyFile(src, dest);
+  return true;
 }
 
 function printList(label, items) {

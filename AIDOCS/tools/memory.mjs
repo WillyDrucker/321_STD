@@ -290,7 +290,8 @@ Commands:
 
   init      Scaffold a new project from this template. Copies engine + skills,
             generates project-specific AGENTS / MEMORY / SESSION / _index.json.
-            <target-dir> --name <PROJECT> [--release-profile <profile>] [--force]
+            <target-dir> --name <PROJECT> [--release-profile <profile>] [--force] [--dry-run]
+            --dry-run prints the write plan + install contract and writes nothing.
             Profiles: standards | npm-package | vscode-extension |
                       cloudflare-worker | cloudflare-pages | static-site | none
 

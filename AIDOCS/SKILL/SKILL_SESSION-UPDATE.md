@@ -139,14 +139,14 @@ Review the conversation for new work since `session_update.last_committed_at`.
 
 **Migration exception:** when Setup migration capture (`SKILL_SETUP.md`) drives this skill, ambiguous-home archive content routes to SESSION LIFO instead of dropping - capture loses nothing, reconciliation re-homes it later. The DROP rows above apply to routine runs.
 
-## Step 3: Prune before appending
+## Step 3: Prune before appending (relevance, not size)
+
+This is a relevance pass, not a size pass. Size is the engine's job: post-commit auto-prune trims to `prune_to` and archives the overflow (see Structural rules). Never hand-trim to hit a line count - drop only what a cold-start AI would not benefit from.
 
 Keep-test: would an AI starting cold benefit from this? Load-bearing or non-obvious? Yes -> keep. Re-derivable from code or git -> drop.
 
 - SESSION LIFO: resolved blockers and stale observations drop. Current State is overwritten, not pruned.
 - SESSION_EXTENDED: anchors whose parent LIFO bullet was dropped -> drop. Free-standing anchors past their useful window (3 shipped releases unless `<!-- LOAD_BEARING -->`) -> drop.
-
-Size caps are hard limits per `_index.json -> sizes`. Prune harder if over.
 
 ## Step 4: Stage
 

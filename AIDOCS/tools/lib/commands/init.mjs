@@ -20,6 +20,7 @@
 //   --name <PROJECT>                 project name (required)
 //   [--release-profile <profile>]    overrides auto-detect
 //   [--force]                        rewrite scaffold files even if they exist
+//   [--dry-run]                      print the write plan + install contract, write nothing
 
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -46,7 +47,7 @@ export async function cmdInit(_index, args) {
     err("init requires a target directory as the first argument. Usage: node AIDOCS/tools/memory.mjs init <target-dir> --name <PROJECT>");
     process.exit(5);
   }
-  const opts = parseFlags(args, ["name", "release-profile", "force"]);
+  const opts = parseFlags(args, ["name", "release-profile", "force", "dry-run"]);
   requireOpt(opts, "name");
 
   const project = opts.name;
@@ -55,8 +56,14 @@ export async function cmdInit(_index, args) {
     process.exit(5);
   }
 
+  // --dry-run prints the full write plan + the install contract and writes
+  // nothing, so an agent can confirm the exact effect (and trust the stated
+  // guarantees) without auditing this source or running it for real.
+  const dryRun = opts["dry-run"] === true;
+  const force = opts.force === true;
+
   const target = resolve(process.cwd(), targetArg);
-  await mkdir(target, { recursive: true });
+  if (!dryRun) await mkdir(target, { recursive: true });
 
   const explicitProfile = opts["release-profile"];
   const profile = explicitProfile || await detectProfile(target);
@@ -65,10 +72,12 @@ export async function cmdInit(_index, args) {
     process.exit(5);
   }
 
-  const force = opts.force === true;
   const autoMemoryPath = resolveAutoMemoryPath(target);
+  const verb = dryRun ? "would " : "";
 
-  console.log(`init: scaffolding "${project}" at ${target}`);
+  console.log(dryRun
+    ? `init --dry-run: plan for "${project}" at ${target} (NO writes)`
+    : `init: scaffolding "${project}" at ${target}`);
   console.log(`  release_profile: ${profile}${explicitProfile ? "" : " (auto-detected)"}`);
   console.log(`  auto_memory.path: ${autoMemoryPath}`);
 
@@ -94,9 +103,12 @@ export async function cmdInit(_index, args) {
       console.log(`  [engine] in-place: ${rel}`);
       continue;
     }
-    await mkdir(join(dstPath, ".."), { recursive: true });
-    await cp(srcPath, dstPath, { recursive: true, force: true });
-    console.log(`  [engine] ${rel}`);
+    const replacing = existsSync(dstPath);
+    if (!dryRun) {
+      await mkdir(join(dstPath, ".."), { recursive: true });
+      await cp(srcPath, dstPath, { recursive: true, force: true });
+    }
+    console.log(`  [engine] ${verb}${replacing ? "replace" : "write"}: ${rel}`);
   }
 
   // Scaffold: write if missing (or always if --force). User content protected.
@@ -115,8 +127,13 @@ export async function cmdInit(_index, args) {
   ];
   for (const { dst, content } of scaffolds) {
     const dstPath = join(target, dst);
-    if (existsSync(dstPath) && !force) {
-      console.log(`  [scaffold] kept: ${dst} (already exists)`);
+    const exists = existsSync(dstPath);
+    if (exists && !force) {
+      console.log(`  [scaffold] ${verb}keep: ${dst} (already exists)`);
+      continue;
+    }
+    if (dryRun) {
+      console.log(`  [scaffold] ${verb}${exists ? "rewrite" : "write"}: ${dst}`);
       continue;
     }
     await mkdir(join(dstPath, ".."), { recursive: true });
@@ -126,7 +143,7 @@ export async function cmdInit(_index, args) {
       continue;
     }
     await writeFile(dstPath, body, "utf8");
-    console.log(`  [scaffold] ${force && existsSync(dstPath) ? "rewrote" : "wrote"}: ${dst}`);
+    console.log(`  [scaffold] ${exists ? "rewrote" : "wrote"}: ${dst}`);
   }
 
   // Dir-only: create if missing, never touch contents.
@@ -139,16 +156,23 @@ export async function cmdInit(_index, args) {
   for (const d of emptyDirs) {
     const path = join(target, d);
     const created = !existsSync(path);
-    await mkdir(path, { recursive: true });
     const gitkeep = join(path, ".gitkeep");
-    if (!existsSync(gitkeep)) {
-      await writeFile(gitkeep, "", "utf8");
+    const needsGitkeep = !existsSync(gitkeep);
+    if (!dryRun) {
+      await mkdir(path, { recursive: true });
+      if (needsGitkeep) await writeFile(gitkeep, "", "utf8");
     }
-    if (created) console.log(`  [dir] created: ${d}`);
+    if (created) console.log(`  [dir] ${verb}create: ${d}`);
+    else if (needsGitkeep) console.log(`  [dir] ${verb}write: ${d}/.gitkeep`);
   }
 
   // Auto-memory: create dir + merge-copy template files (skip existing).
-  await populateAutoMemory(autoMemoryPath);
+  await populateAutoMemory(autoMemoryPath, dryRun);
+
+  if (dryRun) {
+    printInstallContract(target, autoMemoryPath);
+    return;
+  }
 
   console.log(`\ninit: done.`);
   console.log(`Next steps:`);
@@ -201,15 +225,15 @@ function resolveAutoMemoryPath(target) {
 
 // Create the auto-memory dir and merge-copy AIDOCS/automemory/* into it.
 // Existing files at the destination are preserved (user's personal rules win).
-async function populateAutoMemory(autoMemoryPath) {
+async function populateAutoMemory(autoMemoryPath, dryRun = false) {
   const src = join(REPO_ROOT, "AIDOCS", "automemory");
   if (!existsSync(src)) {
     console.log(`  [auto-memory] skipped: source missing (${src})`);
     return;
   }
   const created = !existsSync(autoMemoryPath);
-  await mkdir(autoMemoryPath, { recursive: true });
-  if (created) console.log(`  [auto-memory] created: ${autoMemoryPath}`);
+  if (!dryRun) await mkdir(autoMemoryPath, { recursive: true });
+  if (created) console.log(`  [auto-memory] ${dryRun ? "would create" : "created"}: ${autoMemoryPath}`);
 
   const entries = await readdir(src, { withFileTypes: true });
   let wrote = 0, kept = 0;
@@ -221,8 +245,23 @@ async function populateAutoMemory(autoMemoryPath) {
       kept++;
       continue;
     }
-    await cp(srcFile, dstFile);
+    if (!dryRun) await cp(srcFile, dstFile);
     wrote++;
   }
-  console.log(`  [auto-memory] merged: ${wrote} new, ${kept} preserved`);
+  console.log(`  [auto-memory] ${dryRun ? "would merge" : "merged"}: ${wrote} new, ${kept} preserved`);
+}
+
+// The install contract: what init touches and the guarantees it honors. Printed
+// by --dry-run so an agent can trust these properties instead of auditing this
+// source or running the install to find out.
+function printInstallContract(target, autoMemoryPath) {
+  console.log(`\ninit --dry-run: nothing was written. The contract a real run honors:`);
+  console.log(`  - Scope: writes land only inside ${target} and the per-machine`);
+  console.log(`    auto-memory dir (${autoMemoryPath}). Nothing else on the machine is touched.`);
+  console.log(`  - Auto-memory is merge-copy: an existing file there is never overwritten.`);
+  console.log(`  - Engine files (the /321 router, AIDOCS/SKILL, AIDOCS/tools) are always replaced.`);
+  console.log(`  - Scaffold files (CLAUDE.md, AGENTS.md, CHANGELOG.md, .gitignore, the project`);
+  console.log(`    docs) are kept if they already exist - your content is preserved.`);
+  console.log(`  - No network calls and no execution of fetched code. init is local and offline.`);
+  console.log(`  Re-run without --dry-run to apply.`);
 }
