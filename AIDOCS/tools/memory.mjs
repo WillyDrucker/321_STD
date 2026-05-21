@@ -5,7 +5,7 @@
 // diff/lint and the long commands (sync, commit, prune, archive, doctor). This
 // file is intentionally small so the CLI surface is visible in one read.
 //
-// Subcommands: prune / lint / archive / sync / validate / commit / clear / state / doctor / init / migrate-archive / migrate-import / migrate-restore / help.
+// Subcommands: prune / lint / archive / sync / import-skills / validate / commit / clear / state / doctor / init / migrate-archive / migrate-import / migrate-restore / help.
 // Routine writes go through the staging pipeline (validate -> commit) so the
 // static-section protection rules apply. The legacy `add` subcommand was
 // removed because it bypassed staging.
@@ -20,6 +20,7 @@ import { err, parseFlags, requireOpt } from "./lib/cli.mjs";
 import { cmdArchive } from "./lib/commands/archive.mjs";
 import { cmdCommit } from "./lib/commands/commit.mjs";
 import { cmdDoctor } from "./lib/commands/doctor.mjs";
+import { cmdImportSkills } from "./lib/commands/import-skills.mjs";
 import { cmdInit } from "./lib/commands/init.mjs";
 import { cmdMigrateArchive } from "./lib/commands/migrate-archive.mjs";
 import { cmdMigrateImport } from "./lib/commands/migrate-import.mjs";
@@ -34,7 +35,7 @@ import {
 } from "./lib/state.mjs";
 import { validateStaging } from "./lib/validator.mjs";
 
-const COMMANDS = ["prune", "lint", "archive", "sync", "validate", "commit", "clear", "state", "doctor", "init", "migrate-archive", "migrate-import", "migrate-restore", "help"];
+const COMMANDS = ["prune", "lint", "archive", "sync", "import-skills", "validate", "commit", "clear", "state", "doctor", "init", "migrate-archive", "migrate-import", "migrate-restore", "help"];
 
 async function main() {
   const [, , cmd, ...args] = process.argv;
@@ -85,6 +86,7 @@ async function main() {
     case "lint":     await cmdLint(index);           break;
     case "archive":  await cmdArchive(index, args);  break;
     case "sync":     await cmdSync(index, args);     break;
+    case "import-skills": await cmdImportSkills(index, args); break;
     case "validate": await cmdValidate(args);        break;
     case "commit":   await cmdCommit(index, args);   break;
     case "clear":    await cmdClear(args);           break;
@@ -254,6 +256,16 @@ Commands:
 
   sync      Rebuild skills.dispatch in _index.json from skill body frontmatter.
             Walks paths.skills_bodies, reads YAML frontmatter.
+            [--dry-run]
+
+  import-skills  Copy a project's own skill bodies into AIDOCS/SKILL/ under the
+            canonical SKILL_<FUNC>.md name so sync can register them with the
+            router. Never overwrites a canonical body - a collision is reported
+            (with the canonical hash) for /321 -Update to merge as canonical-base
+            + delta. Non-destructive. Run sync afterwards to register imports.
+            [--from <dir>]  default scans AIDOCS/SKILLS/ (the legacy tree). The
+            migration points it at the setup archive, the -Update late-scan at
+            specific candidate dirs outside AIDOCS/SKILL/.
             [--dry-run]
 
   validate  Validate a staging file against AIDOCS/tools/staging/SCHEMA.json.

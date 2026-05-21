@@ -29,6 +29,7 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 
 import { err, parseFlags, requireOpt } from "../cli.mjs";
+import { skillBodyHash } from "../markdown.mjs";
 import { REPO_ROOT } from "../paths.mjs";
 import {
   agentsTemplate, backlogTemplate, changelogTemplate, devAuditStarter,
@@ -116,7 +117,7 @@ export async function cmdInit(_index, args) {
   // is preserved - a project's customized pipeline (its SKILL_AUTO-PUSH, say) must
   // survive an engine update. Fresh install has no customizations, so all write.
   const srcSkillDir = join(REPO_ROOT, "AIDOCS", "SKILL");
-  const preservedSkills = repoIsTarget ? new Set() : await readPreservedSkills(target);
+  const preservedSkills = repoIsTarget ? new Map() : await readPreservedSkills(target);
   if (repoIsTarget) {
     console.log(`  [skill] in-place: AIDOCS/SKILL`);
   } else if (existsSync(srcSkillDir)) {
@@ -124,7 +125,17 @@ export async function cmdInit(_index, args) {
       const rel = `AIDOCS/SKILL/${file}`;
       const dstPath = join(target, rel);
       if (preservedSkills.has(rel) && existsSync(dstPath)) {
-        console.log(`  [skill] ${verb}preserve: ${rel} (customized, in customizations[])`);
+        // A flagged body that recorded its base hash lets us detect when the
+        // canonical it was merged from has since advanced, and nudge a re-merge.
+        const baseHash = preservedSkills.get(rel)?.baseHash;
+        let note = "";
+        if (baseHash) {
+          const canonHash = skillBodyHash(await readFile(join(srcSkillDir, file), "utf8"));
+          note = canonHash === baseHash
+            ? ` [canonical ${canonHash}]`
+            : ` [canonical advanced ${baseHash} -> ${canonHash}, re-merge at /321 -Update]`;
+        }
+        console.log(`  [skill] ${verb}preserve: ${rel} (customized, in customizations[])${note}`);
         continue;
       }
       const replacing = existsSync(dstPath);
@@ -293,23 +304,27 @@ function printInstallContract(target, autoMemoryPath) {
   console.log(`  Re-run without --dry-run to apply.`);
 }
 
-// Read the target's existing _index.json customizations[] and return the set of
-// skill-body paths (AIDOCS/SKILL/SKILL_*.md, forward-slash) flagged "do not
-// overwrite". A customized skill body is preserved across an engine update; a
-// fresh target (or a malformed index) yields an empty set, so all generics write.
+// Read the target's existing _index.json customizations[] and return a Map of
+// skill-body path (AIDOCS/SKILL/SKILL_*.md, forward-slash) -> { baseHash }, the set
+// flagged "do not overwrite". A customized skill body is preserved across an engine
+// update. baseHash (from customizations[].base.hash, when present) is the canonical
+// hash the body was merged from, so the preserve branch can nudge a re-merge once
+// the canonical advances. A fresh target (or a malformed index) yields an empty
+// Map, so all generics write.
 async function readPreservedSkills(target) {
-  const set = new Set();
+  const map = new Map();
   const idxPath = join(target, "AIDOCS", "_index.json");
-  if (!existsSync(idxPath)) return set;
+  if (!existsSync(idxPath)) return map;
   try {
     const idx = JSON.parse(await readFile(idxPath, "utf8"));
     const customs = Array.isArray(idx.customizations) ? idx.customizations : [];
     for (const c of customs) {
+      const baseHash = (c?.base && typeof c.base.hash === "string") ? c.base.hash : undefined;
       for (const p of (Array.isArray(c?.applies_to) ? c.applies_to : [])) {
         const norm = String(p).replace(/^\.\//, "").replace(/\\/g, "/");
-        if (/^AIDOCS\/SKILL\/SKILL_.+\.md$/.test(norm)) set.add(norm);
+        if (/^AIDOCS\/SKILL\/SKILL_.+\.md$/.test(norm)) map.set(norm, { baseHash });
       }
     }
   } catch { /* malformed index: preserve nothing, init writes fresh generics */ }
-  return set;
+  return map;
 }

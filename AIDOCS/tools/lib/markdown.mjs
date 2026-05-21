@@ -7,6 +7,7 @@
 // list ALL top-level sections or LIFO sub-sections (used by prune's bottom-up
 // drop walk). Both live here so markdown-section parsing has one home.
 
+import { createHash } from "node:crypto";
 import { relative } from "node:path";
 
 // "ai-script-driver" -> "Ai Script Driver". Used by mutators when deriving
@@ -35,6 +36,18 @@ export function normalizeForMatch(s) {
 
 export function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Stable content hash of a skill body. A customized skill records the hash of the
+// canonical body it was merged from (customizations[].base.hash). init compares it
+// to the current canonical and prints a re-merge nudge when they diverge. CRLF is
+// normalized to LF and trailing whitespace stripped so a Windows checkout or a
+// stray final newline does not read as a real change. Truncated sha256 - this is
+// drift detection, not integrity, so 16 hex chars is plenty and keeps the index
+// readable. Pure (a deterministic digest), so it lives with the other utilities.
+export function skillBodyHash(content) {
+  const norm = content.replace(/\r\n/g, "\n").replace(/\s+$/, "");
+  return createHash("sha256").update(norm, "utf8").digest("hex").slice(0, 16);
 }
 
 // Anchor a main-file LIFO bullet points into the EXTENDED file, or null. Two

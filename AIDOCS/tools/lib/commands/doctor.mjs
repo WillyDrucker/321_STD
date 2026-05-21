@@ -31,6 +31,7 @@ export async function cmdDoctor(index, opts = {}) {
     "Paths":                   checkPaths(index),
     "State":                   await checkState(),
     "Skill bodies":            await checkSkills(index),
+    "Legacy skills":           checkLegacySkills(),
     "Reconcile residue":       await checkReconcileResidue(index),
     ...(structuralOnly ? {} : {
       "Big-6 Decisions":       await checkBig6Decisions(index),
@@ -127,6 +128,19 @@ async function checkSkills(index) {
     if (!fm.name) issues.push(`${file}: missing frontmatter name`);
     if (!fm.description) issues.push(`${file}: missing frontmatter description`);
     if (!/^\*\*Purpose:\*\*/m.test(content)) issues.push(`${file}: missing **Purpose:** callout under H1`);
+  }
+  return issues;
+}
+
+// A top-level AIDOCS/SKILLS/ (plural) is a pre-321 / legacy skill tree not yet
+// imported. The migration moves it into the setup archive, and import-skills +
+// /321 -Update bring the bodies into AIDOCS/SKILL/ (singular). Its presence here
+// means that import / reconcile has not finished. The archived copy under
+// _SETUP_ARCHIVE/ is not flagged - only the live top-level tree.
+function checkLegacySkills() {
+  const issues = [];
+  if (existsSync(resolve(REPO_ROOT, "AIDOCS", "SKILLS"))) {
+    issues.push("legacy AIDOCS/SKILLS/ (plural) present - run /321 -Setup (migration), or `import-skills` then /321 -Update, to bring these into AIDOCS/SKILL/, then remove the legacy tree");
   }
   return issues;
 }
@@ -342,6 +356,16 @@ function checkCustomizations(index) {
     }
     if (c.reason !== undefined && typeof c.reason !== "string") {
       issues.push(`${prefix}.reason must be a string if present`);
+    }
+    if (c.base !== undefined) {
+      // base records the canonical skill + the hash of the body the customization
+      // was merged from, so init can nudge a re-merge once the canonical advances.
+      if (typeof c.base !== "object" || c.base === null || Array.isArray(c.base)) {
+        issues.push(`${prefix}.base must be an object { skill, hash } if present`);
+      } else {
+        if (typeof c.base.skill !== "string" || c.base.skill.length === 0) issues.push(`${prefix}.base.skill required (string) when base is present`);
+        if (typeof c.base.hash !== "string" || c.base.hash.length === 0) issues.push(`${prefix}.base.hash required (string) when base is present`);
+      }
     }
   }
   return issues;

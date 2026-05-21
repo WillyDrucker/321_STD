@@ -219,12 +219,17 @@ Where `<tmp>` is the freshly-cloned source (the same temp dir used by the public
 
 Why this works without `--force`: archive in migration Step 1 moved all scaffold-class files into `AIDOCS/<X>_SETUP_ARCHIVE/`. The target's scaffold paths are now empty, so `init`'s "write if missing" semantics write fresh. Engine paths get rewritten (always-replace). Auto-memory dir gets merge-copied (preserves any personal rules already there).
 
-### Step 3: Sync + health
+### Step 3: Import easy skills, then sync + health
+
+The migration archived the project's legacy skill tree in Step 1. Bring its own skills forward mechanically before sync. `import-skills` copies each legacy body into `AIDOCS/SKILL/` under the canonical `SKILL_<FUNC>.md` name. It NEVER overwrites a canonical body, so net-new skills land and any that share a function with a canonical skill (auto-push, session-update, and the like) are reported as collisions, left for `/321 -Update` to merge.
 
 ```bash
+node AIDOCS/tools/memory.mjs import-skills --from AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/SKILLS
 node AIDOCS/tools/memory.mjs sync
 node AIDOCS/tools/memory.mjs doctor
 ```
+
+The imported net-new skills register on this sync. They keep their legacy frontmatter for now (the `/321 -Update` skills-lane normalizes the dispatch names and records every project skill in `customizations[]`). Collisions and any malformed-frontmatter bodies are reported, not applied. A project with no legacy skills gets a clean no-op (`import-skills` reports nothing to import).
 
 Categorize doctor output (same split as Step 9). Structural / engine checks (Paths, State, Skill bodies, Big-6 Decisions, Auto-memory pointers, Router quick-ref, Customization manifest, Release profile) must pass - a failure there is real, so surface and bail. Migration is reversible at this point: the archive is intact, the user can restore from `AIDOCS/<X>_SETUP_ARCHIVE/`. Banned-prose lint in a user-owned file still in the tree (notably `README.md`, which migration never touches) is a WARNING, not a bail - it predates the install and is the user's to scrub. Sync must succeed.
 
@@ -401,9 +406,10 @@ Artifact sweep:    <N> moved (high-confidence AI state), <M> copied (low-confide
                    (every migration - covers TEMP / .claude / loose memory docs, both shapes)
 Legacy normalized: <N> references (DEV-STANDARDS, SKILLS, project rename)
 Sync:              <N> skills registered
-Custom skills:     <N> custom /321 body(ies) archived (<list>). Generic profile applies
-                   until /321 -Update builds overrides. DELTA: <e.g. AutoPush will run the
-                   vscode-extension default `vsce publish` - archived body used manual upload>
+Custom skills:     <I> net-new imported + registered (<list>), <C> collision(s) with a
+                   canonical skill deferred to /321 -Update (canonical base + delta).
+                   DELTA: <e.g. AutoPush still runs the vscode-extension default until
+                   -Update folds in the archived manual-upload steps>
 Doctor:            <pass> | <N user-content lint warnings>, <K> import size warnings (expected)
 SessionUpdate:     SESSION + SESSION_EXTENDED written, <N> LIFO entries
 MemoryUpdate:      MEMORY Big 6 filled, <N> LIFO entries, BACKLOG <K> items (raw import, un-distilled)
@@ -424,8 +430,9 @@ import is over-split, over-cap, with raw [+] bullets and the source project's
 migration trail intact. /321 -Update reads the gate and runs the distillation
 pass (merge over-split, drop duplicates / dead code, rewrite to descriptive [+]
 bullets, strip the trail, sweep BACKLOG against WDDOCS), then clears the gate.
-It also runs the skills-lane (archived custom /321 bodies -> customized AIDOCS/SKILL/
-body + customizations[] entry, or fold), the AGENTS / CLAUDE classification lane (archived orchestrator
+It also runs the skills-lane (net-new skills imported above are normalized + recorded,
+collisions merge as canonical base + delta, engine-superseded ones fold, then a late
+scan offers any skills found outside AIDOCS/SKILL/), the AGENTS / CLAUDE classification lane (archived orchestrator
 content -> lean AGENTS / MEMORY / DEV-AUDIT), and the DEV-AUDIT Project-specifics
 dedup. Until then the generic profile applies, so a custom release pipeline is not
 yet in effect. Migration is NOT complete until it runs.
@@ -443,7 +450,7 @@ right. The archive is the safety net - keep it until the project does.
 The migration defers all distillation to the gated `/321 -Update` pass, which reconciles everything it captured. Nothing is a manual follow-up:
 
 - **SESSION / MEMORY / BACKLOG distillation** - the raw import distilled to a steady state. Mechanics in `SKILL_UPDATE.md` (the reconciliation gate) and `SKILL_MEMORY-UPDATE.md` (the record conventions).
-- **Custom `/321` skill bodies** (skills-lane) - each archived custom body is merged into its `AIDOCS/SKILL/SKILL_<NAME>.md` and flagged in `customizations[]` (so `init` preserves it on updates) or folds its genuine deviations into `<X>_DEV-AUDIT.md` / `<X>_MEMORY.md`.
+- **Project `/321` skill bodies** (skills-lane) - Setup already imported the net-new bodies into `AIDOCS/SKILL/`. `/321 -Update` normalizes their dispatch names, records every project skill in `customizations[]`, merges any that collide with a canonical skill as canonical base + delta (recording the base hash so `init` can nudge a re-merge later), folds engine-superseded ones into `<X>_DEV-AUDIT.md` / `<X>_MEMORY.md`, and late-scans for skills outside `AIDOCS/SKILL/`.
 - **AGENTS / CLAUDE classification + DEV-AUDIT Project-specifics dedup** - archived orchestrator content folds into a lean `AGENTS.md` / MEMORY / DEV-AUDIT, and the restored DEV-AUDIT Project specifics dedup against the canonical baseline.
 
 Setup only sets the gate. The full per-lane mechanics - the reconciliation principle (canonical scan wins on overlap, contradictions surface, complements keep), the DEV-AUDIT scope guard (only `## Project specifics`, never the baseline), and the AGENTS lean targets - all live in `SKILL_UPDATE.md`.
