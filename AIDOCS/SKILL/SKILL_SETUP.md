@@ -16,36 +16,11 @@ description: First-run wizard or migration for a 321_STD project. Detects fresh-
 
 The script can't decide what the project's Stack is, or whether the user prefers `npm-package` vs `static-site`, or which archived bullets are still load-bearing after a migration. Setup is the place where AI judgment meets project context and user preference. For fresh-install Big 6 drafts, per-section confirmation (accept / edit / skip) keeps the user in the loop. For migration, the canonical skill pipeline (SessionUpdate, MemoryUpdate -FULL) auto-applies through its own staging rules - migration is a "run end-to-end, review the result" flow, not a step-by-step approval flow.
 
-## Pipeline (fresh path)
+**Fresh path (Steps 1-7):** sync + doctor -> Big 6 fill (the judgment step) -> release_profile -> auto_memory.path -> ENV starters -> first commit -> summary. Step 0 (detect) is shared with migration. Detailed below.
 
-| Step | Action | AI does | Script does |
-|---|---|---|---|
-| 0 | Detect state | Read signals, decide fresh vs migration | (none) |
-| 1 | Sync + health | Decide pass / fail | `sync` + `doctor` |
-| 2 | Big 6 fill | Read project, draft each section, prompt user, build staging | `memory-update` two-phase commit |
-| 3 | release_profile | Confirm init's auto-detect | (file edit) |
-| 4 | auto_memory.path | Confirm init's resolution | (file edit) |
-| 5 | ENV starters | Optional, prompt for keys | (file write) |
-| 6 | First commit | Stage relevant files, write commit message | `git commit` |
-| 7 | Summary | Format + display | (none) |
+**Migration path (Steps 1-11):** archive + artifact sweep -> reinstall (`init`) -> sync + doctor -> load context -> SESSION capture -> MEMORY capture -> restore user content -> voice scrub -> doctor -> set the gate -> summary. Detailed below.
 
-## Pipeline (migration path)
-
-| Step | Action | AI does | Script does |
-|---|---|---|---|
-| 1 | Archive existing + artifact sweep | Move known-path content + sweep TEMP / .claude / tree-wide AI-state files to `AIDOCS/<X>_SETUP_ARCHIVE/` | Bash / PowerShell `mv` |
-| 2 | Reinstall canonical | (none) | `init` |
-| 3 | Sync + health | Decide pass / fail | `sync` + `doctor` |
-| 4 | Load archive into context | Read archive files, normalize legacy refs as they enter context | (none) |
-| 5 | SESSION capture | SessionUpdate appends Current State + history LIFO to the import staging | `migrate-import` (lossless EXTENDED) + `session-update` commit |
-| 6 | MEMORY capture | MemoryUpdate -FULL appends Big 6 + BACKLOG to the import staging | `migrate-import` (lossless EXTENDED) + `memory-update` commit |
-| 7 | Restore verbatim user content | Restore + ENV rename + DEV-AUDIT insert + CHANGELOG voice + auto-memory + AGENTS Hard Rules extension | file ops + voice rules + auto-memory rules |
-| 8 | Voice scrub | Strip em dashes + semicolons from migration-written files | regex in-place edit |
-| 9 | Post-restore doctor | Categorize engine vs user-content findings | `doctor` |
-| 10 | Mark reconciliation pending + stop | Set the gate, point user at `/321 -Update`, log deferred manual follow-ups | `state --set-reconcile` |
-| 11 | Summary | Format + display | (none) |
-
-**Migration captures raw, then hands off.** Steps 1-9 are mechanical (lossless capture + restore + scrub + doctor). Step 10 sets the `reconcile_pending` gate and STOPS - the distillation pass is judgment-heavy and runs with fresh context as `/321 -Update`, not crammed into the migration's exhausted tail. Step 0 decides the mode and resolves the project name. The only prompt migration may ever raise is the Step 0 identity-conflict gate (folder name disagrees with code identity), and it fires before any destructive step. Once past Step 0, Steps 1-11 chain through without asking the user to confirm between them. The only other stop conditions are validate or commit failures inside the skill invocations (migration Step 5 / migration Step 6), which surface for review. The archive at `AIDOCS/<X>_SETUP_ARCHIVE/` is the safety net throughout - migration is reversible until the user deletes it.
+**Migration captures raw, then hands off.** Steps 1-9 are mechanical (capture + restore + scrub + doctor). Step 10 sets the `reconcile_pending` gate and STOPS - distillation is the judgment-heavy `/321 -Update`, run with fresh context. Past Step 0, Steps 1-11 chain with no prompts (only a validate/commit failure in Steps 5-6 stops for review). The archive is the safety net throughout, reversible until the user deletes it.
 
 ## Step 0: Detect state
 
@@ -74,7 +49,7 @@ Read these signals in the target. **Any one of them flips Setup to migration mod
 - The project's auto-memory directory holds AI-written `feedback_*` / log files beyond the canonical scaffold
 - AI-state markdown parked off the canonical layout: a `TEMP/` (or `tmp/`) dump of memory / session / handoff / notes docs, a `.claude/` doc beyond config, a legacy system copied into a subfolder, or memory / session / handoff-named `.md` files loose anywhere in the tree
 
-The **artifact discovery sweep** (Step 1) runs on **every** migration, in addition to the known 321 path list - not only for standard projects. A 321-shaped project still hides prior AI state in non-canonical spots (a `TEMP/` legacy dump, a `.claude/` note, loose memory files), so the sweep is a universal scavenge, not a standard-project fallback. When no 321-structured EXTENDED exists (a pure standard project), Steps 5/6 capture from the swept files plus the code scan instead of the EXTENDED import. Everything else in the migration path is identical.
+The **artifact discovery sweep** (Step 1) runs on **every** migration alongside the known-path list, not only standard projects - a 321-shaped project still hides AI state in non-canonical spots (a `TEMP/` dump, a `.claude/` note). When no 321 EXTENDED exists (a pure standard project), Steps 5/6 capture from the swept files plus the code scan instead.
 
 **Branch decision (auto, no prompt):**
 
@@ -87,7 +62,7 @@ Then check for an identity conflict: does the basename disagree with the project
 
 > "The folder is named `<basename>` but the project's code identity is `<signal-name>` (package.json `<name>`, branch `<prefix>`, docs `<NAME>_*`). The docs scaffold will be named after whichever you pick, and it is upstream of everything Setup writes. Use `<basename>` (rename the docs to match the folder) or `<signal-name>` (keep the code identity)? Default if you do not answer: `<basename>`."
 
-This is the only prompt migration is allowed to raise, and it fires in Step 0 before any destructive step. Every other case runs end-to-end with no mid-flow prompts. Record the resolved `<X>` and the chosen-vs-rejected names for the Step 11 summary.
+Record the resolved `<X>` and the chosen-vs-rejected names for the Step 11 summary.
 
 **Migration-mode entry banner.** When entering migration, print this as a clear announcement before doing any work. No confirmation prompt - this just makes the mode switch visible:
 
@@ -499,27 +474,11 @@ Migration is NOT complete until it runs.
 
 Deferred manual follow-ups (outside the /321 -Update lane):
 
-1. AGENTS.md / CLAUDE.md classification (keep it an index, aim for ~50 lines).
-   Archived AGENTS.md (<N> bytes, <M> sections) and CLAUDE.md (<bytes> bytes,
-   substantive=<Y/N>) hold orchestrator-level content Setup did NOT auto-classify.
-   AGENTS.md is an index that orients a cold start in under a minute and points into
-   deeper docs, NOT a container. The canonical skeleton init wrote is ~50 lines, so the
-   filled file aims for ~50 lines, with 80 a hard ceiling you do not cross. Open the archived files side-by-side with the
-   new AGENTS.md and route each substantive block:
-   - Already captured by Steps 5/6? Skip.
-   - Orchestrator-level fact (cold-start hint, project quirk)? -> new AGENTS.md > Project
-     Specifics, as a one-line pointer. No routed block over ~10 lines - if it needs more,
-     it belongs in a lower doc and AGENTS.md keeps only the pointer to it.
-   - Custom Permissions config? -> new AGENTS.md > Permissions.
-   - Project-specific code rule / language convention? -> <X>_DEV-AUDIT.md > Project specifics.
-   - History the skills missed? -> /321 -SessionUpdate or /321 -MemoryUpdate -FULL.
-   Never drop or bloat the canonical skeleton - the Purpose header, the Cold-start load
-   order (the read order), and the Layout section (the AIDOCS/_index.json pointer) are the
-   index spine. Judge each section for leanness, defaulting to a pointer. Aim for ~50, and
-   past ~80 lines total or any block past ~10 you over-imported: push the weakest blocks
-   down to DEV-AUDIT / MEMORY until it fits.
+1. AGENTS.md / CLAUDE.md classification. Archived AGENTS.md (<N> bytes) + CLAUDE.md
+   (<bytes>, substantive=<Y/N>) hold orchestrator content Setup did NOT auto-classify.
+   Route each block per the deferred surface below, keeping AGENTS.md a lean index (~50 lines).
 2. DEV-AUDIT Project specifics dedup. Walk the restored Project specifics against the
-   canonical baseline using the reconciliation principle (deferred surface below).
+   canonical baseline per the reconciliation principle (deferred surface below).
 
 Review needed (contradictions surfaced, not auto-resolved):
   - <file A> says X / <file B> says not-X
@@ -542,27 +501,16 @@ The migration defers all distillation. Two homes split the work:
 
 **Scope guard - only `## Project specifics` is reconciled in DEV-AUDIT.** The baseline above the divider (Anchor principles, Hard rules, Audit dimensions) is canonical 321_STD content `init` wrote, identical across every project. Do NOT dedup, rewrite, or contradiction-scan it, and never pull it into MEMORY. The DEV-AUDIT "Hard rules" block is an intentional audit-facing copy of the auto-memory inventory (also surfaced in AGENTS.md Hard rules) - that triplication is by design for visibility, not drift to reconcile.
 
-For each sub-section Step 7 inserted into DEV-AUDIT Project specifics:
-
-- Duplicates canonical wording or intent -> DROP.
-- Extends canonical with project specifics (e.g., canonical says "naming follows project conventions", the addendum says "TypeScript files use PascalCase for components, camelCase for utilities") -> KEEP as project addendum.
-- Purely project-specific (build commands, ESLint config, invariants, language version) -> KEEP.
-- Restates something already in MEMORY (Architecture Decisions, Conventions) -> DROP (MEMORY is the home for project-anchored rules).
-- Contradicts canonical -> SURFACE for review, do not auto-resolve.
+For each restored DEV-AUDIT Project-specifics sub-section: DROP if it duplicates the canonical baseline or restates MEMORY (MEMORY is the home for project-anchored rules), KEEP if it is purely project-specific (build commands, ESLint config, language version) or extends canonical with real specifics, SURFACE contradictions for review.
 
 For AGENTS.md: verify every preserved feedback file in auto-memory has a Hard Rules pointer (Step 7 layer 8 should have added it), alphabetize the block, and remove pointers for files no longer present. Aim to hold the whole file at ~50 lines (the canonical skeleton size), 80 a hard ceiling, with no single routed block over ~10 lines - prefer a one-line pointer over an inlined block. Apply the lean test to any restored Project Specifics block - if a cold-start session would not be confused without it in the first 60 seconds, move it down the chain (DEV-AUDIT Project specifics for code rules, MEMORY Conventions for project conventions). The Purpose header, Cold-start load order, and Layout /_index.json pointer stay - they are the index spine.
 
 ## Rules (skill operation)
 
-- **Post-init only.** Won't bootstrap a missing scaffold. Init is the prerequisite for fresh mode. Init is invoked by Setup itself in migration mode (migration Step 2).
-- **Mode auto-detects.** Step 0 picks the path. No flag. False-positive migration (running on a fresh scaffold) is safe - archive is empty, reinstall is a no-op.
-- **Migration handles two shapes.** 321-shaped projects archive the known path list and feed `migrate-import`. Standard (non-321) projects run the artifact discovery sweep: AI classifies scattered AI state by confidence, MOVES high-confidence stale state (session-handoff files, plain memory/session logs, most of auto-memory except its `MEMORY.md` index and `user_*.md`), and COPIES low-confidence-maybe-user files into the archive while leaving the originals in place. Move when sure, copy when unsure - nothing is deleted.
+- **Post-init only.** Won't bootstrap a missing scaffold (Setup invokes init itself in migration Step 2).
+- **Mode auto-detects.** Step 0 picks fresh vs migration, no flag. False-positive migration on a fresh scaffold is safe (archive empty, reinstall a no-op).
 - **Big 6 is the bar.** Sync + doctor are mechanical, Big 6 fill is where Setup earns its space.
-- **Migration captures, it does not distill.** Migration ends at capture + restore + scrub + doctor, sets the `reconcile_pending` gate (`state --set-reconcile`), and stops. The distillation pass is `/321 -Update`'s gated job, run with fresh context. Setup never runs reconciliation itself. The DEV-AUDIT / AGENTS dedup is a separate manual follow-up outside the Update lane.
-- **Capture loses nothing.** When a source section's 321 home is unclear (Known Issues, watch-lists, memory-promotion flags, loose notes embedded in a SESSION or handoff file), it lands in SESSION LIFO, never dropped. Reconciliation re-homes or drops it later against the full import. Setup-only catch-all: routine passes read session data and promote upward, they never demote uncertain content back into SESSION (that would cycle).
-- **Per-section confirmation is fresh-install only.** Fresh-install Big 6 drafts (fresh-install Step 2) get per-section confirmation - that path is the interactive first-run wizard. Migration does NOT confirm between steps - it chains through per the no-prompt contract (the Step 0 identity gate is the only prompt, the archive is the safety net). The skill invocations in migration Step 5 (SessionUpdate) and Step 6 (MemoryUpdate -FULL) run the canonical staging pipeline and auto-apply per their own rules.
-- **Canonical skill pipeline is the writer.** SessionUpdate owns SESSION + SESSION_EXTENDED writes (migration Step 5). MemoryUpdate owns MEMORY + MEMORY_EXTENDED + BACKLOG writes (migration Step 6). Setup does not directly write into these files - it loads archive content into context and delegates.
-- **Archive is the safety net.** `AIDOCS/<X>_SETUP_ARCHIVE/` stays in place after migration. User deletes when verified.
-- **Idempotent.** Re-runs skip filled sections, refresh sync, re-offer skipped sections. A migration-completed project re-running Setup sees "refresh" not "migration" and walks the fresh path harmlessly.
-- **CHANGELOG is AutoPush's domain.** Setup does not compose new release entries. Migration Step 7 normalizes archived blocks to canonical structure and voice (Keep a Changelog + Semantic Versioning + AutoPush wording rules) without inventing facts.
-- **SESSION LIFO from migration is intentional.** SessionUpdate at migration Step 5 writes archive-derived events to SESSION LIFO as part of the migration. That is the canonical capture mechanism. After Setup completes, the user does not need to run a separate SessionUpdate to log "the migration happened" - migration Step 5 already captured the project history.
+- **Migration captures, never distills.** It ends at capture + restore + scrub + doctor, sets the gate, and stops. `/321 -Update` distills later with fresh context. Capture loses nothing - uncertain content lands in SESSION LIFO, never dropped (reconciliation re-homes it). The DEV-AUDIT / AGENTS dedup is a manual follow-up outside the Update lane.
+- **No mid-flow prompts in migration.** The Step 0 identity gate is the only one, the archive is the safety net. Per-section confirmation is fresh-install only.
+- **Skills are the writer.** SessionUpdate owns SESSION (Step 5), MemoryUpdate owns MEMORY + BACKLOG (Step 6). Setup loads context and delegates, it does not write these directly. CHANGELOG is AutoPush's domain (Step 7 only reformats, never invents).
+- **Archive is the safety net**, kept until the user deletes it. Idempotent: a completed project re-running Setup sees "refresh", not "migration".
