@@ -219,6 +219,14 @@ Where `<tmp>` is the freshly-cloned source (the same temp dir used by the public
 
 Why this works without `--force`: archive in migration Step 1 moved all scaffold-class files into `AIDOCS/<X>_SETUP_ARCHIVE/`. The target's scaffold paths are now empty, so `init`'s "write if missing" semantics write fresh. Engine paths get rewritten (always-replace). Auto-memory dir gets merge-copied (preserves any personal rules already there).
 
+**Engine freshness gate (prevents skill / engine skew).** `init` re-lays the engine from `<tmp>`, so a stale `<tmp>` can leave a laid engine missing commands this migration depends on while the skill body you are running expects them - the run then fails mid-Step-3 with a confusing `Unknown command: import-skills`. Catch it here, immediately after init:
+
+```bash
+node AIDOCS/tools/memory.mjs help
+```
+
+Confirm the Commands list includes `import-skills`, `migrate-import`, and `migrate-restore`. If any is missing, `<tmp>` was a stale checkout - STOP. Re-run this step with `<tmp>` sourced from current `main` (a fresh clone, or the local standards repo if up to date), then re-verify. The skill body and the engine must be the same version before Step 3 runs.
+
 ### Step 3: Import easy skills, then sync + health
 
 The migration archived the project's legacy skill tree in Step 1. Bring its own skills forward mechanically before sync. `import-skills` copies each legacy body into `AIDOCS/SKILL/` under the canonical `SKILL_<FUNC>.md` name. It NEVER overwrites a canonical body, so net-new skills land and any that share a function with a canonical skill (auto-push, session-update, and the like) are reported as collisions, left for `/321 -Update` to merge.
