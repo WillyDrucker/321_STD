@@ -282,7 +282,10 @@ Commands:
             anchored MAIN bullet. Migration capture step - distillation deferred
             to the reconciliation pass (the gated /321 -Update).
             --from <archived EXTENDED path> --skill <session-update | memory-update>
-            [--old <OLD_NAME> --new <NEW_NAME>] [--dry-run]
+            [--old <OLD_NAME> --new <NEW_NAME>] [--dry-run] [--append]
+            --append merges into an existing lane staging (anchor-deduped) instead
+            of refusing - used to pile swept scavenge docs onto the 321 import. A
+            doc with no headings / bold-leads imports as a single entry.
 
   help      Print this message.
 

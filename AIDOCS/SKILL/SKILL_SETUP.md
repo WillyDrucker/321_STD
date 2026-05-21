@@ -347,6 +347,15 @@ node AIDOCS/tools/memory.mjs migrate-import \
 
 This writes `staging/session-update.json` with one `### sub-section` per archived entry (one per `### H3` in-flight item, while flat `**bold-lead.**` entries under an `## H2` split one-per-entry) plus one anchored MAIN LIFO bullet per sub-section. The MAIN bullet's `extended_anchor` is the sub-section's slug, so the commit orphan check passes by construction. `--old`/`--new` apply the project rename, and legacy tokens (DEV-STANDARDS, SKILLS) normalize automatically. No content drops - the 10-line prose cap is advisory (post-write lint), never a reason to compress.
 
+**Part A2 - append the swept session-lane scavenge docs (lossless, never dropped).** The Step 1 sweep archived AI-state docs (a `TEMP/` legacy dump, `.claude/` notes, loose handoff / session files). Import each session-shaped one onto the SAME staging with `--append` - do NOT fold it through judgment or drop one as "not authoritative" or "git history covers it", which is a reconcile decision, not a capture one:
+
+```bash
+node AIDOCS/tools/memory.mjs migrate-import \
+  --from AIDOCS/<X>_SETUP_ARCHIVE/<swept-doc> --skill session-update --append --old <OLD> --new <X>
+```
+
+One run per session-shaped swept doc (handoff, active session, in-flight notes). `--append` merges and re-uniquifies slugs against what is already staged, and a doc with no headings imports as a single entry (the engine falls back). Memory / project-notes / standards-shaped docs go to the Step 6 memory lane, user reference docs (setup guides, style maps) restore to WDDOCS in Step 7. Unsure which lane -> memory. The over-import is intentional - reconciliation distills and dedups all of it.
+
 **Part B - SessionUpdate appends to the same staging.** Run SessionUpdate, but instead of writing its own fresh staging, **add its ops to the staging file Part A produced**:
 
 - `overwrite_section current_state` - Current State drafted from archived SESSION Current State + current code reality
@@ -354,7 +363,7 @@ This writes `staging/session-update.json` with one `### sub-section` per archive
 
 Do NOT re-derive SESSION_EXTENDED sub-sections - Part A already captured them losslessly. Adding history LIFO bullets that are NOT anchored to an imported sub-section is fine.
 
-**Capture-completeness (Setup only).** Source projects often embed content the 321 model splits across files - Known Issues / watch-lists, Next Steps, explicit memory-promotion flags, loose notes - directly in their SESSION or handoff file. The Step 1 sweep's artifacts (a `TEMP/` legacy dump, `.claude/` notes, loose memory / handoff docs) are capture source on equal footing with the archived LIFO, in 321-shaped migrations too - distill them into BACKLOG / MEMORY / SESSION here, never leave them only in the archive. Route what has a clear home (forward work to BACKLOG in Step 6, durable constraints to MEMORY in Step 6), but when a section's home is genuinely unclear, land it as a SESSION LIFO bullet rather than dropping it. During migration this overrides SessionUpdate's routine DROP rows (forward-looking work, durable observations, code patterns) - those assume the content already has another home, which at capture time it may not. Setup captures, it does not judge - the reconciliation pass (`/321 -Update`) re-homes or drops it against the full import. This catch-all is Setup-only: routine `/321` passes never demote uncertain content into SESSION (a promote-then-demote loop), they read session data and promote upward or leave it in place.
+**Capture-completeness (Setup only).** Source projects often embed content the 321 model splits across files - Known Issues / watch-lists, Next Steps, explicit memory-promotion flags, loose notes - directly in their SESSION or handoff file. The Step 1 sweep's whole AI-state docs are imported losslessly by Part A2 above (`migrate-import --append`), not folded by judgment or dropped. This catch-all is for content embedded INSIDE a file (Known Issues, watch-lists, Next Steps, memory-promotion flags) that lacks a clear home: land it in SESSION LIFO rather than dropping it. Route what has a clear home (forward work to BACKLOG in Step 6, durable constraints to MEMORY in Step 6), but when a section's home is genuinely unclear, land it as a SESSION LIFO bullet rather than dropping it. During migration this overrides SessionUpdate's routine DROP rows (forward-looking work, durable observations, code patterns) - those assume the content already has another home, which at capture time it may not. Setup captures, it does not judge - the reconciliation pass (`/321 -Update`) re-homes or drops it against the full import. This catch-all is Setup-only: routine `/321` passes never demote uncertain content into SESSION (a promote-then-demote loop), they read session data and promote upward or leave it in place.
 
 **One commit for both parts, auto-prune suppressed.** `--no-prune` keeps the whole migration purely additive - nothing is reaped until the separate reconciliation pass (the gated `/321 -Update`), so the lossless import is never pruned mid-flight:
 
@@ -380,6 +389,15 @@ node AIDOCS/tools/memory.mjs migrate-import \
 ```
 
 This writes `staging/memory-update.json` with one `### sub-section` per archived entry plus one anchored MAIN LIFO bullet each. A dense flat section (an `## H2` holding many `**bold-lead.**` paragraphs) splits per bold-lead, one sub-section each, so no single entry collides with the 10-line cap. List-item bolds (`- **x**`) stay as body of their parent entry.
+
+**Part A2 - append the swept memory-lane scavenge docs (lossless, never dropped).** Same as Step 5 Part A2, for the memory-shaped swept docs (project notes, dev-standards / conventions, architecture or pitfall notes). Import each onto the memory staging with `--append`, never dropping one as "git history is authoritative" - capture it, let reconciliation decide what survives:
+
+```bash
+node AIDOCS/tools/memory.mjs migrate-import \
+  --from AIDOCS/<X>_SETUP_ARCHIVE/<swept-doc> --skill memory-update --append --old <OLD> --new <X>
+```
+
+A headless doc imports as a single entry. This is the capture half - the raw over-import (the 321 EXTENDED plus every swept doc) is intentional and gets distilled and cross-deduped by the reconciliation pass (`/321 -Update`).
 
 **Part B - MemoryUpdate -FULL appends to the same staging.** Run MemoryUpdate -FULL for its classification + Big-6 fill, but skip its Step 1 (the SessionUpdate auto-invoke) - Step 5 already captured SESSION this run, and re-invoking it would re-walk the conversation and demote the fresh Current State. Add its ops to the staging file Part A produced:
 

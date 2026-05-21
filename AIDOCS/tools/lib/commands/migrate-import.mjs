@@ -21,6 +21,7 @@
 
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { basename } from "node:path";
 import process from "node:process";
 
 import { err, parseFlags, requireOpt } from "../cli.mjs";
@@ -34,7 +35,7 @@ const VALID_SKILLS = ["session-update", "memory-update"];
 const META_HEADING = /^(what goes in|what doesn't|what does not|pruning|pruning rule|purpose|lifo|in-flight items.*)$/i;
 
 export async function cmdMigrateImport(args) {
-  const opts = parseFlags(args, ["from", "skill", "old", "new", "dry-run"]);
+  const opts = parseFlags(args, ["from", "skill", "old", "new", "dry-run", "append"]);
   requireOpt(opts, "from");
   requireOpt(opts, "skill");
   if (!VALID_SKILLS.includes(opts.skill)) {
@@ -54,13 +55,32 @@ export async function cmdMigrateImport(args) {
   if (opts.old && opts.new) content = normalizeNames(content, opts.old, opts.new);
   content = normalizeLegacy(content);
 
-  const entries = parseEntries(content);
+  let entries = parseEntries(content);
   if (entries.length === 0) {
-    err(`No importable entries found in ${opts.from}. Check the file shape.`);
+    // No headings or bold-leads to split on. Import the whole doc as one entry so
+    // a freeform scavenge file (loose notes with no structure) is still captured
+    // losslessly - the reconciliation pass distills it later. Title from the H1,
+    // else the filename stem.
+    const title = (content.match(/^#\s+(.+?)\s*$/m)?.[1] || basename(fromPath).replace(/\.md$/i, "")).trim();
+    const body = content.replace(/^#\s+.+$/m, "").trim();
+    if (title && body) entries = [{ title: stripTrailingPeriod(title), body }];
+  }
+  if (entries.length === 0) {
+    err(`No importable content found in ${opts.from} (empty after normalization).`);
     process.exit(17);
   }
 
+  // --append merges into an existing lane staging. The Setup flow imports the 321
+  // EXTENDED first, then appends each swept scavenge doc onto the same staging.
+  // Seed the slug set with the existing anchors so appended entries get
+  // collision-free -N suffixes against what is already staged.
+  const append = opts.append === true;
+  const existing = (append && existsSync(stagingPath(opts.skill)))
+    ? JSON.parse(await readFile(stagingPath(opts.skill), "utf8"))
+    : null;
+
   const used = new Set();
+  if (existing) for (const ea of existing.extended_actions || []) { if (ea.anchor) used.add(ea.anchor); }
   const actions = [];
   const extendedActions = [];
   for (const entry of entries) {
@@ -83,7 +103,15 @@ export async function cmdMigrateImport(args) {
     actions.push({ op: "lifo_insert", section: "lifo", bullet: heading, extended_anchor: slug });
   }
 
-  const staging = { skill: opts.skill, mode: "full", actions, extended_actions: extendedActions };
+  const staging = existing
+    ? {
+        skill: opts.skill,
+        mode: existing.mode || "full",
+        actions: [...(existing.actions || []), ...actions],
+        extended_actions: [...(existing.extended_actions || []), ...extendedActions],
+        ...(existing.backlog_actions ? { backlog_actions: existing.backlog_actions } : {}),
+      }
+    : { skill: opts.skill, mode: "full", actions, extended_actions: extendedActions };
   const out = `${JSON.stringify(staging, null, 2)}\n`;
 
   if (opts["dry-run"] === true) {
@@ -93,17 +121,19 @@ export async function cmdMigrateImport(args) {
     return;
   }
 
-  // Do not clobber existing staging. In the Setup flow migrate-import CREATES
-  // the lane staging the sub-skill then appends to, so a pre-existing file means
-  // a prior run is in flight - overwriting would silently drop those ops. Make
-  // the caller clear it deliberately.
-  if (existsSync(stagingPath(opts.skill))) {
-    err(`Staging already exists at ${stagingPath(opts.skill)}. Clear it first (node AIDOCS/tools/memory.mjs clear --skill ${opts.skill}) or commit it, then re-run.`);
+  // Do not clobber existing staging unless --append was passed. In the Setup flow
+  // migrate-import CREATES the lane staging the sub-skill then appends to, so a
+  // pre-existing file (without --append) means a prior run is in flight -
+  // overwriting would silently drop those ops. Make the caller decide: clear,
+  // commit, or --append to merge.
+  if (!append && existsSync(stagingPath(opts.skill))) {
+    err(`Staging already exists at ${stagingPath(opts.skill)}. Clear it first (node AIDOCS/tools/memory.mjs clear --skill ${opts.skill}), commit it, or pass --append to merge into it, then re-run.`);
     process.exit(14);
   }
   await writeFile(stagingPath(opts.skill), out, "utf8");
-  console.log(`migrate-import: ${entries.length} entries -> ${stagingPath(opts.skill)}`);
-  console.log(`  ${extendedActions.length} extended_actions (### sub-sections), ${actions.length} anchored MAIN bullets.`);
+  const verb = existing ? "appended" : "wrote";
+  console.log(`migrate-import: ${verb} ${entries.length} entries -> ${stagingPath(opts.skill)}`);
+  console.log(`  ${extendedActions.length} new extended_actions (### sub-sections), ${actions.length} new anchored MAIN bullets${existing ? ` (staging now ${staging.extended_actions.length} total)` : ""}.`);
   console.log(`Next: node AIDOCS/tools/memory.mjs validate --skill ${opts.skill} && node AIDOCS/tools/memory.mjs commit --skill ${opts.skill}`);
 }
 
