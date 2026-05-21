@@ -45,7 +45,18 @@ Bring MEMORY + MEMORY_EXTENDED back under cap through these intelligent edits (m
 
 Then wire and verify: `node AIDOCS/tools/memory.mjs sync` (repoints dispatch, populates `skills.local_additions`) then `node AIDOCS/tools/memory.mjs doctor` (the Local overrides check confirms each override is named to match its generic, dispatch points at it, and `local_additions` records it). The override is direct curated edits gated by doctor, same mechanism as the rest of this pass. Report the outcome per body in the Step 5 summary.
 
-Unlike the skills lane above (which runs in-gate), the DEV-AUDIT Project specifics dedup and AGENTS / CLAUDE classification are a separate manual follow-up Setup points the user at - they are outside Update's SESSION / MEMORY / BACKLOG write lane and stay out of this gate.
+**AGENTS / CLAUDE classification lane.** The migration archived the project's old `AGENTS.md` and `CLAUDE.md` and `init` wrote the canonical lean skeleton over them. This lane folds the archived orchestrator content into the right home, keeping `AGENTS.md` a lean index. For each block in the archived files, apply the reconciliation principle (canonical scan wins on overlap, contradictions surface, complements keep):
+
+- Cold-start orientation / read-order / Hard-rules pointer -> the canonical `AGENTS.md` (target ~50 lines, 80 ceiling, no routed block over ~10 lines, prefer a one-line pointer over an inlined block). Keep the canonical spine intact: Purpose header, Cold-start load order, layout / `_index.json` pointer.
+- Project conventions / product principles / durable architecture -> `<X>_MEMORY.md` (Conventions or the matching Big 6 section).
+- Code-applicable rules -> `<X>_DEV-AUDIT.md` Project specifics.
+- A duplicate of the canonical skeleton -> drop. A contradiction -> surface for the user.
+
+`CLAUDE.md` stays the canonical `@AGENTS.md` import - route any substantive archived CLAUDE content the same way (the two orchestrator files are usually near-duplicates, so dedup them against each other). Confirm auto-memory Hard-rules pointers with doctor's Auto-memory pointers check.
+
+**DEV-AUDIT Project-specifics dedup lane.** Setup restored the project's `## Project specifics` verbatim. Walk each restored sub-section against the canonical baseline (the Anchor principles / Hard rules / Audit dimensions above the divider, which `init` wrote identically across every project): DROP if it duplicates the baseline or restates MEMORY (MEMORY owns project-anchored rules), KEEP if it is purely project-specific (build / lint commands, language version, framework gotchas) or extends the baseline with real specifics, SURFACE contradictions. Only `## Project specifics` is reconciled - never dedup, rewrite, or contradiction-scan the baseline above the divider. The DEV-AUDIT Hard rules block is an intentional audit-facing copy of the auto-memory inventory (also surfaced in AGENTS Hard rules) - that triplication is by design for visibility, not drift to reconcile.
+
+All lanes are direct curated edits gated by doctor, the same mechanism as the distillation. The one step that stays the user's is deleting `AIDOCS/<X>_SETUP_ARCHIVE/` once they are satisfied - the archive is the recovery net, so its removal is a human call, not part of the gate.
 
 ## What this skill does differently
 
@@ -163,17 +174,18 @@ Post-migration reconciliation complete. Gate cleared (reconcile_pending: false).
   BACKLOG:   <K> items swept from WDDOCS
   Skills:    <N> custom body(ies) reconciled - <A> override(s) -> AIDOCS/SKILL_LOCAL/,
              <B> folded into MEMORY / DEV-AUDIT, <C> surfaced for your decision
+  AGENTS:    <N> archived blocks classified (kept lean / -> MEMORY / -> DEV-AUDIT / dropped)
+  DEV-AUDIT: <N> Project-specifics sub-sections kept, <D> dropped as baseline / MEMORY dupes
   Doctor:    0 structural, <N> content/prose (all pre-existing user WDDOCS,
              migration-written files clean: 0 over-length anchors / markers)
 
-Still pending (manual, outside this lane): DEV-AUDIT Project specifics dedup +
-AGENTS / CLAUDE classification. See the /321 -Setup summary deferred follow-ups.
+Only step left to you: delete AIDOCS/<X>_SETUP_ARCHIVE/ once satisfied (the recovery net).
 ```
 
 ## Rules (skill operation)
 
 - **Reconciliation gate first, silent when off.** Read `reconcile_pending` before Step 0. Set -> this run is the post-migration distillation pass (force `-FULL`, apply the framing, distill via direct edits, clear the gate after doctor verifies). Off -> normal chain, never mention the gate.
-- **Reconciliation re-homes custom skill bodies too.** When the gate is set, classify each archived custom `/321` body: executable override -> `AIDOCS/SKILL_LOCAL/`, engine-superseded -> fold genuine deviations into MEMORY / DEV-AUDIT, workflow divergence -> surface for the user. `sync` + `doctor` wire and verify. Routine (non-gated) updates never touch skill bodies.
+- **Reconciliation re-homes everything the migration captured.** When the gate is set, beyond SESSION / MEMORY / BACKLOG it also runs the skills lane (custom `/321` bodies -> `AIDOCS/SKILL_LOCAL/` override or fold), the AGENTS / CLAUDE classification lane (archived orchestrator content -> lean AGENTS / MEMORY / DEV-AUDIT), and the DEV-AUDIT Project-specifics dedup lane. All are direct edits gated by doctor. Routine (non-gated) updates touch none of these. The only manual step left is deleting the setup archive when satisfied.
 - **Single shared pass.** One conversation walk, one context gather. Per-lane commits stay separate for independent recovery.
 - **Session before Memory.** Session commits first so partial failures stay contained.
 - **`-FULL` auto-applies gap-fill + promotion.** No per-entry confirms.

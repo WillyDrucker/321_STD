@@ -342,7 +342,7 @@ The remaining layers need judgment or network, so they stay manual:
 
 1. **`.gitignore`.** Restore archived verbatim, then append a `# 321_STD additions` block with any entries the new install needs that the archive lacks (TEMP/, staging files, state.json). Conservative on dedup - a false positive is safer than dropping a real entry.
 
-2. **DEV-AUDIT Project specifics.** Extract `## Project specifics` from archived `<X>_DEV-AUDIT.md` (or DEV-STANDARDS legacy) and insert into the new DEV-AUDIT's Project specifics verbatim. The canonical baseline (anchor principles, Hard Rules) is untouched. **Do not dedup here** - the deferred manual pass (reconciliation surface below) walks it against the baseline. Bias: preserve everything.
+2. **DEV-AUDIT Project specifics.** Extract `## Project specifics` from archived `<X>_DEV-AUDIT.md` (or DEV-STANDARDS legacy) and insert into the new DEV-AUDIT's Project specifics verbatim. The canonical baseline (anchor principles, Hard Rules) is untouched. **Do not dedup here** - `/321 -Update`'s DEV-AUDIT lane walks it against the baseline. Bias: preserve everything.
 
 3. **`CHANGELOG.md`.** Reformat archived entries to canonical structure and voice per `SKILL_AUTO-PUSH.md` (its CHANGELOG composition: `## [<VERSION>] - <YYYY-MM-DD>`, `### Added / Changed / Fixed / Removed`). Two distinct operations: **content fidelity** (reformatting invents no facts - sparse stays sparse, a missing date marks `<unknown>`) and **voice scrub** (mechanical: semicolon -> period/comma, em dash -> space-dash-space, applied even if the source skipped it). The archive keeps originals, so the user reviews after the run.
 
@@ -384,7 +384,7 @@ This sets `reconcile_pending: true` in `state.json`. The next `/321 -Update` rea
 
 **Stop after this step.** Print the Step 11 summary and end the run. Do not chain into reconciliation - it is a separate invocation. The user runs `/321 -Update` next.
 
-**Two manual follow-ups stay outside the Update lane** (detailed in the deferred surface below, surfaced in the summary): the DEV-AUDIT Project specifics dedup and the AGENTS / CLAUDE classification. Both are judgment edits on files the skills do not own, so they are not part of the gated `/321 -Update` pass.
+**All reconciliation runs in the gated `/321 -Update` pass** - SESSION / MEMORY / BACKLOG distillation, custom skill bodies, AGENTS / CLAUDE classification, and DEV-AUDIT Project-specifics dedup (mechanics in `SKILL_UPDATE.md`). Setup captures everything raw and sets the gate, it does not distill. The one step that stays the user's is deleting the setup archive once satisfied.
 
 ### Step 11: Summary
 
@@ -403,7 +403,7 @@ Custom skills:     <N> custom /321 body(ies) archived (<list>). Generic profile 
 Doctor:            <pass> | <N user-content lint warnings>, <K> import size warnings (expected)
 SessionUpdate:     SESSION + SESSION_EXTENDED written, <N> LIFO entries
 MemoryUpdate:      MEMORY Big 6 filled, <N> LIFO entries, BACKLOG <K> items (raw import, un-distilled)
-DEV-AUDIT:         Project specifics restored (dedup deferred to manual review)
+DEV-AUDIT:         Project specifics restored (dedup deferred to /321 -Update)
 WDDOCS:            <N> files restored
 ENV:               <N> files restored (renamed <M> filenames if project was renamed)
 CHANGELOG:         normalized to canonical voice, <N> version blocks
@@ -420,44 +420,29 @@ import is over-split, over-cap, with raw [+] bullets and the source project's
 migration trail intact. /321 -Update reads the gate and runs the distillation
 pass (merge over-split, drop duplicates / dead code, rewrite to descriptive [+]
 bullets, strip the trail, sweep BACKLOG against WDDOCS), then clears the gate.
-It also runs the skills-lane: each archived custom /321 body becomes an executable
-override in AIDOCS/SKILL_LOCAL/ or folds into DEV-AUDIT / MEMORY. Until then the
-generic profile applies, so a custom release pipeline is not yet in effect.
-Migration is NOT complete until it runs.
+It also runs the skills-lane (archived custom /321 bodies -> AIDOCS/SKILL_LOCAL/
+override or fold), the AGENTS / CLAUDE classification lane (archived orchestrator
+content -> lean AGENTS / MEMORY / DEV-AUDIT), and the DEV-AUDIT Project-specifics
+dedup. Until then the generic profile applies, so a custom release pipeline is not
+yet in effect. Migration is NOT complete until it runs.
 
-Deferred manual follow-ups (outside the /321 -Update lane):
+/321 -Update reconciles all of the above in-gate (SESSION / MEMORY / BACKLOG, custom
+skill bodies, AGENTS / CLAUDE classification, DEV-AUDIT dedup), surfacing any
+contradictions for you mid-run. One step stays yours afterward:
 
-1. AGENTS.md / CLAUDE.md classification. Archived AGENTS.md (<N> bytes) + CLAUDE.md
-   (<bytes>, substantive=<Y/N>) hold orchestrator content Setup did NOT auto-classify.
-   Route each block per the deferred surface below, keeping AGENTS.md a lean index (~50 lines).
-2. DEV-AUDIT Project specifics dedup. Walk the restored Project specifics against the
-   canonical baseline per the reconciliation principle (deferred surface below).
-
-Review needed (contradictions surfaced, not auto-resolved):
-  - <file A> says X / <file B> says not-X
-  (empty block if none)
-
-3. Delete AIDOCS/<X>_SETUP_ARCHIVE/ ONLY after /321 -Update and the manual follow-ups
-   are complete. The archive is the safety net - keep it until the project feels right.
+Delete AIDOCS/<X>_SETUP_ARCHIVE/ ONLY once /321 -Update has run and the result feels
+right. The archive is the safety net - keep it until the project does.
 ```
 
 ### Deferred reconciliation surface (reference)
 
-The migration defers all distillation. The work splits across homes:
+The migration defers all distillation to the gated `/321 -Update` pass, which reconciles everything it captured. Nothing is a manual follow-up:
 
-- **SESSION / MEMORY / BACKLOG distillation -> `/321 -Update`** (gated by `reconcile_pending`). This is the primary reconciliation: it distills the raw import to a steady state. The mechanics live in `SKILL_UPDATE.md` (the reconciliation gate) and `SKILL_MEMORY-UPDATE.md` (the record conventions). Setup does not run it - it only sets the gate.
-- **Custom `/321` skill bodies -> `/321 -Update` skills-lane** (same gated pass). Each archived custom body is classified: an irreducibly project-specific pipeline (a release / deploy flow, a project audit rule-set) becomes an executable override at `AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md` (normalized to the generic frontmatter `name`, project rename + voice scrub applied, recorded in `customizations[]`), while one the generic engine now supersedes folds its genuine deviations into `<X>_DEV-AUDIT.md` or `<X>_MEMORY.md` and is dropped. Mechanics in `SKILL_UPDATE.md`.
-- **DEV-AUDIT Project specifics + AGENTS classification -> manual follow-up.** These files are outside the skills' write lane, so they are not part of the gated pass. The guidance below is for the user (or an AI acting on the user's behalf) to apply after `/321 -Update`.
+- **SESSION / MEMORY / BACKLOG distillation** - the raw import distilled to a steady state. Mechanics in `SKILL_UPDATE.md` (the reconciliation gate) and `SKILL_MEMORY-UPDATE.md` (the record conventions).
+- **Custom `/321` skill bodies** (skills-lane) - each archived custom body becomes an executable override at `AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md` (recorded in `customizations[]`) or folds its genuine deviations into `<X>_DEV-AUDIT.md` / `<X>_MEMORY.md`.
+- **AGENTS / CLAUDE classification + DEV-AUDIT Project-specifics dedup** - archived orchestrator content folds into a lean `AGENTS.md` / MEMORY / DEV-AUDIT, and the restored DEV-AUDIT Project specifics dedup against the canonical baseline.
 
-**The reconciliation principle** (the nudge for the manual DEV-AUDIT / AGENTS pass):
-
-> "Our canonical scan is the source of truth. Restored content is supplemental detail. When they overlap, the scan wins - drop or trim the restored copy. When they contradict, surface for review. When they complement (restored adds project specifics the scan couldn't derive), keep both."
-
-**Scope guard - only `## Project specifics` is reconciled in DEV-AUDIT.** The baseline above the divider (Anchor principles, Hard rules, Audit dimensions) is canonical 321_STD content `init` wrote, identical across every project. Do NOT dedup, rewrite, or contradiction-scan it, and never pull it into MEMORY. The DEV-AUDIT "Hard rules" block is an intentional audit-facing copy of the auto-memory inventory (also surfaced in AGENTS.md Hard rules) - that triplication is by design for visibility, not drift to reconcile.
-
-For each restored DEV-AUDIT Project-specifics sub-section: DROP if it duplicates the canonical baseline or restates MEMORY (MEMORY is the home for project-anchored rules), KEEP if it is purely project-specific (build commands, ESLint config, language version) or extends canonical with real specifics, SURFACE contradictions for review.
-
-For AGENTS.md: verify every preserved feedback file in auto-memory has a Hard Rules pointer (Step 7 layer 8 should have added it), alphabetize the block, and remove pointers for files no longer present. Aim to hold the whole file at ~50 lines (the canonical skeleton size), 80 a hard ceiling, with no single routed block over ~10 lines - prefer a one-line pointer over an inlined block. Apply the lean test to any restored Project Specifics block - if a cold-start session would not be confused without it in the first 60 seconds, move it down the chain (DEV-AUDIT Project specifics for code rules, MEMORY Conventions for project conventions). The Purpose header, Cold-start load order, and Layout /_index.json pointer stay - they are the index spine.
+Setup only sets the gate. The full per-lane mechanics - the reconciliation principle (canonical scan wins on overlap, contradictions surface, complements keep), the DEV-AUDIT scope guard (only `## Project specifics`, never the baseline), and the AGENTS lean targets - all live in `SKILL_UPDATE.md`.
 
 ## Rules (skill operation)
 
