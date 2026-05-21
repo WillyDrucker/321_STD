@@ -227,13 +227,7 @@ Create `AIDOCS/<X>_SETUP_ARCHIVE/` in the target. **Move** (not copy) the projec
 - `AIDOCS/ENV/`
 - `WDDOCS/`
 
-`<X>` was already resolved in Step 0 (the identity-conflict gate runs there, before `init`). The resolution precedence Step 0 uses:
-
-1. **Target directory's basename** wins by default. The user controls naming by naming their folder.
-2. If basename is invalid (does not match `^[A-Za-z][A-Za-z0-9_-]*$`), fall back to archived `_index.json -> project_name`.
-3. If both fail, fall back to the dominant archived filename pattern (whichever `<NAME>_MEMORY.md` pattern has the most matching files).
-
-Step 0 also raised the identity-conflict gate if the basename disagreed with strong code-identity signals. By the time migration Step 1 runs, `<X>` is fixed. The banner already showed `Project name: <X> (from <source>)`. Archive preserves old names verbatim. Legacy name normalization in migration Step 4 rewrites archived prose references to the new name (the `migrate-import` command takes `--old`/`--new` for the EXTENDED files, and other restores apply the rename inline).
+`<X>` was resolved in Step 0 (basename wins, identity gate already fired). Archive preserves old names verbatim - legacy name normalization happens in Step 4 (`migrate-import --old/--new` for the EXTENDED files, inline rename for the rest).
 
 **Dual-pattern AIDOCS state** (legacy `OldName_*.md` alongside fresh `NewName_*.md` from a prior install): archive the legacy files (the migration source - they hold the content). The fresh `NewName_*.md` scaffolds only need to move aside so the reinstall in migration Step 2 lands cleanly. Delete any that are byte-identical to the init template - they are regenerable, hold nothing to preserve, and archiving empty scaffolds just clutters the safety net by reading as migrated content when they are not. Archive a `NewName_*` scaffold only when it carries real content (the prior install was worked on before the re-run). After reinstall, only the fresh `<X>_*.md` scaffolds remain at the project root.
 
@@ -262,15 +256,7 @@ Where to look (scan the whole tree, exclude build noise):
 - Hand-rolled assistant config at root: `AGENTS.md`, `CLAUDE.md`
 - The project's auto-memory directory, if one exists
 
-Classify each find on two axes: **who owns it** (a user document the user reads and edits, vs AI-tracked working state the assistant wrote to remember things between sessions and the user rarely opens) and **confidence it is stale AI state** (how sure you are it is safe to lift out of the working tree). Then route by confidence - the rule is move when sure, copy when unsure, and the archive is the safety net either way since nothing is deleted:
-
-- **High confidence AI-tracked and stale -> MOVE to `AIDOCS/<X>_SETUP_ARCHIVE/`** (it becomes migration source like the known-path list). Session-handoff files are the clearest case - they exist to bridge one session to the next and are throwaway once captured. Files plainly named as memory/session logs land here too.
-- **Auto-memory directory -> MOVE most of it** (AI-tracked by definition), with two carve-outs that stay put: `MEMORY.md` (the auto-memory index init manages) and `user_*.md` profiles. Init's auto-memory merge handles canonical files, and preserved user rules stay.
-- **Low confidence / might still be user content -> COPY into the archive, leave the original in place.** Ambiguous docs, anything half-user-half-AI, anything you cannot confidently call stale. The copy seeds the Big 6 fill and the capture passes (Steps 5/6) without disturbing the user's working tree.
-- **`CLAUDE.md` / `AGENTS.md` bodies** are archived by the known-path list above (init must rewrite them), but do NOT treat them as throwaway - users bloat them with real project rules. Their content is classified in the deferred review (Step 11), not discarded.
-- **Never sweep** user source, project config, build artifacts, or `README.md` - same exclusions as above.
-
-Record what moved vs what was copied (with the confidence call for each) for the Step 11 summary, so the user can see what was lifted out of their tree and what was left in place.
+Classify each find by who owns it (user doc vs AI working state) and confidence it is stale. Route: **move when sure** (clear AI state - session-handoff files, named memory/session logs - becomes migration source), **copy when unsure** (might be user content, leave the original in place), archive is the safety net since nothing is deleted. Auto-memory dir: move most, but leave its `MEMORY.md` index and `user_*.md` profiles. `CLAUDE.md` / `AGENTS.md` are archived above but classified in the Step 11 deferred review, not discarded. Never sweep source, config, build artifacts, or `README.md`. Record moved-vs-copied for the Step 11 summary.
 
 **Legacy cleanup before init:**
 
@@ -313,17 +299,9 @@ Files to read into context (verify each by quoting at least one section header b
 - `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/<X>_BACKLOG.md` (Features, Ideas)
 - `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/<X>_DEV-AUDIT.md` or `<X>_DEV-STANDARDS.md` (Project specifics, all sub-sections)
 - `AIDOCS/<X>_SETUP_ARCHIVE/AGENTS.md` and `CLAUDE.md` (orchestrator-level content if substantive)
-- **Swept artifacts (every migration):** also read every file the artifact discovery sweep moved or copied into the archive (session-handoff, loose memory/context/notes docs, a `TEMP/` legacy dump, swept assistant-state folders, the copied low-confidence files). For a standard project these ARE the project history (the 321-structured files above will not exist). For a 321-shaped project they are supplemental scavenge layered on top of the EXTENDED import - do not skip them because the canonical files exist. Read any session-handoff file first, it is usually the densest single source of Current State and recent arc.
+- **Swept artifacts (every migration):** also read every file the artifact discovery sweep moved or copied into the archive (session-handoff, loose memory/context/notes docs, a `TEMP/` legacy dump, swept assistant-state folders, the copied low-confidence files). For a standard project these ARE the project history (the 321-structured files above will not exist). For a 321-shaped project they are supplemental scavenge layered on top of the EXTENDED import - do not skip them because the canonical files exist. Read any session-handoff file first, it is usually the densest single source of Current State and recent arc. Read for Big-6 context - the EXTENDED depth is captured by the engine in Steps 5-6 regardless of what you read here.
 
-**Verification (do not skip):** after reading, list the H2 + H3 section headers you observed across all files. If MEMORY_EXTENDED, SESSION_EXTENDED, or any other file has zero sections in your list, you skipped it - read it now.
-
-While reading, normalize legacy references on the fly so what enters context is canonical:
-
-- `DEV-STANDARDS` -> `DEV-AUDIT`
-- `/321 -DevStandards` -> `/321 -DevAudit`
-- `AIDOCS/SKILLS/` -> `AIDOCS/SKILL/`
-- `SKILLS_<NAME>.md` -> `SKILL_<NAME>.md`
-- Project name renames: if migration Step 1 resolved the new install name differently from the archived `_index.json -> project_name`, rewrite the doc filename prefixes (`<OLD>_*.md` -> `<NEW>_*.md`) and the project's own scaffold references. **Preserve real identity verbatim, even when it contains the old name** - marketplace IDs, repo URLs, git branches (`<OLD>_v1.2.3`), code symbols / folders, env vars (`<OLD>_WORKSPACE_ID`), and filesystem paths (`~/.<old>/`) are not "the project name as a doc subject," they are real identifiers that break if rewritten. Only rewrite a bare prose project-name mention when the new name is genuinely the project's identity (the normal case, basename matches code identity). When the identity gate chose the basename OVER a disagreeing code identity, the content legitimately keeps describing the real product - lean to preserving it. Conservative on word-boundary matches.
+While reading, normalize legacy tokens so context is canonical (`DEV-STANDARDS` -> `DEV-AUDIT`, `/321 -DevStandards` -> `/321 -DevAudit`, `AIDOCS/SKILLS/` -> `AIDOCS/SKILL/`, `SKILLS_<NAME>` -> `SKILL_<NAME>`), and apply the project rename (`<OLD>_*.md` doc prefixes -> `<NEW>_*.md`). **Preserve real identifiers verbatim even when they contain the old name** - branches (`<OLD>_v1.2.3`), env vars (`<OLD>_WORKSPACE_ID`), bundle / marketplace IDs, repo URLs, code symbols, paths (`~/.<old>/`). Only rewrite a bare prose project-name mention, and only when the new name is the project's real identity (when the identity gate kept a disagreeing code identity, lean to preserving). Conservative on word boundaries.
 
 State a one-line framing for the next skill invocations:
 
@@ -335,7 +313,7 @@ Two parts share one commit. The engine does the lossless depth capture (EXTENDED
 
 **Standard-project case (no 321-structured EXTENDED).** When migration was triggered by standard-project signals, there is no archived `<OLD>_SESSION_EXTENDED.md` to feed `migrate-import`. Skip Part A and let Part B do the capture from the discovered/copied artifacts plus the code scan. A session-handoff file is the highest-value source here - it usually IS the prior session's Current State and recent history. Loose memory/context files contribute LIFO events. Lossless depth import only applies when a 321-shaped EXTENDED exists. Otherwise SessionUpdate's judgment is the capture mechanism (acceptable, since there is no curated EXTENDED structure to preserve verbatim).
 
-**Why split it this way.** Distillation at capture is irreversible loss - routing EXTENDED through a skill's judgment compresses it (sub-sections get dropped as "completed arcs"). So depth (EXTENDED sub-sections, the prior author's curated narratives) is captured VERBATIM by the engine, and only history (the SESSION LIFO event log) is distilled by the skill. The reconciliation pass (the gated `/321 -Update`) does any depth distillation later, against the complete import, auditable by diff.
+**Why split it this way.** Distillation at capture is irreversible loss. So the engine captures depth (EXTENDED sub-sections) VERBATIM, and only the SESSION LIFO event log is distilled by the skill. Reconciliation distills depth later against the complete import, auditable by diff.
 
 **Part A - lossless EXTENDED import.** Run the engine command against the archived SESSION_EXTENDED:
 
@@ -345,7 +323,7 @@ node AIDOCS/tools/memory.mjs migrate-import \
   --skill session-update --old <OLD> --new <X>
 ```
 
-This writes `staging/session-update.json` with one `### sub-section` per archived entry (one per `### H3` in-flight item, while flat `**bold-lead.**` entries under an `## H2` split one-per-entry) plus one anchored MAIN LIFO bullet per sub-section. The MAIN bullet's `extended_anchor` is the sub-section's slug, so the commit orphan check passes by construction. `--old`/`--new` apply the project rename, and legacy tokens (DEV-STANDARDS, SKILLS) normalize automatically. No content drops - the 10-line prose cap is advisory (post-write lint), never a reason to compress.
+`--old`/`--new` apply the project rename (legacy tokens normalize automatically). Lossless by construction, one `### sub-section` + one anchored MAIN bullet per entry - the engine README has the mechanics.
 
 **Part A2 - append the swept session-lane scavenge docs (lossless, never dropped).** The Step 1 sweep archived AI-state docs (a `TEMP/` legacy dump, `.claude/` notes, loose handoff / session files). Import each session-shaped one onto the SAME staging with `--append` - do NOT fold it through judgment or drop one as "not authoritative" or "git history covers it", which is a reconcile decision, not a capture one:
 
@@ -363,7 +341,7 @@ One run per session-shaped swept doc (handoff, active session, in-flight notes).
 
 Do NOT re-derive SESSION_EXTENDED sub-sections - Part A already captured them losslessly. Adding history LIFO bullets that are NOT anchored to an imported sub-section is fine.
 
-**Capture-completeness (Setup only).** Source projects often embed content the 321 model splits across files - Known Issues / watch-lists, Next Steps, explicit memory-promotion flags, loose notes - directly in their SESSION or handoff file. The Step 1 sweep's whole AI-state docs are imported losslessly by Part A2 above (`migrate-import --append`), not folded by judgment or dropped. This catch-all is for content embedded INSIDE a file (Known Issues, watch-lists, Next Steps, memory-promotion flags) that lacks a clear home: land it in SESSION LIFO rather than dropping it. Route what has a clear home (forward work to BACKLOG in Step 6, durable constraints to MEMORY in Step 6), but when a section's home is genuinely unclear, land it as a SESSION LIFO bullet rather than dropping it. During migration this overrides SessionUpdate's routine DROP rows (forward-looking work, durable observations, code patterns) - those assume the content already has another home, which at capture time it may not. Setup captures, it does not judge - the reconciliation pass (`/321 -Update`) re-homes or drops it against the full import. This catch-all is Setup-only: routine `/321` passes never demote uncertain content into SESSION (a promote-then-demote loop), they read session data and promote upward or leave it in place.
+**Capture-completeness (Setup only).** Whole swept docs are imported by Part A2. This catch-all is for content embedded INSIDE a file (Known Issues, Next Steps, memory-promotion flags, loose notes) that lacks a clear home: route what has one (forward work to BACKLOG, durable constraints to MEMORY in Step 6), and land the rest in SESSION LIFO rather than dropping it, even where SessionUpdate's routine rules would DROP it - at capture time it may have no other home. Setup captures, it does not judge: reconciliation re-homes or drops it later. Routine `/321` passes never do this (they promote upward, never demote into SESSION).
 
 **One commit for both parts, auto-prune suppressed.** `--no-prune` keeps the whole migration purely additive - nothing is reaped until the separate reconciliation pass (the gated `/321 -Update`), so the lossless import is never pruned mid-flight:
 
@@ -372,7 +350,7 @@ node AIDOCS/tools/memory.mjs validate --skill session-update
 node AIDOCS/tools/memory.mjs commit   --skill session-update --no-prune
 ```
 
-**Failure recovery.** If validate fails, fix the staging file and re-validate. If commit fails after validate succeeded (rare - filesystem error, concurrent edit), inspect SESSION + SESSION_EXTENDED for partial writes, restore from `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION.md` if needed, then re-run migration Step 5 from Part A. Archive is intact throughout - migration is recoverable up through migration Step 7.
+**Failure recovery.** Validate fails -> fix staging, re-validate. Commit fails -> the archive is intact, re-run from Part A. Recoverable through Step 7.
 
 ### Step 6: MEMORY capture (lossless EXTENDED import + MemoryUpdate -FULL)
 
@@ -388,16 +366,9 @@ node AIDOCS/tools/memory.mjs migrate-import \
   --skill memory-update --old <OLD> --new <X>
 ```
 
-This writes `staging/memory-update.json` with one `### sub-section` per archived entry plus one anchored MAIN LIFO bullet each. A dense flat section (an `## H2` holding many `**bold-lead.**` paragraphs) splits per bold-lead, one sub-section each, so no single entry collides with the 10-line cap. List-item bolds (`- **x**`) stay as body of their parent entry.
+Same lossless mechanics as Step 5 (the engine README has the detail).
 
-**Part A2 - append the swept memory-lane scavenge docs (lossless, never dropped).** Same as Step 5 Part A2, for the memory-shaped swept docs (project notes, dev-standards / conventions, architecture or pitfall notes). Import each onto the memory staging with `--append`, never dropping one as "git history is authoritative" - capture it, let reconciliation decide what survives:
-
-```bash
-node AIDOCS/tools/memory.mjs migrate-import \
-  --from AIDOCS/<X>_SETUP_ARCHIVE/<swept-doc> --skill memory-update --append --old <OLD> --new <X>
-```
-
-A headless doc imports as a single entry. This is the capture half - the raw over-import (the 321 EXTENDED plus every swept doc) is intentional and gets distilled and cross-deduped by the reconciliation pass (`/321 -Update`).
+**Part A2 - append the swept memory-lane scavenge docs.** Same as Step 5 Part A2, for memory-shaped docs (project notes, dev-standards / conventions, pitfall notes): `--append` each onto the memory staging, never dropped at capture as "git history covers it". Headless docs import as one entry. The raw over-import (321 EXTENDED plus every swept doc) is intentional - reconciliation distills and cross-dedups it.
 
 **Part B - MemoryUpdate -FULL appends to the same staging.** Run MemoryUpdate -FULL for its classification + Big-6 fill, but skip its Step 1 (the SessionUpdate auto-invoke) - Step 5 already captured SESSION this run, and re-invoking it would re-walk the conversation and demote the fresh Current State. Add its ops to the staging file Part A produced:
 
@@ -440,23 +411,9 @@ The skill pipeline owns MEMORY / SESSION / BACKLOG. The remaining archive conten
 
    Reformat and move on - the voice scrub is deterministic and the archive keeps the originals, so the user reviews the reformatted CHANGELOG after the run rather than confirming each entry mid-migration.
 
-7. **Auto-memory dir (per-machine).** The auto-memory dir at `_index.json -> auto_memory.path` was merge-copied by init (existing files preserved). For migration: refresh the canonical shared feedback rules to current versions, and preserve everything else (the index, profiles, references, project-specific rules).
+7. **Auto-memory dir (per-machine).** Init merge-copied it (existing files preserved). Refresh the shared canonical feedback rules to current (plus AI-judged near-matches, e.g. `feedback_no_dashes.md` -> `feedback_no_em_dashes.md`): `feedback_code_comments`, `_doc_purpose_header`, `_lean_docs`, `_no_subagents_for_review`, `_no_versions_in_code`, `_temp_folder_usage`, `_no_em_dashes`, `_no_dates_in_memory`. For each: back up to `_SETUP_ARCHIVE/automemory_pre_migrate/`, then fetch from `https://raw.githubusercontent.com/WillyDrucker/321_STD/main/AIDOCS/automemory/<file>` (`gh api repos/WillyDrucker/321_STD/contents/...` fallback) and overwrite (byte-identical -> skip). Fetch failure (network / 404) -> keep the archived copy, mark unresolved, never fail the migration.
 
-    **Refresh to current canonical** (the shared feedback rules, plus AI-judged near-matches - a filename close to a canonical like `feedback_no_dashes.md` -> `feedback_no_em_dashes.md`, or content covering the same rule worded differently):
-    - `feedback_code_comments.md`, `feedback_doc_purpose_header.md`, `feedback_lean_docs.md`, `feedback_no_subagents_for_review.md`, `feedback_no_versions_in_code.md`, `feedback_temp_folder_usage.md`, `feedback_no_em_dashes.md`, `feedback_no_dates_in_memory.md`
-
-    **Preserve (never overwrite):**
-    - `MEMORY.md` - the auto-memory INDEX. It lists the user's full rule set, including project-specific feedback, references, and profiles the canonical template lacks. Overwriting it drops those pointers. Keep it. If the canonical set added a feedback file the index does not list, append just that one pointer - never replace the index wholesale.
-    - `user_*.md` (profiles, including `user_name.md` renamed to `user_<actual>.md`), `reference_*.md`, and any other non-feedback file
-    - Any `feedback_*.md` not in the canonical list and not a near-match (project-specific rules)
-
-    **Procedure:**
-    1. Read each file. Categorize: canonical-feedback (or near-match), the `MEMORY.md` index, or preserve-as-is.
-    2. For canonical-feedback + near-match: copy to `AIDOCS/<X>_SETUP_ARCHIVE/automemory_pre_migrate/`, then fetch current canonical from `https://raw.githubusercontent.com/WillyDrucker/321_STD/main/AIDOCS/automemory/<filename>` (or `gh api repos/WillyDrucker/321_STD/contents/AIDOCS/automemory/<filename>` as an authenticated fallback) and overwrite. If the dir file is already byte-identical to canonical, leave it (no-op).
-    3. **Fetch failure (network / 404 / private without gh auth):** preserve the archived copy in place. Mark `unresolved - using archived version`. Never fail the migration on an auto-memory fetch error.
-    4. For the index and preserve-as-is files: leave in place.
-
-    Report: N canonical refreshed (or identical, left), index preserved, M profiles + K project-specific + references preserved, J unresolved.
+    **Preserve, never overwrite:** the `MEMORY.md` index (append a pointer if canonical added one, never replace it wholesale), `user_*.md` profiles (rename `user_name.md` -> `user_<actual>.md`), `reference_*.md`, and any project-specific `feedback_*.md` not in the canonical list. Report: N refreshed, index preserved, M profiles + K project-specific preserved, J unresolved.
 
 8. **AGENTS.md Hard Rules extension.** When the auto-memory dir has project-specific `feedback_*.md` files preserved in step 7 (not canonical, not user profiles), append pointers for them to the new AGENTS.md Hard Rules block so they are surfaced at the orchestrator level. Without this, the rules exist on disk but aren't visible at cold-start.
 
@@ -473,44 +430,25 @@ The skill pipeline owns MEMORY / SESSION / BACKLOG. The remaining archive conten
 
 ### Step 8: Voice scrub on migration-written files
 
-The canonical skill pipeline (Steps 5 + 6) and CHANGELOG normalization (Step 7 layer 6) walk archive content. AI judgment can preserve banned characters (em dashes `—`, semicolons `;`) when transferring archive prose into the canonical voice. This step is a deterministic catch-net.
+Steps 5-7 transfer archive prose into the canonical voice, and judgment can let banned characters (em dashes `—`, semicolons `;`) through. Scrub them in place across the migration-written files - `<X>_MEMORY(_EXTENDED)`, `<X>_SESSION(_EXTENDED)`, `<X>_BACKLOG`, `CHANGELOG`, and `AGENTS.md` if extended in 7.8 - skipping fenced code and inline-code spans:
 
-Scrub these files in place after Steps 5, 6, and 7 have all committed:
+- Em dash -> ` - ` (space-dash-space), trim double spaces.
+- Semicolon -> `.` (or `,` for a list continuation), capitalize the next word if it starts a sentence.
 
-- `AIDOCS/<X>_MEMORY.md` and `_MEMORY_EXTENDED.md`
-- `AIDOCS/<X>_SESSION.md` and `_SESSION_EXTENDED.md`
-- `AIDOCS/<X>_BACKLOG.md`
-- `CHANGELOG.md`
-- `AGENTS.md` (only if newly extended in step 7.8)
-
-**Scrub rules** (line-by-line, skip fenced code blocks and inline code spans):
-
-- **Em dash (`—`):** replace with ` - ` (space-dash-space). Trim resulting double-spaces.
-- **Semicolon (`;`)** in prose: replace with `.` followed by capitalization fix of the next word if it starts a new sentence-shaped clause. If the clause after the semicolon does not form a sentence (e.g., a parenthetical list continuation), replace with `,` instead. AI uses judgment per-instance, but the deterministic default is `.` (most archive prose semicolons separate sentences).
-
-**What NOT to scrub:**
-
-- Code blocks (anything inside triple-backtick fences)
-- Inline code spans (anything between single backticks)
-- Filenames with semicolons (unlikely but possible on some platforms - leave alone)
-- URL query strings (preserve `?key=value;other=value` if it appears)
-
-After the scrub, re-validate the affected staging trees (none expected since Steps 5 and 6 already committed - this is a direct in-place edit pass).
+Leave code spans, filenames, and URL query strings (`?a=b;c=d`) alone. Step 9 doctor confirms the result.
 
 ### Step 9: Post-restore doctor
 
-Run `doctor` after Steps 7 and 8. The scrub in Step 8 should have eliminated em dashes and semicolons from migration-written files. Doctor's remaining lint output should now flag only pre-existing prose in user-owned restored content (WDDOCS, README, .github, source code docs) plus the un-distilled raw import (over-cap MEMORY / MEMORY_EXTENDED, length warnings). Both are expected at this stage and get resolved by the reconciliation pass.
+Run `doctor` after Steps 7-8 and categorize:
 
 ```bash
 node AIDOCS/tools/memory.mjs doctor
 ```
 
-Categorize the output:
-
-- **Engine checks (Paths, State, Skill bodies, Auto-memory pointers, Router quick-ref, Customization manifest, Release profile):** must all pass. Failure here is a real structural issue and blocks migration completion.
-- **Banned-prose violations in MEMORY / SESSION / BACKLOG / CHANGELOG / AGENTS.md:** must be zero. If any remain after Step 8, the scrub missed cases - inspect and rescrub before completing.
-- **Size / length warnings on MEMORY / MEMORY_EXTENDED:** expected. The import is intentionally over-cap and over-split. The reconciliation pass (`/321 -Update`) brings it under cap through intelligent edits - do NOT hand-prune here.
-- **Banned-prose violations in WDDOCS / restored ENV / README:** surface as "user-content lint warnings" in the Step 11 summary. Do not fail Setup. User owns these files and can scrub them later or accept them as-is.
+- **Structural / engine checks** (Paths, State, Skill bodies, Reconcile residue, Auto-memory pointers, manifests) must pass - a failure blocks completion.
+- **Banned prose in MEMORY / SESSION / BACKLOG / CHANGELOG / AGENTS.md** must be zero. A survivor means Step 8 missed a case - rescrub.
+- **Size / length warnings on MEMORY(_EXTENDED)** are expected (the raw import is over-cap by design) - do NOT hand-prune, reconciliation handles it.
+- **Banned prose in WDDOCS / restored ENV / README** is pre-existing user content - surface as a warning in the Step 11 summary, do not fail Setup.
 
 ### Step 10: Mark reconciliation pending, then stop
 
