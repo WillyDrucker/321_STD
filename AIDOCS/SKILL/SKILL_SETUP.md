@@ -1,6 +1,6 @@
 ---
 name: setup
-description: First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (321-shaped, or a standard project's scattered AI artifacts via a confidence-graded discovery sweep), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent.
+description: First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (the known 321 layout plus scattered AI artifacts anywhere in the tree - TEMP dumps, .claude notes, loose memory or handoff files - via a confidence-graded discovery sweep that runs on every migration), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent.
 ---
 
 # /321 -Setup
@@ -33,7 +33,7 @@ The script can't decide what the project's Stack is, or whether the user prefers
 
 | Step | Action | AI does | Script does |
 |---|---|---|---|
-| 1 | Archive existing | Move project content to `AIDOCS/<X>_SETUP_ARCHIVE/` | Bash / PowerShell `mv` |
+| 1 | Archive existing + artifact sweep | Move known-path content + sweep TEMP / .claude / tree-wide AI-state files to `AIDOCS/<X>_SETUP_ARCHIVE/` | Bash / PowerShell `mv` |
 | 2 | Reinstall canonical | (none) | `init` |
 | 3 | Sync + health | Decide pass / fail | `sync` + `doctor` |
 | 4 | Load archive into context | Read archive files, normalize legacy refs as they enter context | (none) |
@@ -72,8 +72,9 @@ Read these signals in the target. **Any one of them flips Setup to migration mod
 - Memory/session-named docs not in 321 layout: `MEMORY*.md`, `*_MEMORY.md`, `SESSION*.md`, `CONTEXT*.md`, `NOTES.md`, `PROJECT.md`, `TODO.md` at root or in a docs-ish folder
 - An assistant-state folder with content: `.ai/`, `ai/`, `memory/`, `context/`, `.cursor/`, `.windsurf/`, `.aider*`, `.github/copilot-*`
 - The project's auto-memory directory holds AI-written `feedback_*` / log files beyond the canonical scaffold
+- AI-state markdown parked off the canonical layout: a `TEMP/` (or `tmp/`) dump of memory / session / handoff / notes docs, a `.claude/` doc beyond config, a legacy system copied into a subfolder, or memory / session / handoff-named `.md` files loose anywhere in the tree
 
-When a standard-project signal is what triggered migration (no 321-shaped signal present), the archive step runs the **artifact discovery sweep** (Step 1) instead of relying only on the known 321 path list, and Steps 5/6 capture from the discovered files plus the code scan rather than from a 321-structured EXTENDED. Everything else in the migration path is identical.
+The **artifact discovery sweep** (Step 1) runs on **every** migration, in addition to the known 321 path list - not only for standard projects. A 321-shaped project still hides prior AI state in non-canonical spots (a `TEMP/` legacy dump, a `.claude/` note, loose memory files), so the sweep is a universal scavenge, not a standard-project fallback. When no 321-structured EXTENDED exists (a pure standard project), Steps 5/6 capture from the swept files plus the code scan instead of the EXTENDED import. Everything else in the migration path is identical.
 
 **Branch decision (auto, no prompt):**
 
@@ -250,13 +251,15 @@ Step 0 also raised the identity-conflict gate if the basename disagreed with str
 - Build / dependency artifacts (`node_modules/`, `dist/`, `.next/`, etc.)
 - Project config (`package.json`, `tsconfig.json`, `wrangler.toml`, `astro.config.*`, etc.)
 
-**Artifact discovery sweep (projects not already shaped by 321).** The known-path list above covers 321-shaped projects. A standard project kept its AI working state somewhere else, so scan for it and route each find by confidence. This is judgment work - the lists are "including but not limited to," judge by content, not filename alone.
+**Artifact discovery sweep (runs on every migration, both shapes).** The known-path list above covers a canonical 321 layout. Prior AI state also lands off that layout - a `TEMP/` legacy dump, a `.claude/` note, loose memory files - in 321-shaped and standard projects alike, so this sweep ALWAYS runs alongside the known-path archive. Scan the tree and route each find by confidence. Judgment work - the lists are "including but not limited to," judge by content, not filename alone.
 
-Where to look:
+Where to look (scan the whole tree, exclude build noise):
 
-- Root, and docs-ish or assistant-state folders: `docs/`, `notes/`, `.ai/`, `ai/`, `memory/`, `context/`, `.cursor/`, `.windsurf/`, `.aider*`, `.github/`
-- Files named like memory/session/handoff: `MEMORY*.md`, `*_MEMORY.md`, `SESSION*.md`, `*HANDOFF*.md`, `SESSION_HANDOFF*`, `CONTEXT*.md`, `NOTES.md`, `PROJECT.md`, `TODO.md`, `SCRATCH*`, `*_log.md`
-- Hand-rolled assistant config: `CLAUDE.md`, `AGENTS.md`, `.clauderc`, `.cursorrules`, `*.mdc`
+- **Scope:** every `.md` file in the tree (plus bare config dotfiles like `.cursorrules`), EXCLUDING dependency / build / VCS dirs (`node_modules/`, `.git/`, `dist/`, `build/`, `.next/`, `.cxx/`, `.gradle/`, `Pods/`, `ios/`, `android/build/`). The `.md` restriction keeps source and build files out - a `SessionTypeSelector.tsx` or a `*-generated.cpp` is code, not memory.
+- Folders that collect AI state: `docs/`, `notes/`, `TEMP/`, `tmp/`, `temp/`, `.ai/`, `ai/`, `memory/`, `context/`, `.claude/`, `.cursor/`, `.windsurf/`, `.aider*`, `.github/`. **`TEMP/` especially** - it is the canonical disposable-file home (feedback_temp_folder_usage), so prior projects and legacy systems get parked there and forgotten (e.g. a `TEMP/APD_DUMP/` of `CLAUDE_*.md` files).
+- Names that signal memory / session / handoff / notes, anywhere in the tree: `MEMORY*.md`, `*_MEMORY.md`, `SESSION*.md`, `*HANDOFF*.md`, `CONTEXT*.md`, `NOTES.md`, `*_NOTES.md`, `PROJECT*.md`, `TODO.md`, `SCRATCH*`, `*_log.md`, `*RENAME*.md`
+- Claude / assistant memory docs, anywhere: `CLAUDE*.md`, `USERPROMPT*.md`, `.clauderc`, `.cursorrules`, `*.mdc`, plus auto-memory-shaped files (`feedback_*.md`, `user_*.md`, `reference_*.md`) sitting outside the canonical auto-memory path
+- Hand-rolled assistant config at root: `AGENTS.md`, `CLAUDE.md`
 - The project's auto-memory directory, if one exists
 
 Classify each find on two axes: **who owns it** (a user document the user reads and edits, vs AI-tracked working state the assistant wrote to remember things between sessions and the user rarely opens) and **confidence it is stale AI state** (how sure you are it is safe to lift out of the working tree). Then route by confidence - the rule is move when sure, copy when unsure, and the archive is the safety net either way since nothing is deleted:
@@ -310,7 +313,7 @@ Files to read into context (verify each by quoting at least one section header b
 - `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/<X>_BACKLOG.md` (Features, Ideas)
 - `AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/<X>_DEV-AUDIT.md` or `<X>_DEV-STANDARDS.md` (Project specifics, all sub-sections)
 - `AIDOCS/<X>_SETUP_ARCHIVE/AGENTS.md` and `CLAUDE.md` (orchestrator-level content if substantive)
-- **Standard-project case:** also read every file the artifact discovery sweep moved or copied into the archive (session-handoff, loose memory/context/notes docs, swept assistant-state folders, the copied low-confidence files). For a standard project these ARE the project history - they replace the 321-structured files above, which will not exist. The session-handoff file especially: read it first, it is usually the densest single source of Current State and recent arc.
+- **Swept artifacts (every migration):** also read every file the artifact discovery sweep moved or copied into the archive (session-handoff, loose memory/context/notes docs, a `TEMP/` legacy dump, swept assistant-state folders, the copied low-confidence files). For a standard project these ARE the project history (the 321-structured files above will not exist). For a 321-shaped project they are supplemental scavenge layered on top of the EXTENDED import - do not skip them because the canonical files exist. Read any session-handoff file first, it is usually the densest single source of Current State and recent arc.
 
 **Verification (do not skip):** after reading, list the H2 + H3 section headers you observed across all files. If MEMORY_EXTENDED, SESSION_EXTENDED, or any other file has zero sections in your list, you skipped it - read it now.
 
@@ -351,7 +354,7 @@ This writes `staging/session-update.json` with one `### sub-section` per archive
 
 Do NOT re-derive SESSION_EXTENDED sub-sections - Part A already captured them losslessly. Adding history LIFO bullets that are NOT anchored to an imported sub-section is fine.
 
-**Capture-completeness (Setup only).** Source projects often embed content the 321 model splits across files - Known Issues / watch-lists, Next Steps, explicit memory-promotion flags, loose notes - directly in their SESSION or handoff file. Route what has a clear home (forward work to BACKLOG in Step 6, durable constraints to MEMORY in Step 6), but when a section's home is genuinely unclear, land it as a SESSION LIFO bullet rather than dropping it. During migration this overrides SessionUpdate's routine DROP rows (forward-looking work, durable observations, code patterns) - those assume the content already has another home, which at capture time it may not. Setup captures, it does not judge - the reconciliation pass (`/321 -Update`) re-homes or drops it against the full import. This catch-all is Setup-only: routine `/321` passes never demote uncertain content into SESSION (a promote-then-demote loop), they read session data and promote upward or leave it in place.
+**Capture-completeness (Setup only).** Source projects often embed content the 321 model splits across files - Known Issues / watch-lists, Next Steps, explicit memory-promotion flags, loose notes - directly in their SESSION or handoff file. The Step 1 sweep's artifacts (a `TEMP/` legacy dump, `.claude/` notes, loose memory / handoff docs) are capture source on equal footing with the archived LIFO, in 321-shaped migrations too - distill them into BACKLOG / MEMORY / SESSION here, never leave them only in the archive. Route what has a clear home (forward work to BACKLOG in Step 6, durable constraints to MEMORY in Step 6), but when a section's home is genuinely unclear, land it as a SESSION LIFO bullet rather than dropping it. During migration this overrides SessionUpdate's routine DROP rows (forward-looking work, durable observations, code patterns) - those assume the content already has another home, which at capture time it may not. Setup captures, it does not judge - the reconciliation pass (`/321 -Update`) re-homes or drops it against the full import. This catch-all is Setup-only: routine `/321` passes never demote uncertain content into SESSION (a promote-then-demote loop), they read session data and promote upward or leave it in place.
 
 **One commit for both parts, auto-prune suppressed.** `--no-prune` keeps the whole migration purely additive - nothing is reaped until the separate reconciliation pass (the gated `/321 -Update`), so the lossless import is never pruned mid-flight:
 
@@ -513,7 +516,7 @@ This sets `reconcile_pending: true` in `state.json`. The next `/321 -Update` rea
 Mode:              migration (<321-shaped | standard-project>)
 Archive:           AIDOCS/<X>_SETUP_ARCHIVE/ (<N> paths, <M> files)
 Artifact sweep:    <N> moved (high-confidence AI state), <M> copied (low-confidence, left in place)
-                   (standard-project only - omit line for 321-shaped migrations)
+                   (every migration - covers TEMP / .claude / loose memory docs, both shapes)
 Legacy normalized: <N> references (DEV-STANDARDS, SKILLS, project rename)
 Sync:              <N> skills registered
 Doctor:            <pass> | <N user-content lint warnings>, <K> import size warnings (expected)
