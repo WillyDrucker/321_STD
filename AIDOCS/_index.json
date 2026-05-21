@@ -11,6 +11,7 @@
     "wddocs": "./WDDOCS",
     "skills_router": "./.claude/skills/321/SKILL.md",
     "skills_bodies": "./AIDOCS/SKILL",
+    "skills_local": "./AIDOCS/SKILL_LOCAL",
     "changelog": "./CHANGELOG.md",
     "temp": "./TEMP",
     "tools": "./AIDOCS/tools"
@@ -105,7 +106,7 @@
       "setup": {
         "flag": "-Setup",
         "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
-        "description": "First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (321-shaped, or a standard project's scattered AI artifacts via a confidence-graded discovery sweep), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent."
+        "description": "First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (the known 321 layout plus scattered AI artifacts anywhere in the tree - TEMP dumps, .claude notes, loose memory or handoff files - via a confidence-graded discovery sweep that runs on every migration), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent."
       }
     },
     "local_additions": []

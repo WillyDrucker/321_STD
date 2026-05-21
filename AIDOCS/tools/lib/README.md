@@ -37,11 +37,11 @@ Each lives in `AIDOCS/tools/lib/commands/<name>.mjs` and exports a `cmd*` entryp
 
 | Command | Purpose |
 |---|---|
-| `sync.mjs` | Rebuilds `_index.json -> skills.dispatch` from `SKILL_*.md` frontmatter. Skips `kind: reference`. |
+| `sync.mjs` | Rebuilds `_index.json -> skills.dispatch` from `SKILL_*.md` frontmatter. Skips `kind: reference`. A `SKILL_LOCAL/SKILL_*.md` body takes precedence over the generic of the same filename (override, must share the generic's `name`) or adds a new skill, and the key lands in `skills.local_additions`. |
 | `commit.mjs` | Two-phase apply of a staging file. Simulates all ops first, aborts on any error before writing. Updates `state.json` and clears staging on success. |
 | `prune.mjs` | The `prune` CLI command. Thin wrapper that dispatches to the paired / standalone runner in `pruneRunners.mjs`. |
 | `archive.mjs` | Surgical archive of a single EXTENDED anchor. Slug-based matching via `findExtendedBounds`. |
-| `doctor.mjs` | Health check: a battery of independent checks (lint, paths, state, skill shapes, reconcile residue, Big-6 Decisions, banned prose, auto-memory pointers, router quick-ref, customization manifest, release profile). The `buckets` map in `cmdDoctor` is the live list. Reconcile residue flags `{#anchor}` / leading-date survivors in MAIN LIFO bullets and un-renamed cross-project doc-file refs (`<old>_MEMORY.md`) once the gate clears (the incomplete-reconcile failure) and tallies as structural, not content, so it cannot hide among pre-existing prose lint. `--structural-only` skips the content / prose checks so install can verify wiring without failing on a migrated project's inherited lint debt. |
+| `doctor.mjs` | Health check: a battery of independent checks (lint, paths, state, skill shapes, local overrides, reconcile residue, Big-6 Decisions, banned prose, auto-memory pointers, router quick-ref, customization manifest, release profile). The `buckets` map in `cmdDoctor` is the live list. Reconcile residue flags `{#anchor}` / leading-date survivors in MAIN LIFO bullets and un-renamed cross-project doc-file refs (`<old>_MEMORY.md`) once the gate clears (the incomplete-reconcile failure) and tallies as structural, not content, so it cannot hide among pre-existing prose lint. `--structural-only` skips the content / prose checks so install can verify wiring without failing on a migrated project's inherited lint debt. |
 | `init.mjs` | Scaffolds a new project from this template at `<target-dir>`. Copies the router / engine / skill bodies / schema verbatim. Generates project-named MEMORY / SESSION / EXTENDED / DEV-AUDIT / AGENTS / `_index.json` from canonical sources. |
 | `migrate-archive.mjs` | Deterministic Step 1 of a Setup migration. Moves project-owned content into `AIDOCS/<X>_SETUP_ARCHIVE/` (move, never delete): known 321-shape paths and clearly-stale swept AI-state automatically, borderline swept docs reported for the AI to adjudicate (`--move` / `--copy`, default leave). `--scan` reports both tiers without moving. Owns the find + move so the path lists and sweep patterns stay out of the skill prose. Exports `cmdMigrateArchive(args)` (no index). |
 | `migrate-import.mjs` | Lossless structural import of an archived EXTENDED file into a staging file. One `### sub-section` per entry (bold-leads under an `## H2` split per-entry, `### H3` narratives kept whole) plus one anchored MAIN bullet each. Used by Setup migration Steps 5/6 to capture depth verbatim - distillation is deferred to the reconciliation pass (the gated `/321 -Update`). Exports `cmdMigrateImport(args)` (no index). |
@@ -115,7 +115,7 @@ Avoid:
 
 ## `_index.json` manifests
 
-Beyond paths and dispatch, `AIDOCS/_index.json` carries two optional manifests that doctor validates:
+Beyond paths and dispatch, `AIDOCS/_index.json` carries three optional manifests that doctor validates:
 
 **`release_profile`** (string) names the project's deploy / publish shape so AutoPush picks the right command at Step 7. One of: `standards`, `npm-package`, `vscode-extension`, `cloudflare-worker`, `cloudflare-pages`, `static-site`, `none`. Absent means AutoPush falls back to its template guidance.
 
@@ -132,3 +132,5 @@ Beyond paths and dispatch, `AIDOCS/_index.json` carries two optional manifests t
 ```
 
 `id`, `description`, `rule` are required. `applies_to` and `reason` are optional.
+
+**`skills.local_additions[]`** (array of dispatch keys) lists the skills served from `AIDOCS/SKILL_LOCAL/` rather than the generic `AIDOCS/SKILL/`. `sync` populates it: a `SKILL_LOCAL/SKILL_<NAME>.md` whose filename matches a generic body overrides it (same dispatch key, the local body wins), one with no generic counterpart adds a new skill. `init` always overwrites `AIDOCS/SKILL` but never touches `AIDOCS/SKILL_LOCAL`, so an override is how a project keeps a customized pipeline through an engine update. doctor's Local overrides check keeps it consistent (override named to match its generic, dispatch repointed, key recorded), and an override should also get a `customizations[]` entry. See `AIDOCS/SKILL_LOCAL/README.md`.

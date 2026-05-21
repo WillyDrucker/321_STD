@@ -33,7 +33,7 @@ import { REPO_ROOT } from "../paths.mjs";
 import {
   agentsTemplate, backlogTemplate, changelogTemplate, devAuditStarter,
   gitignoreTemplate, indexTemplate, memoryExtendedTemplate, memoryTemplate,
-  sessionExtendedTemplate, sessionTemplate,
+  sessionExtendedTemplate, sessionTemplate, skillLocalReadme,
 } from "../scaffoldTemplates.mjs";
 
 const VALID_PROFILES = ["standards", "npm-package", "vscode-extension", "cloudflare-worker", "cloudflare-pages", "static-site", "none"];
@@ -124,6 +124,9 @@ export async function cmdInit(_index, args) {
     { dst: `AIDOCS/${project}_BACKLOG.md`, content: () => backlogTemplate(project) },
     { dst: "CHANGELOG.md", content: () => changelogTemplate(project) },
     { dst: ".gitignore", content: () => gitignoreTemplate() },
+    // Creates AIDOCS/SKILL_LOCAL/ (the override home) and documents it. Written
+    // as a scaffold so the dir survives reinstall and any local overrides with it.
+    { dst: "AIDOCS/SKILL_LOCAL/README.md", content: () => skillLocalReadme() },
   ];
   for (const { dst, content } of scaffolds) {
     const dstPath = join(target, dst);
@@ -260,6 +263,7 @@ function printInstallContract(target, autoMemoryPath) {
   console.log(`    auto-memory dir (${autoMemoryPath}). Nothing else on the machine is touched.`);
   console.log(`  - Auto-memory is merge-copy: an existing file there is never overwritten.`);
   console.log(`  - Engine files (the /321 router, AIDOCS/SKILL, AIDOCS/tools) are always replaced.`);
+  console.log(`  - AIDOCS/SKILL_LOCAL is never touched: project-local skill overrides survive reinstall.`);
   console.log(`  - Scaffold files (CLAUDE.md, AGENTS.md, CHANGELOG.md, .gitignore, the project`);
   console.log(`    docs) are kept if they already exist - your content is preserved.`);
   console.log(`  - No network calls and no execution of fetched code. init is local and offline.`);

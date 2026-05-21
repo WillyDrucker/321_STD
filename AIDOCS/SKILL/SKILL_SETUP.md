@@ -199,7 +199,7 @@ Read the borderline list. Judge each by **content, not filename** (open it if un
 node AIDOCS/tools/memory.mjs migrate-archive <target> --name <X> --move <csv> --copy <csv>
 ```
 
-**Read legacy SKILLS content before executing.** If the scan lists `AIDOCS/SKILLS/` (plural) or `.claude/skills/321/SKILLS.md`, read each `SKILLS_<NAME>/<X>_SKILLS_<NAME>.md` in full first - they hold project-specific procedural customizations (custom publish steps, audit rules, embedded Hard Rules) with no other home. The command archives them. You scavenge that content in Step 4 (procedural overrides route to `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`).
+**Read legacy SKILLS content before executing.** If the scan lists `AIDOCS/SKILLS/` (plural), `.claude/skills/321/SKILLS.md`, or any project-customized `SKILL_*.md` bodies, read each in full first - they hold project-specific procedural customizations (custom publish or deploy steps, release invariants, audit rules, embedded Hard Rules) with no other home. The command archives them verbatim. **Capture only here, do NOT distill them into prose** - an executable pipeline scavenged into docs loses its executability. Their fate is decided by the reconcile skills-lane in `/321 -Update` (deferred surface below): an irreducibly project-specific pipeline becomes an executable override in `AIDOCS/SKILL_LOCAL/`, one the generic engine now supersedes folds into `<X>_DEV-AUDIT.md` Project specifics or `<X>_MEMORY.md > Pipeline`. Count them for the loud Step 11 flag.
 
 Archive preserves old filenames verbatim - legacy normalization (`DEV-STANDARDS` -> `DEV-AUDIT`, `<OLD>_*` -> `<X>_*`) happens at capture (Step 4 / `migrate-import --old/--new`), not here. A legacy `OldName_*.md` and a fresh `NewName_*.md` can coexist - both move aside so reinstall lands clean, and the archive keeps the legacy file as the migration source.
 
@@ -397,6 +397,9 @@ Artifact sweep:    <N> moved (high-confidence AI state), <M> copied (low-confide
                    (every migration - covers TEMP / .claude / loose memory docs, both shapes)
 Legacy normalized: <N> references (DEV-STANDARDS, SKILLS, project rename)
 Sync:              <N> skills registered
+Custom skills:     <N> custom /321 body(ies) archived (<list>). Generic profile applies
+                   until /321 -Update builds overrides. DELTA: <e.g. AutoPush will run the
+                   vscode-extension default `vsce publish` - archived body used manual upload>
 Doctor:            <pass> | <N user-content lint warnings>, <K> import size warnings (expected)
 SessionUpdate:     SESSION + SESSION_EXTENDED written, <N> LIFO entries
 MemoryUpdate:      MEMORY Big 6 filled, <N> LIFO entries, BACKLOG <K> items (raw import, un-distilled)
@@ -417,6 +420,9 @@ import is over-split, over-cap, with raw [+] bullets and the source project's
 migration trail intact. /321 -Update reads the gate and runs the distillation
 pass (merge over-split, drop duplicates / dead code, rewrite to descriptive [+]
 bullets, strip the trail, sweep BACKLOG against WDDOCS), then clears the gate.
+It also runs the skills-lane: each archived custom /321 body becomes an executable
+override in AIDOCS/SKILL_LOCAL/ or folds into DEV-AUDIT / MEMORY. Until then the
+generic profile applies, so a custom release pipeline is not yet in effect.
 Migration is NOT complete until it runs.
 
 Deferred manual follow-ups (outside the /321 -Update lane):
@@ -437,9 +443,10 @@ Review needed (contradictions surfaced, not auto-resolved):
 
 ### Deferred reconciliation surface (reference)
 
-The migration defers all distillation. Two homes split the work:
+The migration defers all distillation. The work splits across homes:
 
 - **SESSION / MEMORY / BACKLOG distillation -> `/321 -Update`** (gated by `reconcile_pending`). This is the primary reconciliation: it distills the raw import to a steady state. The mechanics live in `SKILL_UPDATE.md` (the reconciliation gate) and `SKILL_MEMORY-UPDATE.md` (the record conventions). Setup does not run it - it only sets the gate.
+- **Custom `/321` skill bodies -> `/321 -Update` skills-lane** (same gated pass). Each archived custom body is classified: an irreducibly project-specific pipeline (a release / deploy flow, a project audit rule-set) becomes an executable override at `AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md` (normalized to the generic frontmatter `name`, project rename + voice scrub applied, recorded in `customizations[]`), while one the generic engine now supersedes folds its genuine deviations into `<X>_DEV-AUDIT.md` or `<X>_MEMORY.md` and is dropped. Mechanics in `SKILL_UPDATE.md`.
 - **DEV-AUDIT Project specifics + AGENTS classification -> manual follow-up.** These files are outside the skills' write lane, so they are not part of the gated pass. The guidance below is for the user (or an AI acting on the user's behalf) to apply after `/321 -Update`.
 
 **The reconciliation principle** (the nudge for the manual DEV-AUDIT / AGENTS pass):

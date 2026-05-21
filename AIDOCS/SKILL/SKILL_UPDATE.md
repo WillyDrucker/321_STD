@@ -37,7 +37,15 @@ Bring MEMORY + MEMORY_EXTENDED back under cap through these intelligent edits (m
 5. **Cross-source duplicates merged.** The raw import can hold several overlapping sources - the 321 EXTENDED plus every swept scavenge doc (a `TEMP/` legacy dump, a prior project copied in), and on a re-migration even multiple similar projects. The same pitfall, convention, or shipped event often appears in more than one. Merge each into a single entry, keeping the clearest wording, rather than leaving near-duplicate LIFO bullets. This is judgment, not a gate (semantic dedup cannot be mechanically enforced), so it is on you: whenever the Step 1 sweep imported more than the canonical files, scan for cross-source repeats.
 6. **Imported-from-older-project content sorts to the bottom.** Migration content is older than the project's current processes, so in the reconciled LIFO it lands at the BOTTOM, below current-project history. Swept legacy docs (the oldest source) sort to the very bottom, beneath the more recent 321 import. Routine updates after the migration go on top as usual - the migration import never sits above live history.
 
-The DEV-AUDIT Project specifics dedup and AGENTS / CLAUDE classification are a separate manual follow-up Setup points the user at - they are outside Update's SESSION / MEMORY / BACKLOG write lane and stay out of this gate.
+**Skills lane (custom `/321` bodies).** The same gated pass re-homes any custom skill bodies the migration archived (legacy `AIDOCS/SKILLS/SKILLS_*/` or any project-customized `SKILL_*.md`, now under `AIDOCS/<X>_SETUP_ARCHIVE/`). Capture preserved them verbatim and did not distill - this lane decides each one's fate. For each archived body, diff it against the current generic `AIDOCS/SKILL/SKILL_<NAME>.md` and classify:
+
+- **Executable override** - the body is an irreducibly project-specific pipeline the generic cannot express and where the generic default would do the wrong thing (a release / deploy flow with a non-standard publish, project version invariants, project-specific gates, or a project audit rule-set). Merge it into `AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md`: keep the generic body's universal spine and fold in the project-specific steps and gates, do not port verbatim. Normalize the frontmatter `name` to the generic's dispatch key (so sync overrides rather than adds a duplicate), apply the project rename, voice-scrub. Add a `customizations[]` entry (`id`, `description`, `rule`, `applies_to: ["AIDOCS/SKILL_LOCAL/SKILL_<NAME>.md"]`).
+- **Fold** - the generic engine now supersedes the body (it predates the staging engine and mostly restates what the generic skill plus the engine already do). The doc-distillation skills (`-SessionUpdate`, `-MemoryUpdate`, `-Update`) usually land here. Carry forward only genuine deviations - process rules into `<X>_MEMORY.md` (Pipeline / Conventions), code rules into `<X>_DEV-AUDIT.md` Project specifics - then drop the body. Do not fork a skill the engine drives.
+- **Surface a decision** - the divergence is a real workflow choice, not a mechanical merge (for example whether SessionUpdate writes a `CHANGELOG [Unreleased]` block, or whether MemoryUpdate is manual-only). Present the divergence and let the user choose rather than silently adopting either side.
+
+Then wire and verify: `node AIDOCS/tools/memory.mjs sync` (repoints dispatch, populates `skills.local_additions`) then `node AIDOCS/tools/memory.mjs doctor` (the Local overrides check confirms each override is named to match its generic, dispatch points at it, and `local_additions` records it). The override is direct curated edits gated by doctor, same mechanism as the rest of this pass. Report the outcome per body in the Step 5 summary.
+
+Unlike the skills lane above (which runs in-gate), the DEV-AUDIT Project specifics dedup and AGENTS / CLAUDE classification are a separate manual follow-up Setup points the user at - they are outside Update's SESSION / MEMORY / BACKLOG write lane and stay out of this gate.
 
 ## What this skill does differently
 
@@ -153,6 +161,8 @@ Post-migration reconciliation complete. Gate cleared (reconcile_pending: false).
   Distilled: <M> over-split merged, <D> duplicates / dead-code dropped,
              <R> headlines rewritten to descriptive [+], <Q> trail stamps stripped
   BACKLOG:   <K> items swept from WDDOCS
+  Skills:    <N> custom body(ies) reconciled - <A> override(s) -> AIDOCS/SKILL_LOCAL/,
+             <B> folded into MEMORY / DEV-AUDIT, <C> surfaced for your decision
   Doctor:    0 structural, <N> content/prose (all pre-existing user WDDOCS,
              migration-written files clean: 0 over-length anchors / markers)
 
@@ -163,6 +173,7 @@ AGENTS / CLAUDE classification. See the /321 -Setup summary deferred follow-ups.
 ## Rules (skill operation)
 
 - **Reconciliation gate first, silent when off.** Read `reconcile_pending` before Step 0. Set -> this run is the post-migration distillation pass (force `-FULL`, apply the framing, distill via direct edits, clear the gate after doctor verifies). Off -> normal chain, never mention the gate.
+- **Reconciliation re-homes custom skill bodies too.** When the gate is set, classify each archived custom `/321` body: executable override -> `AIDOCS/SKILL_LOCAL/`, engine-superseded -> fold genuine deviations into MEMORY / DEV-AUDIT, workflow divergence -> surface for the user. `sync` + `doctor` wire and verify. Routine (non-gated) updates never touch skill bodies.
 - **Single shared pass.** One conversation walk, one context gather. Per-lane commits stay separate for independent recovery.
 - **Session before Memory.** Session commits first so partial failures stay contained.
 - **`-FULL` auto-applies gap-fill + promotion.** No per-entry confirms.
