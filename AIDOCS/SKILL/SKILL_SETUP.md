@@ -125,6 +125,8 @@ Otherwise re-detect using the same rules `init` uses and offer the result for co
 
 Show suggestion plus full list. Ask user to confirm or override. Write via direct Edit to `_index.json -> release_profile`.
 
+**Non-standard release?** The profile gives the project the generic `/321 -AutoPush`, whose Step 7 runs that profile's canonical publish / deploy. If this project diverges - a different publish target, extra release gates, a project version invariant, or (common for `vscode-extension`) a manual marketplace upload instead of `vsce publish` - capture it as a project-local override at `AIDOCS/SKILL_LOCAL/SKILL_AUTO-PUSH.md` (frontmatter `name: auto-push`), not an inline edit to the generic body, which `init` overwrites on the next engine update. Run `sync` to repoint, and see `AIDOCS/SKILL_LOCAL/README.md`. The same mechanism overrides any skill whose procedure is irreducibly project-specific. Mention this only when the project's pipeline actually diverges - most projects use the profile default as-is. (A migration needs no mention here: its `/321 -Update` skills-lane builds these overrides automatically from the archived bodies.)
+
 ### Step 4: auto_memory.path
 
 `init` already resolved and wrote the per-machine path (`<userprofile>/.claude/projects/<derived>/memory` where `<derived>` is the project's absolute path with drive letter lowercased and `/ \ : _` all collapsed to `-`). Read `_index.json -> auto_memory.path` and confirm it matches the current target. If different (project was moved / cloned to a new machine), prompt the user to confirm a re-resolution.
@@ -177,6 +179,8 @@ Next:
 - Start working. Drop /321 -SessionUpdate at the first checkpoint.
 - Fill remaining Big 6 by re-running /321 -Setup or /321 -MemoryUpdate -FULL.
 - Edit AIDOCS/<PROJECT>_DEV-AUDIT.md to add your Stack / Commands / Language conventions.
+- Non-standard release pipeline (or any skill needing project-specific steps)? Add a
+  project-local override in AIDOCS/SKILL_LOCAL/ (see its README), not an inline edit.
 ```
 
 ## Migration path
