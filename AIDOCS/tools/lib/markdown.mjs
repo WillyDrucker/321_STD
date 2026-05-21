@@ -180,6 +180,28 @@ export function findLifoResidue(lines) {
   return out;
 }
 
+// Scan file content for references to ANOTHER project's doc files (e.g. a
+// surviving `OldName_MEMORY.md` link). currentName is the live project's filename
+// prefix - any `<other>_<doc>.md` where <other> differs is migration residue the
+// reconcile rename should have fixed. The migrate-import `\b<old>\b` rename skips
+// these because `<old>_MEMORY` has no word boundary before the underscore, so they
+// arrive un-renamed and dangle. Returns [{ line, kind: "cross-ref", snippet, ref }].
+// Pure - callers own I/O and the reconcile_pending gate.
+export function findCrossRefResidue(content, currentName) {
+  const out = [];
+  if (!currentName) return out;
+  const re = /\b([A-Za-z0-9][A-Za-z0-9_-]*?)_(MEMORY_EXTENDED|SESSION_EXTENDED|MEMORY|SESSION|BACKLOG|DEV-AUDIT|DEV-STANDARDS)\.md\b/g;
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    for (const m of lines[i].matchAll(re)) {
+      if (m[1] !== currentName) {
+        out.push({ line: i + 1, kind: "cross-ref", snippet: lines[i].trim().slice(0, 70), ref: m[0] });
+      }
+    }
+  }
+  return out;
+}
+
 // Find `### <decisionsHeading>` sub-section inside the named static section. Used by
 // promote_to_section when target_decisions is true and by gap_fill_section
 // when decisions_md is provided. update_section_text edits section bodies

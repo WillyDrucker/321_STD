@@ -14,7 +14,7 @@ import process from "node:process";
 import { lintFile } from "../lint.mjs";
 import { findDecisionsSubsectionBounds, findSectionBounds, isPlaceholderBody, parseFrontmatter } from "../markdown.mjs";
 import { decisionsHeadingFor, REPO_ROOT, STATIC_SECTIONS } from "../paths.mjs";
-import { loadState, scanLifoResidue } from "../state.mjs";
+import { loadState, scanReconcileResidue } from "../state.mjs";
 
 // `structuralOnly` runs only the wiring checks (paths, state, skill bodies,
 // auto-memory pointers, router quick-ref, manifests) and skips the content /
@@ -69,7 +69,7 @@ export async function cmdDoctor(index, opts = {}) {
   }
   const reconcileResidue = buckets["Reconcile residue"]?.length || 0;
   if (reconcileResidue > 0) {
-    console.log(`  Reconcile incomplete: ${reconcileResidue} LIFO bullet(s) still carry migrate-import anchors or dates. The gate is closed but distillation did not run - re-run /321 -Update to distill, then the residue clears.`);
+    console.log(`  Reconcile incomplete: ${reconcileResidue} item(s) of migrate-import residue (LIFO anchors / dates, or un-renamed cross-project file refs). The gate is closed but the distillation / rename did not finish - re-run /321 -Update.`);
   }
   if (total > 0) process.exit(20);
 }
@@ -186,9 +186,10 @@ async function checkMigrationMarkers(index) {
   return issues;
 }
 
-// LIFO bullets in the MAIN memory / session files must be distilled prose once the
-// reconcile gate clears. A surviving migrate-import `{#anchor}` or leading date
-// means -Update closed the gate without distilling - the no-op reconcile a
+// The engine-managed files must be fully reconciled once the gate clears: MAIN LIFO
+// bullets distilled to plain prose, and no cross-project doc-file refs left un-renamed.
+// A surviving migrate-import `{#anchor}`, leading date, or `<old>_MEMORY.md`-style ref
+// means -Update closed the gate without finishing - the incomplete reconcile a
 // lower-capability driver falls into (clears the gate, leaves the raw capture).
 // Expected while reconcile_pending is set (the capture window), so gate on it,
 // same lifecycle as checkMigrationMarkers. Tallies as structural, not content:
@@ -199,8 +200,11 @@ async function checkReconcileResidue(index) {
   let state;
   try { state = await loadState(); } catch { return issues; }
   if (state?.reconcile_pending === true) return issues;
-  for (const hit of await scanLifoResidue(index)) {
-    issues.push(`${hit.key}: LIFO bullet at line ${hit.line} still carries a migrate-import ${hit.kind}, distill to plain prose: "${hit.snippet}"`);
+  for (const hit of await scanReconcileResidue(index)) {
+    const msg = hit.kind === "cross-ref"
+      ? "references another project's doc file, rename it to the current project"
+      : `LIFO bullet still carries a migrate-import ${hit.kind}, distill to plain prose`;
+    issues.push(`${hit.key}: line ${hit.line} ${msg}: "${hit.snippet}"`);
   }
   return issues;
 }

@@ -7,7 +7,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 
 import { err } from "./cli.mjs";
-import { findLifoResidue } from "./markdown.mjs";
+import { findCrossRefResidue, findLifoResidue } from "./markdown.mjs";
 import { INDEX_PATH, REPO_ROOT, STAGING_DIR, STATE_PATH } from "./paths.mjs";
 
 export async function loadIndex() {
@@ -92,20 +92,35 @@ export async function saveState(state) {
   await writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-// Scan the MAIN memory / session LIFO for migrate-import residue (a surviving
-// `{#anchor}` or leading date - see findLifoResidue). Returns
-// [{ key, line, kind, snippet }]. Shared by doctor (reports it as a structural
-// bucket) and the clear-reconcile gate (refuses to close on a no-op reconcile).
-// Only meaningful once reconcile_pending is false - callers own that gate check.
-export async function scanLifoResidue(index) {
+// Scan the engine-managed files for migrate-import residue the reconcile pass
+// should have cleared: anchors / dates left on MAIN LIFO bullets (findLifoResidue),
+// and un-renamed cross-project doc-file refs in MAIN or EXTENDED bodies
+// (findCrossRefResidue). Returns [{ key, line, kind, snippet }] with kind one of
+// anchor / date / cross-ref. Shared by doctor (reports a structural bucket) and the
+// clear-reconcile gate (refuses to close on an incomplete reconcile). Only
+// meaningful once reconcile_pending is false - callers own that gate check.
+export async function scanReconcileResidue(index) {
   const out = [];
+  // The live project's filename prefix (e.g. "TEST321"), to tell its own doc refs
+  // from an un-renamed other-project ref. Derived from the memory file's basename.
+  const memRel = index?.files?.memory;
+  const currentName = memRel ? memRel.split(/[\\/]/).pop().replace(/_MEMORY\.md$/i, "") : null;
   for (const key of ["memory", "session"]) {
     const rel = index?.files?.[key];
     if (!rel) continue;
     const abs = resolve(REPO_ROOT, rel);
     if (!existsSync(abs)) continue;
-    const lines = (await readFile(abs, "utf8")).split("\n");
-    for (const hit of findLifoResidue(lines)) out.push({ key, ...hit });
+    const content = await readFile(abs, "utf8");
+    for (const hit of findLifoResidue(content.split("\n"))) out.push({ key, ...hit });
+    for (const hit of findCrossRefResidue(content, currentName)) out.push({ key, ...hit });
+  }
+  for (const key of ["memory_extended", "session_extended"]) {
+    const rel = index?.files?.[key];
+    if (!rel) continue;
+    const abs = resolve(REPO_ROOT, rel);
+    if (!existsSync(abs)) continue;
+    const content = await readFile(abs, "utf8");
+    for (const hit of findCrossRefResidue(content, currentName)) out.push({ key, ...hit });
   }
   return out;
 }

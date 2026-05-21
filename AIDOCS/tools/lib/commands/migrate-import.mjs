@@ -205,5 +205,13 @@ function normalizeLegacy(content) {
 // `OLD_*.md` cross-references and standalone prose mentions. Conservative -
 // only whole-word matches, so substrings of larger identifiers are left alone.
 function normalizeNames(content, oldName, newName) {
+  // Doc-filename cross-refs first: <old>_<doc>.md -> <new>_<doc>.md. The \b<old>\b
+  // pass below does NOT catch these - `<old>_MEMORY` has no word boundary before the
+  // underscore - so without this they survive as dangling refs to the old project's
+  // files until a reconcile renames them. Safe to rename: these are doc filenames,
+  // not real identifiers (env vars, branches, bundle IDs), which the \b pass also
+  // leaves alone. Runs before normalizeLegacy, so DEV-STANDARDS is still in play here.
+  const docRef = new RegExp(`\\b${escapeRegExp(oldName)}_(MEMORY_EXTENDED|SESSION_EXTENDED|MEMORY|SESSION|BACKLOG|DEV-AUDIT|DEV-STANDARDS)\\.md\\b`, "g");
+  content = content.replace(docRef, `${newName}_$1.md`);
   return content.replace(new RegExp(`\\b${escapeRegExp(oldName)}\\b`, "g"), newName);
 }

@@ -28,7 +28,7 @@ import { lintFile } from "./lib/lint.mjs";
 import { REPO_ROOT, VALID_SKILLS } from "./lib/paths.mjs";
 import {
   bootstrapState, loadIndex, loadStaging, loadState,
-  nowIsoUtc, saveState, scanLifoResidue, stagingPath,
+  nowIsoUtc, saveState, scanReconcileResidue, stagingPath,
 } from "./lib/state.mjs";
 import { validateStaging } from "./lib/validator.mjs";
 
@@ -171,12 +171,12 @@ async function cmdState(args, index) {
     // model failure). This makes "did you distill" a mechanical check, not a
     // prose instruction the driver can skip. --force overrides for manual recovery.
     if (opts["clear-reconcile"] === true && opts.force !== true) {
-      const residue = await scanLifoResidue(index);
+      const residue = await scanReconcileResidue(index);
       if (residue.length > 0) {
-        err(`Refusing to clear the reconcile gate: ${residue.length} MAIN LIFO bullet(s) still carry migrate-import anchors or dates.`);
+        err(`Refusing to clear the reconcile gate: ${residue.length} unresolved migration residue item(s) (LIFO anchors / dates, un-renamed cross-project file refs).`);
         for (const r of residue.slice(0, 8)) err(`  - ${r.key}:${r.line} (${r.kind}) "${r.snippet}"`);
         if (residue.length > 8) err(`  ... and ${residue.length - 8} more.`);
-        err(`Distill these to plain prose first (the /321 -Update reconciliation pass), then clear. Override with --force only for manual recovery.`);
+        err(`Resolve them in the /321 -Update reconciliation pass (distill anchors / dates, rename <old>_*.md refs to the current project), then clear. Override with --force only for manual recovery.`);
         process.exit(17);
       }
     }
@@ -256,15 +256,16 @@ Commands:
             Update reads it (reconciliation vs normal chain) and clears it.
             --clear-reconcile also stamps both lane watermarks (the reconciliation
             reshape is direct edits, not a commit, so it brings them current here).
-            --clear-reconcile refuses while MAIN LIFO bullets still carry
-            migrate-import anchors or dates (a no-op reconcile). --force overrides
-            for manual recovery.
+            --clear-reconcile refuses while migration residue remains (MAIN LIFO
+            anchors / dates, or un-renamed cross-project file refs). --force
+            overrides for manual recovery.
 
   doctor    Health check across the standards system. Runs lint + path / state /
             skill / reconcile-residue / banned-prose / migration-markers /
             auto-memory / router-quick-ref / manifests.
-            Reconcile residue tallies as structural (a no-op reconcile that left
-            import anchors / dates in the LIFO), so it cannot hide among prose lint.
+            Reconcile residue tallies as structural (an incomplete reconcile that
+            left import anchors / dates in the LIFO, or un-renamed cross-project
+            file refs), so it cannot hide among prose lint.
             [--structural-only]  Skip the content / prose checks (lint, Big-6
             Decisions, migration markers, banned prose) and verify only wiring.
             Install uses this so a migration over an existing project is not
