@@ -28,6 +28,12 @@ Bring MEMORY + MEMORY_EXTENDED back under cap through these intelligent edits (m
 
 **Mechanism: direct curated edits, doctor as the gate.** A wholesale merge (e.g. 63 sub-sections -> 20) is far more reliable authored directly than as a hundred hand-written staging ops - the staging model is built for incremental bullet changes, not a full reshape. So edit `MEMORY` / `MEMORY_EXTENDED` / `SESSION_EXTENDED` directly, then verify with `doctor` (orphan links, caps, banned prose, Big-6 Decisions, residual migration markers) - doctor is the gate the staging commit would otherwise be. Distill both EXTENDED lanes evenly: `SESSION_EXTENDED` carries the same over-split and `elided on import` code markers as `MEMORY_EXTENDED`, so give it the same sweep, not a token pass - doctor flags any marker that survives a cleared gate. Bullet-shaped odds and ends (a BACKLOG sweep, a single Big-6 touch-up) can still go through staging if cleaner. Clearing the gate (`state --clear-reconcile`) also stamps both lane watermarks to now, so state.json shows reconciliation brought the lanes current even though the reshape bypassed commit. This is the one sanctioned exception to "everything routes through staging" - it applies only to the gated reconciliation pass, never to routine updates.
 
+**Acceptance checks (the reconciled steady state, verified before clearing the gate).** These describe where a good distillation lands. A capable pass meets them naturally. They exist so a lighter pass has concrete targets, not just principles:
+
+1. **SESSION shipped work collapses to release arcs.** The raw import is one entry per source ship record. In the reconciled `SESSION_EXTENDED`, fold the entries that shipped under the same version into a single arc (per-commit detail lives in git and CHANGELOG, not the session backbone). If `SESSION_EXTENDED` comes out near its imported size, it was not distilled. A genuinely standalone milestone may keep its own entry, which is the exception rather than the default.
+2. **Every `[+]` bullet is clean prose.** Strip any `{#anchor}`, date, or version prefix from the bullet text. The engine slugifies the text to resolve the anchor, so the visible headline must read as a plain description that matches its `### heading`.
+3. **Your own EXTENDED files leave doctor clean.** After the reshape, the only content/prose lint doctor reports is pre-existing user content (WDDOCS). Aim for zero over-length-anchor or `elided on import` warnings in the migration-written `MEMORY_EXTENDED` / `SESSION_EXTENDED`. A surviving warning there means under-distillation, so tighten that entry before clearing the gate rather than attributing it to user content.
+
 The DEV-AUDIT Project specifics dedup and AGENTS / CLAUDE classification are a separate manual follow-up Setup points the user at - they are outside Update's SESSION / MEMORY / BACKLOG write lane and stay out of this gate.
 
 ## What this skill does differently
@@ -144,6 +150,8 @@ Post-migration reconciliation complete. Gate cleared (reconcile_pending: false).
   Distilled: <M> over-split merged, <D> duplicates / dead-code dropped,
              <R> headlines rewritten to descriptive [+], <Q> trail stamps stripped
   BACKLOG:   <K> items swept from WDDOCS
+  Doctor:    0 structural, <N> content/prose (all pre-existing user WDDOCS,
+             migration-written files clean: 0 over-length anchors / markers)
 
 Still pending (manual, outside this lane): DEV-AUDIT Project specifics dedup +
 AGENTS / CLAUDE classification. See the /321 -Setup summary deferred follow-ups.
@@ -151,7 +159,7 @@ AGENTS / CLAUDE classification. See the /321 -Setup summary deferred follow-ups.
 
 ## Rules (skill operation)
 
-- **Reconciliation gate first, silent when off.** Read `reconcile_pending` before Step 0. Set -> this run is the post-migration distillation pass (force `-FULL`, apply the framing, clear the gate after both commits). Off -> normal chain, never mention the gate.
+- **Reconciliation gate first, silent when off.** Read `reconcile_pending` before Step 0. Set -> this run is the post-migration distillation pass (force `-FULL`, apply the framing, distill via direct edits, clear the gate after doctor verifies). Off -> normal chain, never mention the gate.
 - **Single shared pass.** One conversation walk, one context gather. Per-lane commits stay separate for independent recovery.
 - **Session before Memory.** Session commits first so partial failures stay contained.
 - **`-FULL` auto-applies gap-fill + promotion.** No per-entry confirms.
