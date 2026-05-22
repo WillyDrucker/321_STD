@@ -14,11 +14,20 @@ Zero runtime dependencies. Built on Node's standard library. Storage: markdown +
 
 The entry point should not grow. New behavior either extends an engine module or lands as a new command.
 
+## Engine tiers (steady vs onboarding)
+
+The engine splits into two tiers so a steady install carries only what daily work needs:
+
+- **Steady tier (installed, permanent):** every module above plus the `sync` / `commit` / `prune` / `archive` / `doctor` commands. These run cross-tool with no network, every session.
+- **Onboarding tier (fetched, ephemeral):** `init`, `migrate-archive`, `migrate-import`, `migrate-restore`, `import-skills`, `verdict`, and `scaffoldTemplates.mjs`. These ship with the fetched `INSTALL/` engine and are listed in `paths.mjs` (`ONBOARDING_COMMAND_PATHS`, `ONBOARDING_FILE_PATHS`).
+
+Two mechanisms keep the tiers apart: `init` filters the onboarding tier out of the `lib/` copy (a steady install never carries it), and `memory.mjs` resolves onboarding commands with a lazy dynamic `import()` (a static import would crash the steady entry point when those modules are absent). A steady project that requests an onboarding command gets a clean pointer to re-fetch, exit `3`, not a missing-module crash. **Never add a static import of an onboarding module to a steady-tier file** - it would re-couple the tiers.
+
 ## Engine modules
 
 | Module | Purpose | Key exports |
 |---|---|---|
-| `paths.mjs` | Filesystem constants + skill / section vocabulary | `REPO_ROOT`, `INDEX_PATH`, `STAGING_DIR`, `STATE_PATH`, `LOCK_PATH`, `VALID_SKILLS`, `ROUTINE_SECTIONS_BY_SKILL`, `STATIC_SECTIONS`, `BACKLOG_SECTIONS`, `decisionsHeadingFor` |
+| `paths.mjs` | Filesystem constants + skill / section vocabulary + the onboarding-tier manifest | `REPO_ROOT`, `INDEX_PATH`, `STAGING_DIR`, `STATE_PATH`, `LOCK_PATH`, `ONBOARDING_COMMAND_PATHS`, `ONBOARDING_FILE_PATHS`, `VALID_SKILLS`, `ROUTINE_SECTIONS_BY_SKILL`, `STATIC_SECTIONS`, `BACKLOG_SECTIONS`, `decisionsHeadingFor` |
 | `cli.mjs` | CLI helpers | `err`, `parseFlags`, `requireOpt` |
 | `state.mjs` | The I/O boundary. Reads / writes `_index.json`, `state.json`, staging files, resolves index-relative and within-repo paths, and runs the reconcile-residue scan (reads the memory / session files, delegates the pure detection to `markdown.mjs`). Plus `assertFileExists` pre-flight, a timestamp helper, and archive-filename helpers (`nowStampUtc` minute stamp, `uniqueArchivePath` collision guard). | `loadIndex`, `resolveIndexFile`, `resolveWithinRepo`, `assertFileExists`, `stagingPath`, `loadStaging`, `loadState`, `bootstrapState`, `saveState`, `nowIsoUtc`, `nowStampUtc`, `uniqueArchivePath`, `scanReconcileResidue` |
 | `markdown.mjs` | Pure parsing utilities. No I/O, no side effects. The `find*Bounds` helpers locate one section / anchor, the `enumerate*` helpers list all sections / LIFO sub-sections (for prune), and the `find*Residue` helpers detect un-distilled migrate-import anchors / dates and un-renamed cross-project file refs (the reconcile gate), and `skillBodyHash` is the drift-detection digest a customized skill records as its canonical base. | `headingFromSlug`, `slugify`, `normalizeForMatch`, `escapeRegExp`, `parseFrontmatter`, `filenameToFlag`, `toRelativePosix`, `bulletExtendedAnchor`, `findSectionBounds`, `findExtendedBounds`, `findLifoSubsectionBounds`, `findDecisionsSubsectionBounds`, `isPlaceholderBody`, `enumerateTopLevelSections`, `enumerateLifoSubsections`, `findLifoResidue`, `findCrossRefResidue`, `skillBodyHash` |
@@ -30,6 +39,8 @@ The entry point should not grow. New behavior either extends an engine module or
 | `validator.mjs` | Schema + op-shape validation against `AIDOCS/tools/staging/SCHEMA.json`. Enforces `additionalProperties: false`, field types, mode=full for static-section ops, and no fenced code in EXTENDED-bound prose. All hard gates (commit aborts pre-write). | `validateStaging` |
 | `diff.mjs` | LCS-based unified diff renderer used by `commit --preview` | `printUnifiedDiff` |
 | `lint.mjs` | File-level + per-bullet + per-anchor checks consumed by `lint` and `doctor` | `lintFile` |
+| `installFetch.mjs` | Clone-or-copy core for `fetch-engine`: git shallow-clone a remote 321_STD source or copy a local tree into `INSTALL/engine`. No I/O beyond the fetch. | `fetchEngine` |
+| `verdict.mjs` | The shared C-hybrid contract: vocab + validator for the verdict array (`{ path, type, action, confidence? }`) the AI writes and `verdict` executes. Pure (parse + validate, no I/O). | `VERDICT_TYPES`, `VERDICT_ACTIONS`, `VERDICT_LEVELS`, `validateVerdict` |
 
 ## Commands
 
@@ -42,11 +53,15 @@ Each lives in `AIDOCS/tools/lib/commands/<name>.mjs` and exports a `cmd*` entryp
 | `commit.mjs` | Two-phase apply of a staging file. Simulates all ops first, aborts on any error before writing. Updates `state.json` and clears staging on success. |
 | `prune.mjs` | The `prune` CLI command. Thin wrapper that dispatches to the paired / standalone runner in `pruneRunners.mjs`. |
 | `archive.mjs` | Surgical archive of a single EXTENDED anchor. Slug-based matching via `findExtendedBounds`. |
+| `fetch-engine.mjs` | (Re)creates `INSTALL/engine` from a 321_STD source so the onboarding tier is available on demand without the steady project carrying it. Shells out to `git clone --depth 1` for a remote source (defaults to the canonical repo when no `--repo`/`--from` given) or copies a local tree (`--from`, the offline / test path, excluding `INSTALL` / `.git` / `TEMP` / `node_modules`). Steady-tier, pre-index. The clone-vs-copy core lives in `installFetch.mjs`. Exit `21` on fetch failure so a caller (-Sync) can fall back to the local engine. |
+| `origin.mjs` | Read or update the upstream pointer (`origin` in `_index.json`: `repo` / `ref` / `engine_version`). No flags prints it, `--version` / `--repo` / `--ref` update the named fields. `-Sync` writes `engine_version` here after a refresh so the next drift compare is against the new baseline. Steady-tier. |
+| `graduate.mjs` | Reconcile Phase 2 cleanup. Once a project is steady (gate cleared), tears down the onboarding tier: deregisters `-Setup` (body + dispatch + installed), carves the engine back to steady (removes the onboarding modules a migration laid in-place), removes `INSTALL/`, and sets `graduated: true` so a later `-Sync` `init` refresh skips re-adding `-Setup`. Idempotent. Refuses (exit `18`) while `reconcile_pending` is set unless `--force`. Steady-tier. |
 | `doctor.mjs` | Health check: a battery of independent checks (lint, paths, state, skill shapes, legacy-skills tree, reconcile residue, Big-6 Decisions, banned prose, auto-memory pointers, router quick-ref, customization manifest, release profile). The `buckets` map in `cmdDoctor` is the live list. The legacy-skills check flags a live `AIDOCS/SKILLS/` (plural) tree not yet imported into `AIDOCS/SKILL/`. Reconcile residue flags `{#anchor}` / leading-date survivors in MAIN LIFO bullets and un-renamed cross-project doc-file refs (`<old>_MEMORY.md`) once the gate clears (the incomplete-reconcile failure) and tallies as structural, not content, so it cannot hide among pre-existing prose lint. `--structural-only` skips the content / prose checks so install can verify wiring without failing on a migrated project's inherited lint debt. |
-| `init.mjs` | Scaffolds a new project from this template at `<target-dir>`. Copies the router / engine / skill bodies / schema verbatim. Generates project-named MEMORY / SESSION / EXTENDED / DEV-AUDIT / AGENTS / `_index.json` from canonical sources. |
+| `init.mjs` | Scaffolds a new project from this template at `<target-dir>`. Copies the router / engine / skill bodies / schema verbatim, filtering the onboarding tier out of the `lib/` copy so the target carries only the steady tier. Generates project-named MEMORY / SESSION / EXTENDED / DEV-AUDIT / AGENTS / `_index.json` from canonical sources. Onboarding-tier command, run from the fetched `INSTALL/` engine. |
 | `migrate-archive.mjs` | Deterministic Step 1 of a Setup migration. Moves project-owned content into `AIDOCS/<X>_SETUP_ARCHIVE/` (move, never delete): known 321-shape paths and clearly-stale swept AI-state automatically, borderline swept docs reported for the AI to adjudicate (`--move` / `--copy`, default leave). `--scan` reports both tiers without moving. Owns the find + move so the path lists and sweep patterns stay out of the skill prose. Exports `cmdMigrateArchive(args)` (no index). |
 | `migrate-import.mjs` | Lossless structural import of an archived EXTENDED file into a staging file. One `### sub-section` per entry (bold-leads under an `## H2` split per-entry, `### H3` narratives kept whole) plus one anchored MAIN bullet each. Used by Setup migration Steps 5/6 to capture depth verbatim - distillation is deferred to the reconciliation pass (the gated `/321 -Update`). Exports `cmdMigrateImport(args)` (no index). |
 | `migrate-restore.mjs` | Deterministic Step 7 of a Setup migration. Moves user-owned content back out of `AIDOCS/<X>_SETUP_ARCHIVE/`: `WDDOCS/` verbatim, the `*_ARCHIVE` history dirs, and `AIDOCS/ENV/` (renaming `<OLD>_ENV_*` basenames on a project rename). Move, so the archive drains as content returns. The judgment / network layers (`.gitignore` merge, DEV-AUDIT, CHANGELOG, auto-memory, AGENTS) stay in the skill. Exports `cmdMigrateRestore(args)` (no index). |
+| `verdict.mjs` | Validates and executes a C-hybrid verdict file (default `INSTALL/work/verdict.json`) - the shared "AI classifies, script moves" handoff for the discovery sweep, auto-memory near-match map, and skill-collision list. No `--apply` validates + prints the plan, `--apply --archive <dir>` (or `--name <X>`) runs the deterministic ops: `move`/`copy` land under the archive, `leave` is a no-op, `import` is reported for routing via import-skills / migrate-import. Validation core in `verdict.mjs` (lib). Onboarding-tier, pre-index. Exports `cmdVerdict(args)` (no index). |
 
 ## Contract between modules
 
@@ -85,7 +100,9 @@ Exit codes:
 - `14` - lockfile present or staging-write race
 - `15` - malformed state.json
 - `16` - source file missing (commit / prune / archive pre-flight)
+- `18` - graduate refused (reconcile_pending still set) - distill first, or --force for manual recovery
 - `20` - doctor failure
+- `21` - fetch-engine failure (offline / no source) - caller falls back to the local engine
 - `99` - fatal/unexpected
 
 When adding a command, claim an unused code in this range and document it in `memory.mjs` help text.
@@ -138,3 +155,15 @@ Beyond paths and dispatch, `AIDOCS/_index.json` carries two optional manifests t
 `applies_to` doubles as the **preserve signal for a customized skill body**: `init` skips any `AIDOCS/SKILL/SKILL_*.md` named there instead of overwriting it on an engine update, so a project's customized pipeline (its `SKILL_AUTO-PUSH.md`, say) survives. That is how a project keeps a custom skill while non-customized skills still receive engine updates. doctor checks that each `applies_to` path exists, since a stale path silently drops that protection.
 
 `base` is the **re-merge signal for a skill customized as canonical base + delta**: it records the canonical skill key and a `skillBodyHash` of the canonical body the customization was merged from. When `init` preserves the body it compares that hash to the current canonical and prints a re-merge nudge if the canonical has advanced, so a customized pipeline can be refreshed against an improved spine at the next `/321 -Update` instead of drifting. Net-new project skills (no canonical equivalent) carry no `base`. doctor checks the `{ skill, hash }` shape when present.
+
+**`origin`** (object) is the upstream pointer for fetch-from-git:
+
+```json
+"origin": {
+  "repo": "https://github.com/WillyDrucker/321_STD.git",
+  "ref": "main",
+  "engine_version": "<source commit at install or last sync>"
+}
+```
+
+`init` writes it on a fresh scaffold (`engine_version` from the source's git commit), `-Sync` updates `engine_version` after a refresh (via the `origin` command), and `fetch-engine` defaults its repo/ref from the canonical constants in `paths.mjs`. It is enough to re-fetch the onboarding engine and drift-compare. doctor validates that `repo` / `ref` / `engine_version` are strings when the block is present. A version in a manifest is fine (like package.json), this is not memory.

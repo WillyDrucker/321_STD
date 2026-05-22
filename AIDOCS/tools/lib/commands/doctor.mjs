@@ -42,6 +42,7 @@ export async function cmdDoctor(index, opts = {}) {
     "Router quick-ref":        await checkRouterQuickRef(index),
     "Customization manifest":  checkCustomizations(index),
     "Release profile":         checkReleaseProfile(index),
+    "Origin pointer":          checkOrigin(index),
   };
 
   // Content / prose checks vs structural wiring checks. Splitting the count lets
@@ -382,6 +383,23 @@ function checkReleaseProfile(index) {
   if (profile === undefined) return issues;
   if (typeof profile !== "string" || !VALID.includes(profile)) {
     issues.push(`release_profile must be one of: ${VALID.join(", ")} (got "${profile}")`);
+  }
+  return issues;
+}
+
+// The upstream pointer for fetch-from-git. Optional (older installs lack it), but
+// when present must carry string repo / ref / engine_version so -Sync can re-fetch
+// and drift-compare. A version here is a manifest field, not memory.
+function checkOrigin(index) {
+  const issues = [];
+  const origin = index.origin;
+  if (origin === undefined) return issues;
+  if (typeof origin !== "object" || Array.isArray(origin)) {
+    issues.push("origin must be an object { repo, ref, engine_version } if present");
+    return issues;
+  }
+  for (const k of ["repo", "ref", "engine_version"]) {
+    if (typeof origin[k] !== "string") issues.push(`origin.${k} must be a string`);
   }
   return issues;
 }

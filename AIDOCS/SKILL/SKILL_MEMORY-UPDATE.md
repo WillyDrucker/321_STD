@@ -86,7 +86,7 @@ Always invoke `/321 -SessionUpdate` first (with pass-through `-FULL` if set). En
 
 If SessionUpdate fails: chain stops, MemoryUpdate reports the failure and exits. User fixes, re-invokes.
 
-**Migration exception:** when Setup migration capture (`SKILL_SETUP.md`) drives this skill, skip this Step 1. Setup's SESSION capture already ran in the same migration run, so re-invoking SessionUpdate here would re-walk the conversation and demote the just-written Current State. In that path this lane also appends its ops to the migrate-import staging Setup's memory-capture step produced, rather than building a fresh staging file.
+**Migration exception:** when Setup migration capture (the runbook at `AIDOCS/runbooks/SETUP.md`) drives this skill, skip this Step 1. Setup's SESSION capture already ran in the same migration run, so re-invoking SessionUpdate here would re-walk the conversation and demote the just-written Current State. In that path this lane also appends its ops to the migrate-import staging Setup's memory-capture step produced, rather than building a fresh staging file.
 
 ## Step 2: Detect mode + bootstrap state
 

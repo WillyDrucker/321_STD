@@ -137,7 +137,7 @@ Review the conversation for new work since `session_update.last_committed_at`.
 | Code-applicable pattern enforceable by lint or grep | DROP - belongs in DevAudit | (n/a) |
 | Wishlist / speculation without intentionality | DROP - if it matters, it resurfaces | (n/a) |
 
-**Migration exception:** when Setup migration capture (`SKILL_SETUP.md`) drives this skill, ambiguous-home archive content routes to SESSION LIFO instead of dropping - capture loses nothing, reconciliation re-homes it later. The DROP rows above apply to routine runs.
+**Migration exception:** when Setup migration capture (the runbook at `AIDOCS/runbooks/SETUP.md`) drives this skill, ambiguous-home archive content routes to SESSION LIFO instead of dropping - capture loses nothing, reconciliation re-homes it later. The DROP rows above apply to routine runs.
 
 ## Step 3: Prune before appending (relevance, not size)
 

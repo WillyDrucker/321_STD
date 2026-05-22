@@ -67,7 +67,7 @@ async function loadHardRulesBlock() {
   return (await readFile(src, "utf8")).trim();
 }
 
-export function indexTemplate(project, profile, autoMemoryPath) {
+export function indexTemplate(project, profile, autoMemoryPath, origin) {
   // No `paths.automemory` here: downstream auto-memory lives per-machine at
   // auto_memory.path (init populates the home dir, not a project-local copy), so
   // a `./AIDOCS/automemory` entry would be a dangling path doctor flags. The
@@ -123,6 +123,9 @@ export function indexTemplate(project, profile, autoMemoryPath) {
       dispatch: {},
     },
     customizations: [],
+    // Upstream pointer for fetch-from-git: enough to re-fetch the onboarding
+    // engine and drift-compare. engine_version is the source commit at install.
+    origin: origin || { repo: "", ref: "main", engine_version: "unknown" },
   };
   return `${JSON.stringify(obj, null, 2)}\n`;
 }
@@ -270,6 +273,10 @@ Composed by \`/321 -AutoPush\` at release. User-readable tone, bold lead sentenc
 export function gitignoreTemplate() {
   return `# Scratch / temp
 TEMP/
+
+# Ephemeral onboarding root: the fetched engine + runbooks + setup scratch.
+# Created at bootstrap, removed by the reconcile pass at graduation.
+INSTALL/
 
 # Setup migration archive: keep the empty folder for reference, ignore captured contents (transient, deleted after review)
 AIDOCS/*_SETUP_ARCHIVE/*

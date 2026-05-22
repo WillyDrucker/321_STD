@@ -74,7 +74,8 @@
       "memory-update",
       "session-update",
       "update",
-      "setup"
+      "setup",
+      "sync"
     ],
     "dispatch": {
       "auto-push": {
@@ -105,9 +106,19 @@
       "setup": {
         "flag": "-Setup",
         "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
-        "description": "First-run wizard or migration for a 321_STD project. Detects fresh-install vs existing-project state. Fresh - walks Big 6 fill from project signals with per-section confirmation, sets release_profile, resolves auto_memory.path, optional ENV starter and first git commit. Migration - archives existing content (the known 321 layout plus scattered AI artifacts anywhere in the tree - TEMP dumps, .claude notes, loose memory or handoff files - via a confidence-graded discovery sweep that runs on every migration), reinstalls canonical 321_STD, captures depth losslessly via migrate-import, restores user content, then sets the reconcile_pending gate and stops for /321 -Update to distill. Idempotent."
+        "description": "First-run wizard or migration for a 321_STD project, auto-detecting fresh-install vs existing-project. Thin pointer - reads and executes the onboarding runbook at INSTALL/engine/AIDOCS/runbooks/SETUP.md (fetched at install, removed by the reconcile pass at graduation). Fresh - Big 6 fill from code signals, release_profile, auto_memory.path, optional ENV + first commit. Migration - archive existing content, reinstall canonical 321_STD, capture losslessly, restore, set reconcile_pending and stop for /321 -Update. Idempotent."
+      },
+      "sync": {
+        "flag": "-Sync",
+        "body": "./AIDOCS/SKILL/SKILL_SYNC.md",
+        "description": "Engine self-sync. Fetches the latest 321_STD release into INSTALL/engine, compares the project's installed engine_version against it, and brings the steady engine current - a minor update refreshes the engine + canonical skills (customizations preserved), a major update follows the release's upgrade notes and reruns the migrate-to-reconcile spine where needed. Updates the origin pointer and cleans up INSTALL/. Offline is a clean no-op on the local engine. Steady-tier, survives graduation."
       }
     }
   },
-  "customizations": []
+  "customizations": [],
+  "origin": {
+    "repo": "https://github.com/WillyDrucker/321_STD.git",
+    "ref": "main",
+    "engine_version": "5cad323"
+  }
 }

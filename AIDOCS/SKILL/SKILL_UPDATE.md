@@ -17,7 +17,7 @@ description: Optimized chain of session-track + memory-track in one shared-conte
 
 Before anything else, read the gate: `node AIDOCS/tools/memory.mjs state`. The `reconcile_pending` field is the Setup -> Update handoff. A migration (`/321 -Setup`) captures the prior project as a lossless raw import and stops, setting this gate. Update is where the deferred distillation actually happens.
 
-- **`reconcile_pending: true`** - this run is the reconciliation pass. Announce it ("Post-migration reconciliation - distilling the raw import."), force both lanes to `-FULL`, apply the reconciliation framing below, verify the reconciled files with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. If reconciliation does not verify clean, leave the gate set so the next `/321 -Update` resumes it.
+- **`reconcile_pending: true`** - this run is the reconciliation pass. Announce it ("Post-migration reconciliation - distilling the raw import."), force both lanes to `-FULL`, apply the reconciliation framing below, verify the reconciled files with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. If reconciliation does not verify clean, leave the gate set so the next `/321 -Update` resumes it. Once the gate clears, run **Phase 2: Graduate** (below) to tear down the onboarding tier.
 - **`reconcile_pending: false` (or the field absent)** - normal chain. **Do not mention the gate.** Proceed to Step 0 silently. The gate is plumbing, not something to narrate every routine update.
 
 **Reconciliation framing (only when the gate is set).** Distillation is the assess half of "capture raw, then assess" - this is the ONLY pass that distills, everything Setup did preserved. Give both lanes this nudge before the conversation walk:
@@ -61,6 +61,20 @@ Then verify: `node AIDOCS/tools/memory.mjs sync` (refreshes dispatch from the ed
 **DEV-AUDIT Project-specifics dedup lane.** Setup restored the project's `## Project specifics` verbatim. Walk each restored sub-section against the canonical baseline (the Anchor principles / Hard rules / Audit dimensions above the divider, which `init` wrote identically across every project): DROP if it duplicates the baseline or restates MEMORY (MEMORY owns project-anchored rules), KEEP if it is purely project-specific (build / lint commands, language version, framework gotchas) or extends the baseline with real specifics, SURFACE contradictions. Only `## Project specifics` is reconciled - never dedup, rewrite, or contradiction-scan the baseline above the divider. The DEV-AUDIT Hard rules block is an intentional audit-facing copy of the auto-memory inventory (also surfaced in AGENTS Hard rules) - that triplication is by design for visibility, not drift to reconcile.
 
 All lanes are direct curated edits gated by doctor, the same mechanism as the distillation. The one step that stays the user's is deleting `AIDOCS/<X>_SETUP_ARCHIVE/` once they are satisfied - the archive is the recovery net, so its removal is a human call, not part of the gate.
+
+## Phase 2: Graduate (onboarding teardown)
+
+Runs only after distillation verifies - the gate is cleared and doctor is clean. This is the graduation point: the project is steady, so tear down the onboarding tier it no longer needs. All A (one mechanical command), idempotent, and safe because the `origin` pointer makes `INSTALL/` re-fetchable - removal is not a one-way loss.
+
+```bash
+node AIDOCS/tools/memory.mjs graduate
+node AIDOCS/tools/memory.mjs sync
+node AIDOCS/tools/memory.mjs doctor
+```
+
+`graduate` deregisters `-Setup` (removes the body + its dispatch / installed entries), carves the engine back to steady (removes the onboarding modules a migration laid in-place via `init --with-onboarding`), removes `INSTALL/`, and marks the project `graduated` so a later `/321 -Sync` engine refresh does not re-introduce `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` then rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean (no dangling dispatch entries).
+
+After this the project carries no onboarding machinery - lean skills, the steady engine, and the `origin` pointer for future `-Sync`. The `<X>_SETUP_ARCHIVE/` (project content, not re-fetchable) stays the user's separate deletion call.
 
 ## What this skill does differently
 
@@ -152,7 +166,7 @@ Auto-applies. AGENTS / auto-memory suggestion bullets stage as `lifo_insert` ops
 
 If commit fails, SessionUpdate's commit already applied. Report MemoryUpdate failure with recovery guidance from `SKILL_MEMORY-UPDATE.md`.
 
-**Reconciliation mode only:** the wholesale reshape is direct curated edits (see the Mechanism note above), not the staging commits of Steps 3-4. Make the edits, verify with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. Small bullet-shaped ops may still ride staging. If doctor does not pass, leave the gate set so the next `/321 -Update` resumes the reconciliation.
+**Reconciliation mode only:** the wholesale reshape is direct curated edits (see the Mechanism note above), not the staging commits of Steps 3-4. Make the edits, verify with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. Small bullet-shaped ops may still ride staging. If doctor does not pass, leave the gate set so the next `/321 -Update` resumes the reconciliation. Once the gate clears and doctor is clean, run **Phase 2: Graduate** (the onboarding teardown above).
 
 ## Step 5: Combined summary
 

@@ -1,0 +1,20 @@
+# Scratch / temp
+TEMP/
+
+# Environment docs: keep the folder, ignore contents (may hold secrets / setup notes - local-only)
+AIDOCS/ENV/*
+!AIDOCS/ENV/.gitkeep
+
+# Local-only AI session handoff (working state, not committed project content)
+WDDOCS/SESSION_HANDOFF.md
+
+# Staging files + machine-local state (transient, written by the engine)
+AIDOCS/tools/staging/*
+!AIDOCS/tools/staging/.gitkeep
+AIDOCS/tools/state.json
+
+# Ephemeral engine-fetch target for -Update -Sync / re-setup
+INSTALL/
+
+# Node (if tooling grows)
+node_modules/

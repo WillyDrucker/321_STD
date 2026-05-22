@@ -81,13 +81,16 @@ if ($ReleaseProfile) {
 }
 Write-Host ""
 
-# Shallow clone to a temp dir
-$tempDir = Join-Path $env:TEMP "321std-install-$(Get-Random)"
+# Shallow clone into the target's ephemeral INSTALL/engine. This is the
+# onboarding tier (init, migrate-*, import-skills, runbooks); it persists
+# through setup and is removed by the reconcile pass at graduation. Gitignored.
+$engineDir = Join-Path $Target "INSTALL/engine"
+if (Test-Path $engineDir) { Remove-Item -Recurse -Force $engineDir }
+New-Item -ItemType Directory -Path (Join-Path $Target "INSTALL") -Force | Out-Null
 Write-Host "Fetching 321_STD..."
-git clone --depth 1 --quiet https://github.com/WillyDrucker/321_STD.git $tempDir
+git clone --depth 1 --quiet https://github.com/WillyDrucker/321_STD.git $engineDir
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Failed to clone 321_STD repository." -ForegroundColor Red
-  Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
   exit 1
 }
 
@@ -97,10 +100,9 @@ if ($ReleaseProfile) { $initArgs += @("--release-profile", $ReleaseProfile) }
 if ($Force)   { $initArgs += "--force" }
 
 Write-Host "Scaffolding..."
-& node "$tempDir/AIDOCS/tools/memory.mjs" init @initArgs
+& node "$engineDir/AIDOCS/tools/memory.mjs" init @initArgs
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Init failed." -ForegroundColor Red
-  Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
   exit 1
 }
 
@@ -131,15 +133,12 @@ try {
 }
 if ($failed) {
   Write-Host $failed -ForegroundColor Red
-  Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
   exit 1
 }
 
-# Cleanup the temp clone
-Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
-
 Write-Host ""
 Write-Host "321_STD installed at $Target" -ForegroundColor Green
+Write-Host "  INSTALL/ holds the onboarding engine for setup (gitignored, removed by reconcile)."
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  cd `"$Target`""

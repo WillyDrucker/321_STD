@@ -15,6 +15,40 @@ export const STAGING_DIR = join(TOOLS_DIR, "staging");
 export const STATE_PATH = join(TOOLS_DIR, "state.json");
 export const LOCK_PATH = join(STAGING_DIR, ".lock");
 
+// Canonical upstream for fetch-from-git. The default for the `origin` pointer
+// and for fetch-engine when no explicit source is given. A version in a manifest
+// is fine (like package.json), this is not memory.
+export const ORIGIN_REPO = "https://github.com/WillyDrucker/321_STD.git";
+export const ORIGIN_REF = "main";
+
+// The ephemeral onboarding root. Created at bootstrap, it owns the fetched
+// engine + runbooks + scratch through install -> setup -> the start of reconcile,
+// and is removed at graduation (the reconcile pass). Gitignored, like TEMP.
+// engine/ holds the fetched 321_STD release (the full onboarding tier), work/
+// holds verdict JSON and setup scratch.
+export const INSTALL_DIR = join(REPO_ROOT, "INSTALL");
+export const INSTALL_ENGINE_DIR = join(INSTALL_DIR, "engine");
+export const INSTALL_WORK_DIR = join(INSTALL_DIR, "work");
+
+// Onboarding-tier engine modules. These ship with the fetched INSTALL/ engine
+// and are NOT laid into a steady-state install: init excludes them when copying
+// lib/, and memory.mjs resolves them lazily so a steady project (which carries
+// only the steady tier) still loads for its daily commands. Absolute source
+// paths - memory.mjs imports via file URL, init excludes by path match.
+export const ONBOARDING_COMMAND_PATHS = {
+  "init": join(TOOLS_DIR, "lib", "commands", "init.mjs"),
+  "migrate-archive": join(TOOLS_DIR, "lib", "commands", "migrate-archive.mjs"),
+  "migrate-import": join(TOOLS_DIR, "lib", "commands", "migrate-import.mjs"),
+  "migrate-restore": join(TOOLS_DIR, "lib", "commands", "migrate-restore.mjs"),
+  "import-skills": join(TOOLS_DIR, "lib", "commands", "import-skills.mjs"),
+  "verdict": join(TOOLS_DIR, "lib", "commands", "verdict.mjs"),
+};
+
+// Onboarding-tier files with no command of their own (init's content templates).
+export const ONBOARDING_FILE_PATHS = [
+  join(TOOLS_DIR, "lib", "scaffoldTemplates.mjs"),
+];
+
 export const VALID_SKILLS = ["session-update", "memory-update"];
 
 // Routine-op section slugs by skill. session-update lands in current_state

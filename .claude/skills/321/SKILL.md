@@ -1,6 +1,6 @@
 ---
 name: 321
-description: Router for the /321 skill family. Dispatches by flag - -Setup, -SessionUpdate, -MemoryUpdate, -Update, -DevAudit, -AutoPush. Loads the matching sub-skill body from AIDOCS/_index.json.
+description: Router for the /321 skill family. Dispatches by flag - -Setup, -SessionUpdate, -MemoryUpdate, -Update, -DevAudit, -AutoPush, -Sync. Loads the matching sub-skill body from AIDOCS/_index.json.
 ---
 
 # /321
@@ -21,6 +21,7 @@ description: Router for the /321 skill family. Dispatches by flag - -Setup, -Ses
 /321 -DevAudit -FULL             audit + cohesion-aware refactor
 /321 -AutoPush                   release pipeline. Delegates to SessionUpdate. Sole writer of CHANGELOG (composed at release)
 /321 -AutoPush -SKIM | -FULL     release pipeline with SessionUpdate in that mode
+/321 -Sync                       engine self-sync. Fetch the latest 321_STD release, refresh the steady engine (customizations preserved), update the origin pointer
 ```
 
 `/321` alone prints this usage block.
@@ -44,6 +45,7 @@ Unknown flag -> list available sub-skills and exit. Do not guess.
 | `-Update` | `AIDOCS/SKILL/SKILL_UPDATE.md` | default, `-SKIM`, `-FULL` |
 | `-DevAudit` | `AIDOCS/SKILL/SKILL_DEV-AUDIT.md` | default, `-READ`, `-FULL` |
 | `-AutoPush` | `AIDOCS/SKILL/SKILL_AUTO-PUSH.md` | default, `-SKIM`, `-FULL` |
+| `-Sync` | `AIDOCS/SKILL/SKILL_SYNC.md` | default |
 
 Downstream projects customize a skill by editing its `AIDOCS/SKILL/SKILL_<NAME>.md` body and recording it in `_index.json customizations[]` (with `applies_to` naming the body). That entry tells `init` to preserve the customized body on an engine update instead of overwriting it.
 

@@ -22,6 +22,7 @@
 //   [--force]                        rewrite scaffold files even if they exist
 //   [--dry-run]                      print the write plan + install contract, write nothing
 
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -30,7 +31,19 @@ import process from "node:process";
 
 import { err, parseFlags, requireOpt } from "../cli.mjs";
 import { skillBodyHash } from "../markdown.mjs";
-import { REPO_ROOT } from "../paths.mjs";
+import { ONBOARDING_COMMAND_PATHS, ONBOARDING_FILE_PATHS, ORIGIN_REF, ORIGIN_REPO, REPO_ROOT } from "../paths.mjs";
+
+// The source commit at install, recorded in the origin pointer for drift compare.
+// Best-effort: a non-git source (a tarball, an offline copy) records "unknown".
+function detectEngineVersion(root) {
+  try {
+    return execFileSync("git", ["-C", root, "rev-parse", "--short", "HEAD"], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    }).trim() || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 import {
   agentsTemplate, backlogTemplate, changelogTemplate, devAuditStarter,
   gitignoreTemplate, indexTemplate, memoryExtendedTemplate, memoryTemplate,
@@ -48,7 +61,7 @@ export async function cmdInit(_index, args) {
     err("init requires a target directory as the first argument. Usage: node AIDOCS/tools/memory.mjs init <target-dir> --name <PROJECT>");
     process.exit(5);
   }
-  const opts = parseFlags(args, ["name", "release-profile", "force", "dry-run"]);
+  const opts = parseFlags(args, ["name", "release-profile", "force", "dry-run", "with-onboarding"]);
   requireOpt(opts, "name");
 
   const project = opts.name;
@@ -62,6 +75,11 @@ export async function cmdInit(_index, args) {
   // guarantees) without auditing this source or running it for real.
   const dryRun = opts["dry-run"] === true;
   const force = opts.force === true;
+  // Migration lays the full engine (steady + onboarding) so migrate-* / import-skills
+  // and the steady commit share one staging dir and project root. Fresh installs
+  // omit it and carry only the steady tier. The reconcile pass carves a migrated
+  // project down to steady at graduation.
+  const withOnboarding = opts["with-onboarding"] === true;
 
   const target = resolve(process.cwd(), targetArg);
   if (!dryRun) await mkdir(target, { recursive: true });
@@ -94,6 +112,16 @@ export async function cmdInit(_index, args) {
     "AIDOCS/tools/staging/memory-update.example.json",
   ];
   const repoIsTarget = resolve(REPO_ROOT) === resolve(target);
+  // The onboarding tier (init, migrate-*, import-skills, scaffoldTemplates) ships
+  // with the fetched INSTALL/ engine, not a steady install. Filter it out of the
+  // lib/ copy so the target carries only the steady tier (Decision 1). Single-file
+  // engineCopies entries are never in this set, so the same filter is safe for all.
+  const onboardingSrc = new Set(
+    [...Object.values(ONBOARDING_COMMAND_PATHS), ...ONBOARDING_FILE_PATHS].map((p) => resolve(p)),
+  );
+  // --with-onboarding lays the full engine (migration path). The default keeps the
+  // onboarding tier out so a fresh install carries only the steady tier.
+  const steadyFilter = withOnboarding ? undefined : (src) => !onboardingSrc.has(resolve(src));
   for (const rel of engineCopies) {
     const srcPath = join(REPO_ROOT, rel);
     const dstPath = join(target, rel);
@@ -108,9 +136,14 @@ export async function cmdInit(_index, args) {
     const replacing = existsSync(dstPath);
     if (!dryRun) {
       await mkdir(join(dstPath, ".."), { recursive: true });
-      await cp(srcPath, dstPath, { recursive: true, force: true });
+      await cp(srcPath, dstPath, { recursive: true, force: true, filter: steadyFilter });
     }
     console.log(`  [engine] ${verb}${replacing ? "replace" : "write"}: ${rel}`);
+  }
+  if (!repoIsTarget) {
+    console.log(withOnboarding
+      ? `  [engine] full engine laid (onboarding tier included) - migration install, carved to steady at graduation`
+      : `  [engine] onboarding tier excluded (init, migrate-*, import-skills, scaffoldTemplates) - steady install`);
   }
 
   // Skill bodies: engine-class, but a body flagged in the target's customizations[]
@@ -118,12 +151,19 @@ export async function cmdInit(_index, args) {
   // survive an engine update. Fresh install has no customizations, so all write.
   const srcSkillDir = join(REPO_ROOT, "AIDOCS", "SKILL");
   const preservedSkills = repoIsTarget ? new Map() : await readPreservedSkills(target);
+  // A graduated project has torn down the onboarding tier - do not let a -Sync
+  // engine refresh re-introduce the -Setup body it deregistered.
+  const graduated = repoIsTarget ? false : await readGraduated(target);
   if (repoIsTarget) {
     console.log(`  [skill] in-place: AIDOCS/SKILL`);
   } else if (existsSync(srcSkillDir)) {
     for (const file of await readdir(srcSkillDir)) {
       const rel = `AIDOCS/SKILL/${file}`;
       const dstPath = join(target, rel);
+      if (graduated && file === "SKILL_SETUP.md") {
+        console.log(`  [skill] ${verb}skip: ${rel} (project graduated, onboarding tier deregistered)`);
+        continue;
+      }
       if (preservedSkills.has(rel) && existsSync(dstPath)) {
         // A flagged body that recorded its base hash lets us detect when the
         // canonical it was merged from has since advanced, and nudge a re-merge.
@@ -148,10 +188,11 @@ export async function cmdInit(_index, args) {
   }
 
   // Scaffold: write if missing (or always if --force). User content protected.
+  const origin = { repo: ORIGIN_REPO, ref: ORIGIN_REF, engine_version: detectEngineVersion(REPO_ROOT) };
   const scaffolds = [
     { dst: "CLAUDE.md", content: () => readFile(join(REPO_ROOT, "CLAUDE.md"), "utf8") },
     { dst: "AGENTS.md", content: () => agentsTemplate(project) },
-    { dst: "AIDOCS/_index.json", content: () => indexTemplate(project, profile, autoMemoryPath) },
+    { dst: "AIDOCS/_index.json", content: () => indexTemplate(project, profile, autoMemoryPath, origin) },
     { dst: `AIDOCS/${project}_MEMORY.md`, content: () => memoryTemplate(project) },
     { dst: `AIDOCS/${project}_MEMORY_EXTENDED.md`, content: () => memoryExtendedTemplate(project) },
     { dst: `AIDOCS/${project}_SESSION.md`, content: () => sessionTemplate(project) },
@@ -327,4 +368,14 @@ async function readPreservedSkills(target) {
     }
   } catch { /* malformed index: preserve nothing, init writes fresh generics */ }
   return map;
+}
+
+// True when the target has graduated off the onboarding tier (graduate set the
+// flag). A graduated project must not have -Setup re-introduced by a -Sync refresh.
+async function readGraduated(target) {
+  const idxPath = join(target, "AIDOCS", "_index.json");
+  if (!existsSync(idxPath)) return false;
+  try {
+    return JSON.parse(await readFile(idxPath, "utf8")).graduated === true;
+  } catch { return false; }
 }

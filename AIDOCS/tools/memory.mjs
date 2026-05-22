@@ -15,27 +15,40 @@ import { existsSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 import { err, parseFlags, requireOpt } from "./lib/cli.mjs";
 import { cmdArchive } from "./lib/commands/archive.mjs";
 import { cmdCommit } from "./lib/commands/commit.mjs";
 import { cmdDoctor } from "./lib/commands/doctor.mjs";
-import { cmdImportSkills } from "./lib/commands/import-skills.mjs";
-import { cmdInit } from "./lib/commands/init.mjs";
-import { cmdMigrateArchive } from "./lib/commands/migrate-archive.mjs";
-import { cmdMigrateImport } from "./lib/commands/migrate-import.mjs";
-import { cmdMigrateRestore } from "./lib/commands/migrate-restore.mjs";
+import { cmdFetchEngine } from "./lib/commands/fetch-engine.mjs";
+import { cmdGraduate } from "./lib/commands/graduate.mjs";
+import { cmdOrigin } from "./lib/commands/origin.mjs";
 import { cmdPrune } from "./lib/commands/prune.mjs";
 import { cmdSync } from "./lib/commands/sync.mjs";
 import { lintFile } from "./lib/lint.mjs";
-import { REPO_ROOT, VALID_SKILLS } from "./lib/paths.mjs";
+import { ONBOARDING_COMMAND_PATHS, REPO_ROOT, VALID_SKILLS } from "./lib/paths.mjs";
 import {
   bootstrapState, loadIndex, loadStaging, loadState,
   nowIsoUtc, saveState, scanReconcileResidue, stagingPath,
 } from "./lib/state.mjs";
 import { validateStaging } from "./lib/validator.mjs";
 
-const COMMANDS = ["prune", "lint", "archive", "sync", "import-skills", "validate", "commit", "clear", "state", "doctor", "init", "migrate-archive", "migrate-import", "migrate-restore", "help"];
+const COMMANDS = ["prune", "lint", "archive", "sync", "import-skills", "validate", "commit", "clear", "state", "doctor", "fetch-engine", "origin", "graduate", "init", "migrate-archive", "migrate-import", "migrate-restore", "verdict", "help"];
+
+// Onboarding-tier commands (init, migrate-*, import-skills) live in the fetched
+// INSTALL/ engine, not in a steady install, so they are loaded lazily: a static
+// import would crash memory.mjs on every steady command when those modules are
+// absent. When a project carries only the steady tier, the command name still
+// validates but resolves to a clean pointer instead of a missing-module crash.
+async function loadOnboarding(cmd) {
+  const abs = ONBOARDING_COMMAND_PATHS[cmd];
+  if (!existsSync(abs)) {
+    err(`"${cmd}" is an onboarding-tier command and is not installed in this steady-state project. Run it from the fetched INSTALL/ engine (re-fetch with /321 -Sync, or re-install).`);
+    process.exit(3);
+  }
+  return import(pathToFileURL(abs).href);
+}
 
 async function main() {
   const [, , cmd, ...args] = process.argv;
@@ -50,9 +63,17 @@ async function main() {
     process.exit(2);
   }
 
+  // fetch-engine (re)creates INSTALL/engine from a 321_STD source. Steady-tier,
+  // but pre-index since it does not read _index.json. -Sync and re-setup use it.
+  if (cmd === "fetch-engine") {
+    await cmdFetchEngine(args);
+    return;
+  }
+
   // init runs before loadIndex - it scaffolds a new project from this repo
   // and has no source index to read from.
   if (cmd === "init") {
+    const { cmdInit } = await loadOnboarding(cmd);
     await cmdInit(null, args);
     return;
   }
@@ -60,6 +81,7 @@ async function main() {
   // migrate-archive moves project content to SETUP_ARCHIVE before init runs, so it
   // globs the tree and runs pre-index like init.
   if (cmd === "migrate-archive") {
+    const { cmdMigrateArchive } = await loadOnboarding(cmd);
     await cmdMigrateArchive(args);
     return;
   }
@@ -67,6 +89,7 @@ async function main() {
   // migrate-import operates on a --from path and writes a staging file. It does
   // not read _index.json, so it runs pre-index like init.
   if (cmd === "migrate-import") {
+    const { cmdMigrateImport } = await loadOnboarding(cmd);
     await cmdMigrateImport(args);
     return;
   }
@@ -75,7 +98,17 @@ async function main() {
   // reinstalled the engine. It globs the archive dir, not _index.json, so it runs
   // pre-index like its archive sibling.
   if (cmd === "migrate-restore") {
+    const { cmdMigrateRestore } = await loadOnboarding(cmd);
     await cmdMigrateRestore(args);
+    return;
+  }
+
+  // verdict validates + executes a C-hybrid verdict file (the discovery sweep /
+  // auto-memory map / skill-collision handoff). Operates on a verdict file + the
+  // archive, not _index.json, so it runs pre-index like its migrate siblings.
+  if (cmd === "verdict") {
+    const { cmdVerdict } = await loadOnboarding(cmd);
+    await cmdVerdict(args);
     return;
   }
 
@@ -86,7 +119,13 @@ async function main() {
     case "lint":     await cmdLint(index);           break;
     case "archive":  await cmdArchive(index, args);  break;
     case "sync":     await cmdSync(index, args);     break;
-    case "import-skills": await cmdImportSkills(index, args); break;
+    case "origin":   await cmdOrigin(index, args);   break;
+    case "graduate": await cmdGraduate(index, args);  break;
+    case "import-skills": {
+      const { cmdImportSkills } = await loadOnboarding(cmd);
+      await cmdImportSkills(index, args);
+      break;
+    }
     case "validate": await cmdValidate(args);        break;
     case "commit":   await cmdCommit(index, args);   break;
     case "clear":    await cmdClear(args);           break;
@@ -301,9 +340,32 @@ Commands:
             Install uses this so a migration over an existing project is not
             failed by that project's inherited lint debt.
 
-  init      Scaffold a new project from this template. Copies engine + skills,
-            generates project-specific AGENTS / MEMORY / SESSION / _index.json.
-            <target-dir> --name <PROJECT> [--release-profile <profile>] [--force] [--dry-run]
+  fetch-engine  (Re)create INSTALL/engine from a 321_STD source so the onboarding
+            tier (init, migrate-*, import-skills) is available on demand without
+            the steady project carrying it. -Sync and re-setup use this.
+            [--repo <url>] [--ref <branch>]  shallow git clone (defaults to the
+                                             canonical 321_STD repo, ref main)
+            [--from <local-dir>]             copy a local source instead (offline)
+            [--dest <dir>]                   default INSTALL/engine under the project
+
+  origin    Read or update the upstream pointer in _index.json (repo / ref /
+            engine_version). -Sync writes engine_version here after a refresh so
+            the next drift compare is against the new baseline.
+            [--version <v>] [--repo <url>] [--ref <branch>]  no flags = print
+
+  graduate  Reconcile Phase 2: tear down the onboarding tier once a project is
+            steady. Deregisters -Setup (body + dispatch), carves the engine back
+            to steady (removes the onboarding modules a migration laid in-place),
+            removes INSTALL/, and marks the project graduated so a later -Sync does
+            not re-introduce it. Idempotent. Refuses while reconcile_pending is set.
+            [--force]  override the gate for manual recovery
+
+  init      Scaffold a new project from this template. Copies the steady engine +
+            skills, generates project-specific AGENTS / MEMORY / SESSION / _index.json.
+            <target-dir> --name <PROJECT> [--release-profile <profile>] [--force]
+                         [--with-onboarding] [--dry-run]
+            --with-onboarding lays the full engine (onboarding tier too) for the
+            migration path - the reconcile pass carves it back to steady at graduation.
             --dry-run prints the write plan + install contract and writes nothing.
             Profiles: standards | npm-package | vscode-extension |
                       cloudflare-worker | cloudflare-pages | static-site | none
@@ -324,6 +386,14 @@ Commands:
             --append merges into an existing lane staging (anchor-deduped) instead
             of refusing - used to pile swept scavenge docs onto the 321 import. A
             doc with no headings / bold-leads imports as a single entry.
+
+  verdict   Validate and execute a C-hybrid verdict file - the shared "AI classifies,
+            script moves" handoff for the discovery sweep, auto-memory near-match map,
+            and skill-collision list. A JSON array of { path, type, action, confidence? }:
+            type in handoff/design/memory/notes/scratch/skill/env/other, action in
+            move/copy/leave/import. Unknown values rejected. No --apply = validate + plan.
+            [--file <json>]   default INSTALL/work/verdict.json
+            [--apply --archive <dir> | --name <X>]   execute move/copy into the archive
 
   migrate-restore  Step 7 of a Setup migration: move user-owned content back out of
             AIDOCS/<X>_SETUP_ARCHIVE/ after init reinstalls the engine. WDDOCS verbatim,

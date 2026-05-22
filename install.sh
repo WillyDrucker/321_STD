@@ -83,13 +83,15 @@ else
 fi
 echo ""
 
-# Shallow clone to system temp
-TMPDIR_BASE="${TMPDIR:-/tmp}"
-TMP_DIR="$TMPDIR_BASE/321std-install-$$-$RANDOM"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# Shallow clone into the target's ephemeral INSTALL/engine. This is the
+# onboarding tier (init, migrate-*, import-skills, runbooks); it persists
+# through setup and is removed by the reconcile pass at graduation. Gitignored.
+ENGINE_DIR="$TARGET/INSTALL/engine"
+rm -rf "$ENGINE_DIR"
+mkdir -p "$TARGET/INSTALL"
 
 echo "Fetching 321_STD..."
-git clone --depth 1 --quiet https://github.com/WillyDrucker/321_STD.git "$TMP_DIR"
+git clone --depth 1 --quiet https://github.com/WillyDrucker/321_STD.git "$ENGINE_DIR"
 
 # Build init args. Only pass --release-profile if user set it explicitly.
 INIT_ARGS=("$TARGET" --name "$NAME")
@@ -101,7 +103,7 @@ if [[ "$FORCE" == "true" ]]; then
 fi
 
 echo "Scaffolding..."
-node "$TMP_DIR/AIDOCS/tools/memory.mjs" init "${INIT_ARGS[@]}"
+node "$ENGINE_DIR/AIDOCS/tools/memory.mjs" init "${INIT_ARGS[@]}"
 
 # Sync + doctor in the new project. Also git init if not already a repo.
 cd "$TARGET"
@@ -121,6 +123,7 @@ fi
 
 echo ""
 echo "321_STD installed at $TARGET"
+echo "  INSTALL/ holds the onboarding engine for setup (gitignored, removed by reconcile)."
 echo ""
 echo "Next steps:"
 echo "  cd '$TARGET'"
