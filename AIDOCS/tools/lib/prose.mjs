@@ -32,6 +32,20 @@ export function authoredTargets(index) {
   }
   const installDir = fromRoot("./INSTALL");
   if (existsSync(installDir)) for (const f of readdirSync(installDir).filter((f) => /\.md$/.test(f))) set.add(join(installDir, f));
+  // README (the public front door) and the WDDOCS docs. ARCHIVE is frozen legacy
+  // prose, and the gitignored handoff / deploy scratch is local-only, so skip both.
+  const readme = fromRoot("./README.md");
+  if (existsSync(readme)) set.add(readme);
+  const wddocs = fromRoot("./WDDOCS");
+  if (existsSync(wddocs)) {
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) { if (e.name !== "ARCHIVE") walk(join(dir, e.name)); }
+        else if (/\.md$/.test(e.name) && !/SESSION_HANDOFF|STD_PAGE_DEPLOY/.test(e.name)) set.add(join(dir, e.name));
+      }
+    };
+    walk(wddocs);
+  }
   // feedback_no_em_dashes.md is the one self-reference excluded: it documents the
   // banned glyphs by showing them, so scanning it would flag its own examples.
   return [...set].filter((abs) => isFile(abs) && !/feedback_no_em_dashes\.md$/.test(abs));
@@ -44,6 +58,7 @@ export function scanBanned(content) {
   content.split("\n").forEach((line, i) => {
     if (/^\s*```/.test(line)) { inFence = !inFence; return; }
     if (inFence) return;
+    if (/^ {4,}\S/.test(line)) return;   // indented code block - not prose
     const prose = line.replace(/`[^`]*`/g, "");
     if (prose.includes("—")) out.push({ line: i + 1, kind: "em dash" });
     if (prose.includes(";")) out.push({ line: i + 1, kind: "semicolon" });

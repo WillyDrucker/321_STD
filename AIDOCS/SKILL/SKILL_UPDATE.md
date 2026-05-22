@@ -68,6 +68,7 @@ These lanes are direct curated edits gated by doctor, the same mechanism as the 
 7. **Auto-memory is canonical plus the kept profile** - no re-added standalone rules, every pointer matched. Doctor's auto-memory check confirms the pointers both ways.
 8. **Config docs are reconciled.** DEV-AUDIT Project specifics deduped against the baseline, AUTO-PUSH release steps are the project's real cycle (or on placeholder when there is no signal), CHANGELOG in house voice.
 9. **AGENTS stays lean.** Archived orchestrator content folded into MEMORY / DEV-AUDIT, no routed block bloating the index, the Hard-rules pointers resolve (doctor confirms).
+10. **Every filled Big-6 section carries its `### <Section> Decisions` sub-section.** The capture fills these, so this is a confirm pass - a filled Overview / Stack / Architecture / Environment / Pipeline / Conventions whose Decisions block is missing gets one (even "(none yet)"), so the why travels with the what. Doctor does not gate this, so check it by eye.
 
 **Close the pass.** First audit each distilled lane against its archive - the verify of what took and what did not. Point `--audit` at the same archived EXTENDED Setup imported from:
 
@@ -99,6 +100,8 @@ node AIDOCS/tools/engine.mjs doctor
 ```
 
 `graduate` deregisters `-Setup` (drops its body and dispatch entry), removes `INSTALL/`, and marks the project `graduated` so a later `-Update -Sync` does not re-add `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean. The onboarding lib modules `init` laid stay in place, unused once `INSTALL/` and `-Setup` are gone - no skill invokes them after graduation (the `--root` model carries no engine carve).
+
+**Confirm the router quick-ref.** `sync` rewrites the `_index.json` registry but not the router prose, so verify they agree: every skill in `skills.dispatch` has a row in the `.claude/skills/321/SKILL.md` How-to-invoke / Registry block, and the deregistered `-Setup` no longer appears there. Edit the router by hand to close any drift, since nothing else does.
 
 After this the project carries no onboarding machinery. The `<PROJECT>_SETUP_ARCHIVE/` holds project content that is not re-fetchable, so deleting it stays the user's separate call.
 

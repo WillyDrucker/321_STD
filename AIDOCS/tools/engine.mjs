@@ -92,7 +92,8 @@ Commands:
   fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -Update -Sync / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.
   state     Print state.json, or flip the reconcile gate (the Setup -> Update handoff).
-            [--set-reconcile | --clear-reconcile]
+            [--set-reconcile | --clear-reconcile [--force]]. Clear refuses on reconcile
+            residue (stale cross-project refs / import markers) unless --force.
   migrate-archive  Move a project's known 321-shape content into
             AIDOCS/<NAME>_SETUP_ARCHIVE/ (move, not delete). --name <PROJECT>
   migrate-restore  Layer archived content back after reinstall: WDDOCS verbatim, a

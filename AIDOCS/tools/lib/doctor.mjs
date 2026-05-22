@@ -6,6 +6,7 @@
 // and clear as the reconcile pass distills (DEV-AUDIT anchor: fail at gates).
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
@@ -20,6 +21,7 @@ export function cmdDoctor(index) {
     "Registry":             checkRegistry(index),
     "Memory shape":         checkMemoryShape(index),
     "Session shape":        checkSessionShape(index),
+    "Skill bodies":         checkSkillBodies(index),
     "Orphan pairs":         checkOrphans(index),
     "Auto-memory pointers": checkAutoMemory(index),
     "Banned prose":         checkProse(index),
@@ -97,8 +99,15 @@ function checkMemoryShape(index) {
   }
   const ext = readReg(index, "memoryupdate.memory_extended");
   if (ext === null) issues.push("memoryupdate.memory_extended not found");
-  else { needPurpose(ext, "MEMORY_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("MEMORY_EXTENDED: missing ## LIFO"); }
+  else { needPurpose(ext, "MEMORY_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("MEMORY_EXTENDED: missing ## LIFO"); needNoFence(ext, "MEMORY_EXTENDED", issues); }
   return issues;
+}
+
+// Code never belongs in EXTENDED - it lives in the source, and the 1:1 import elides
+// it to a marker. The staging gate blocks a fenced body, but a direct-edit reconcile
+// bypasses staging, so doctor catches a fence the hand-edit path would let through.
+function needNoFence(content, label, issues) {
+  if (/^\s*```/m.test(content)) issues.push(`${label}: contains a fenced code block (code lives in source - summarize the takeaway to prose)`);
 }
 
 function checkSessionShape(index) {
@@ -113,7 +122,29 @@ function checkSessionShape(index) {
   }
   const ext = readReg(index, "sessionupdate.session_extended");
   if (ext === null) issues.push("sessionupdate.session_extended not found");
-  else { needPurpose(ext, "SESSION_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("SESSION_EXTENDED: missing ## LIFO"); }
+  else { needPurpose(ext, "SESSION_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("SESSION_EXTENDED: missing ## LIFO"); needNoFence(ext, "SESSION_EXTENDED", issues); }
+  return issues;
+}
+
+// Each registered skill body is well-formed: a frontmatter name + description (sync
+// reads the description into the router, so a missing one ships an empty entry) and a
+// Purpose callout. A legacy plural AIDOCS/SKILLS/ tree is a not-yet-imported pre-321
+// skill set, flagged so the migration finishes bringing it into AIDOCS/SKILL/.
+function checkSkillBodies(index) {
+  const issues = [];
+  if (existsSync(fromRoot("./AIDOCS/SKILLS"))) issues.push("legacy AIDOCS/SKILLS/ (plural) present - migrate it into AIDOCS/SKILL/");
+  const bodiesRel = index.paths?.skills_bodies;
+  if (!bodiesRel) return issues;
+  const dir = fromRoot(bodiesRel);
+  if (!existsSync(dir)) return issues;
+  for (const f of readdirSync(dir).filter((n) => /^SKILL_.+\.md$/.test(n))) {
+    const content = readFileSync(join(dir, f), "utf8");
+    const fm = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!fm) { issues.push(`${f}: missing frontmatter block`); continue; }
+    if (!/^name:\s*\S/m.test(fm[1])) issues.push(`${f}: frontmatter missing name`);
+    if (!/^description:\s*\S/m.test(fm[1])) issues.push(`${f}: frontmatter missing description (sync reads it into the router)`);
+    if (!/^\*\*Purpose:\*\*/m.test(content)) issues.push(`${f}: missing **Purpose:** callout`);
+  }
   return issues;
 }
 
