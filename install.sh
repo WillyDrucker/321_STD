@@ -11,23 +11,28 @@
 #     curl -fsSL <raw-install-url> | bash -s -- --target . --name MyProject
 #
 # Options / env (all optional):
-#   --target DIR / STD321_TARGET   where to install. Default: current directory.
-#   --name NAME  / STD321_NAME     project name (letter, then letters / digits / _ / -).
-#                                  Default: target directory basename.
-#   --repo URL   / STD321_REPO     engine repo to clone when no local engine is found.
+#   --target DIR  / STD321_TARGET   where to install. Default: current directory.
+#   --name NAME   / STD321_NAME     project name (letter, then letters / digits / _ / -).
+#                                   Default: target directory basename.
+#   --repo URL    / STD321_REPO     engine repo to clone when no local engine is found.
+#   --privacy M   / STD321_PRIVACY  tracking mode: private (default - tracks the project's
+#                                   memory / auto-memory / WDDOCS) or public (gates them
+#                                   local; the engine is tracked either way).
 
 set -eu
 
 NAME="${STD321_NAME:-}"
 TARGET="${STD321_TARGET:-.}"
 REPO="${STD321_REPO:-https://github.com/WillyDrucker/321_STD.git}"
+PRIVACY="${STD321_PRIVACY:-}"
 
 require_value() { if [ -z "${2:-}" ] || [ "${2#--}" != "$2" ]; then echo "Missing value for $1" >&2; exit 1; fi; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    --name)   require_value "$1" "${2:-}"; NAME="$2"; shift 2 ;;
-    --target) require_value "$1" "${2:-}"; TARGET="$2"; shift 2 ;;
-    --repo)   require_value "$1" "${2:-}"; REPO="$2"; shift 2 ;;
+    --name)    require_value "$1" "${2:-}"; NAME="$2"; shift 2 ;;
+    --target)  require_value "$1" "${2:-}"; TARGET="$2"; shift 2 ;;
+    --repo)    require_value "$1" "${2:-}"; REPO="$2"; shift 2 ;;
+    --privacy) require_value "$1" "${2:-}"; PRIVACY="$2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -45,8 +50,8 @@ if ! [[ "$NAME" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
 fi
 
 # Did the target already hold project content (checked before init writes)? Then
-# doctor's pre-migration findings are expected, and /321 -Setup reconciles them, so
-# they report without failing the install. A fresh scaffold must still pass cleanly.
+# doctor's pre-migration findings are expected, and setup reconciles them, so they
+# report without failing the install. A fresh scaffold must still pass cleanly.
 existing=false
 for marker in ".claude/skills/321" "AIDOCS" "AGENTS.md" "CLAUDE.md" "package.json" "src"; do
   if [ -e "$TARGET/$marker" ]; then existing=true; break; fi
@@ -74,7 +79,11 @@ echo "  Name:   $NAME"
 echo ""
 
 echo "Scaffolding..."
-node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME"
+if [ -n "$PRIVACY" ]; then
+  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME" --privacy "$PRIVACY"
+else
+  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME"
+fi
 
 cd "$TARGET"
 echo ""
@@ -84,7 +93,7 @@ echo ""
 echo "Health check..."
 if ! node AIDOCS/tools/engine.mjs doctor; then
   if [ "$existing" = true ]; then
-    echo "doctor reports pre-migration issues - expected for an existing project, /321 -Setup reconciles them."
+    echo "doctor reports pre-migration issues - expected for an existing project, setup reconciles them."
   else
     echo "doctor failed" >&2
     exit 1

@@ -13,6 +13,8 @@ From a clone of the 321 repo (the engine ships in the repo):
 
 `--name` defaults to the target directory basename. A name must start with a letter and use only letters, digits, `_`, or `-`. With no local engine, the script shallow-clones the repo into a temp dir and removes it afterward.
 
+`--privacy <public | private>` sets the tracking mode (default `private`). `private` tracks the project's own knowledge - the MEMORY / SESSION / BACKLOG data docs, the auto-memory, and the WDDOCS design docs. `public` keeps that knowledge local and tracks only the framework (engine, skills, registry, runbooks) plus the folder skeletons, so a public repo ships the code without leaking the project's memory. The default is private because it tracks everything - a missed call cannot silently hide content, and a public project passes `--privacy public`. Flip it later with `node AIDOCS/tools/engine.mjs privacy --set <mode>`.
+
 ## What it does
 
 The bootstrap script runs the mechanical steps 1-6, then the install continues into setup (step 7):
@@ -20,7 +22,7 @@ The bootstrap script runs the mechanical steps 1-6, then the install continues i
 1. **Check prerequisites.** Node.js and git must be on PATH.
 2. **Resolve the target and name.** Create the target dir if missing, validate the name.
 3. **Find the engine.** The repo this script ships in, or a temp clone of the repo.
-4. **Scaffold.** `init <target> --name <NAME>` lays the skeleton - engine, skills, auto-memory, data files with the name substituted, and `INSTALL/` with these runbooks.
+4. **Scaffold.** `init <target> --name <NAME> [--privacy <mode>]` lays the skeleton - engine, skills, auto-memory, data files with the name substituted, and `INSTALL/` with these runbooks. The `.gitignore` is generated for the privacy mode (not copied), so a public install gates the project's own knowledge from the start. A reinstall (the migration relay) recalls the mode from the registry, then the archive, so it is not lost.
 5. **Register and health-check.** `sync` builds the skill dispatch, `doctor` validates the shape. On a fresh scaffold doctor must pass. On an existing project the install does not fail on doctor - a preserved legacy `AGENTS.md` or unscrubbed `CHANGELOG` makes pre-migration findings expected, and the migration reconciles them - so they report and the install continues.
 6. **Init git (fresh only).** `git init` if a fresh target is not already a repo. An existing project is left as the user has it - its version control is the user's call, not the installer's.
 7. **Run setup.** The assistant driving the install then executes `INSTALL/setup.md` to finish onboarding (fresh fill or migration, auto-detected). Setup is part of the install, not a separate step the user has to invoke - it never depends on the `/321 -Setup` skill being loaded, since the runbook is executed directly.

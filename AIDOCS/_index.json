@@ -1,5 +1,6 @@
 {
   "project_name": "PROJECTNAME",
+  "privacy": "full",
   "paths": {
     "root": ".",
     "agents_md": "./AGENTS.md",

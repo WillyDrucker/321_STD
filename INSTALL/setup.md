@@ -151,6 +151,7 @@ Step 2 of the migration path is where Setup's judgement lives, on top of the det
 
 ## Rules
 
+- **Confirm privacy before the first commit.** `init` defaults to `private` (tracks the project's MEMORY / SESSION / BACKLOG, auto-memory, and WDDOCS docs) and prints the mode it used. If this is a public repo, run `node AIDOCS/tools/engine.mjs privacy --set public` before any capture commit, so the project's own knowledge is gated local and only the framework ships. An AI-agent install that ran `init` without a privacy choice should ask the user once, here, before committing.
 - **Mode auto-detects.** No flag. Migration biases safe (archive first, nothing deleted).
 - **Two-part capture.** The 1:1 scavenge (`migrate-import`) grabs the archived depth verbatim into staging, then the writer skills (`-SessionUpdate` / `-MemoryUpdate`) verify what landed and fill the gaps. Both go through validate then commit, so nothing reaches a file unchecked.
 - **Two lanes, one archive.** The deterministic backstop (`migrate-archive`) covers the known shape and is re-runnable, the AI sweep covers the rest, and the sweep can route anything into the same `SETUP_ARCHIVE` or fall back to the backstop when judgement is uncertain.

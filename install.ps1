@@ -10,26 +10,31 @@
 #     iwr -useb <raw-install-url> | iex
 #
 # Options / env (all optional):
-#   -Target DIR / STD321_TARGET   where to install. Default: current directory.
-#   -Name NAME  / STD321_NAME     project name (letter, then letters / digits / _ / -).
-#                                 Default: target directory basename.
-#   -Repo URL   / STD321_REPO     engine repo to clone when no local engine is found.
+#   -Target DIR  / STD321_TARGET   where to install. Default: current directory.
+#   -Name NAME   / STD321_NAME     project name (letter, then letters / digits / _ / -).
+#                                  Default: target directory basename.
+#   -Repo URL    / STD321_REPO     engine repo to clone when no local engine is found.
+#   -Privacy M   / STD321_PRIVACY  tracking mode: private (default - tracks the project's
+#                                  memory / auto-memory / WDDOCS) or public (gates them
+#                                  local; the engine is tracked either way).
 
 $ErrorActionPreference = "Stop"
 
-$Name   = $env:STD321_NAME
-$Target = if ($env:STD321_TARGET) { $env:STD321_TARGET } else { "." }
-$Repo   = if ($env:STD321_REPO)   { $env:STD321_REPO }   else { "https://github.com/WillyDrucker/321_STD.git" }
+$Name    = $env:STD321_NAME
+$Target  = if ($env:STD321_TARGET) { $env:STD321_TARGET } else { "." }
+$Repo    = if ($env:STD321_REPO)   { $env:STD321_REPO }   else { "https://github.com/WillyDrucker/321_STD.git" }
+$Privacy = $env:STD321_PRIVACY
 
 function Require-Value($flagName, $value) {
   if ($null -eq $value -or $value -like '-*') { Write-Host "Missing value for $flagName" -ForegroundColor Red; exit 1 }
 }
 for ($i = 0; $i -lt $args.Count; $i++) {
   switch ($args[$i]) {
-    "-Name"   { $v = $args[++$i]; Require-Value "-Name"   $v; $Name   = $v }
-    "-Target" { $v = $args[++$i]; Require-Value "-Target" $v; $Target = $v }
-    "-Repo"   { $v = $args[++$i]; Require-Value "-Repo"   $v; $Repo   = $v }
-    default   { Write-Host "Unknown argument: $($args[$i])" -ForegroundColor Red; exit 1 }
+    "-Name"    { $v = $args[++$i]; Require-Value "-Name"    $v; $Name    = $v }
+    "-Target"  { $v = $args[++$i]; Require-Value "-Target"  $v; $Target  = $v }
+    "-Repo"    { $v = $args[++$i]; Require-Value "-Repo"    $v; $Repo    = $v }
+    "-Privacy" { $v = $args[++$i]; Require-Value "-Privacy" $v; $Privacy = $v }
+    default    { Write-Host "Unknown argument: $($args[$i])" -ForegroundColor Red; exit 1 }
   }
 }
 
@@ -51,8 +56,8 @@ if (-not ($Name -match '^[A-Za-z][A-Za-z0-9_-]*$')) {
 
 # Did the target already hold project content (checked before init writes)? Then
 # doctor's pre-migration findings are expected - a legacy AGENTS without the canonical
-# Hard-rules, unscrubbed CHANGELOG voice - and /321 -Setup reconciles them, so they
-# report without failing the install. A fresh scaffold must still pass doctor cleanly.
+# Hard-rules, unscrubbed CHANGELOG voice - and setup reconciles them, so they report
+# without failing the install. A fresh scaffold must still pass doctor cleanly.
 $existing = $false
 foreach ($marker in @(".claude/skills/321", "AIDOCS", "AGENTS.md", "CLAUDE.md", "package.json", "src")) {
   if (Test-Path (Join-Path $Target $marker)) { $existing = $true; break }
@@ -80,7 +85,9 @@ Write-Host "  Name:   $Name"
 Write-Host ""
 
 Write-Host "Scaffolding..."
-& node (Join-Path $engine "AIDOCS/tools/engine.mjs") init $Target --name $Name
+$initArgs = @((Join-Path $engine "AIDOCS/tools/engine.mjs"), "init", $Target, "--name", $Name)
+if ($Privacy) { $initArgs += @("--privacy", $Privacy) }
+& node @initArgs
 if ($LASTEXITCODE -ne 0) {
   if ($cloneTmp) { Remove-Item -Recurse -Force $cloneTmp }
   Write-Host "Init failed." -ForegroundColor Red; exit 1
@@ -96,7 +103,7 @@ try {
   Write-Host ""; Write-Host "Health check..."
   & node "AIDOCS/tools/engine.mjs" doctor
   if ($LASTEXITCODE -ne 0) {
-    if ($existing) { Write-Host "doctor reports pre-migration issues - expected for an existing project, /321 -Setup reconciles them." -ForegroundColor Yellow }
+    if ($existing) { Write-Host "doctor reports pre-migration issues - expected for an existing project, setup reconciles them." -ForegroundColor Yellow }
     else { throw "doctor failed" }
   }
   if (-not $existing -and -not (Test-Path ".git")) {

@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { hasPrivacyBlock } from "./gitignore.mjs";
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
 import { authoredTargets, isFile, scanBanned } from "./prose.mjs";
@@ -32,6 +33,7 @@ export function cmdDoctor(index) {
   const warnChecks = {
     "Size caps":      checkCaps(index),
     "Import residue": checkResidue(index),
+    "Privacy gate":   checkPrivacy(index),
   };
   let errors = 0, warns = 0;
   for (const [name, issues] of Object.entries(errorChecks)) {
@@ -206,6 +208,23 @@ function checkResidue(index) {
       if (line.includes("elided on import")) issues.push(`${key}:${i + 1} unresolved import marker (summarize the takeaway in prose)`);
     });
   }
+  return issues;
+}
+
+// The .gitignore matches the recorded privacy mode. A public project must carry the
+// gate block (else its memory / auto-memory / WDDOCS could be tracked); a private one
+// must not. "full" (the template repo) is hand-maintained and an unset mode is a legacy
+// project - both skip. A warning, not an error: drift surfaces at the gate without
+// blocking the install or reconcile, and `privacy --set` fixes it.
+function checkPrivacy(index) {
+  const issues = [];
+  const mode = index.privacy;
+  if (!mode || mode === "full") return issues;
+  const giAbs = fromRoot("./.gitignore");
+  if (!existsSync(giAbs)) { issues.push("privacy is set but .gitignore is missing"); return issues; }
+  const has = hasPrivacyBlock(readFileSync(giAbs, "utf8"));
+  if (mode === "public" && !has) issues.push('privacy is "public" but .gitignore has no public gate - memory / auto-memory / WDDOCS may be tracked (run privacy --set public)');
+  if (mode === "private" && has) issues.push('privacy is "private" but .gitignore still carries the public gate (run privacy --set private)');
   return issues;
 }
 

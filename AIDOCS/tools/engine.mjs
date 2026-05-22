@@ -16,13 +16,14 @@ import { cmdMigrateArchive } from "./lib/migrate-archive.mjs";
 import { cmdMigrateImport } from "./lib/migrate-import.mjs";
 import { cmdMigrateRestore } from "./lib/migrate-restore.mjs";
 import { loadIndex, setRoot } from "./lib/paths.mjs";
+import { cmdPrivacy } from "./lib/privacy.mjs";
 import { cmdScrub } from "./lib/scrub.mjs";
 import { cmdState } from "./lib/state.mjs";
 import { cmdSync } from "./lib/sync.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "validate", "commit", "state", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -58,6 +59,7 @@ async function main() {
   switch (cmd) {
     case "doctor":   cmdDoctor(index); break;
     case "scrub":    cmdScrub(index, args); break;
+    case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
@@ -94,6 +96,10 @@ Commands:
   state     Print state.json, or flip the reconcile gate (the Setup -> Update handoff).
             [--set-reconcile | --clear-reconcile [--force]]. Clear refuses on reconcile
             residue (stale cross-project refs / import markers) unless --force.
+  privacy   Print the project's tracking mode, or flip it. private tracks the project's
+            memory / auto-memory / WDDOCS docs. public gates them local (the engine is
+            tracked either way). Flipping to public rewrites .gitignore and untracks the
+            gated content from the git index (working tree kept). [--set <public | private>]
   migrate-archive  Move a project's known 321-shape content into
             AIDOCS/<NAME>_SETUP_ARCHIVE/ (move, not delete). --name <PROJECT>
   migrate-restore  Layer archived content back after reinstall: WDDOCS verbatim, a
@@ -111,8 +117,10 @@ Commands:
             Pipeline) from package.json, for the MemoryUpdate fill to refine.
   graduate  Tear down onboarding: deregister -Setup, remove INSTALL/, mark graduated.
             Refuses while reconcile_pending is set ([--force] overrides).
-  init      Lay the project skeleton into a target, substituting the name.
-            <target-dir> --name <PROJECT>
+  init      Lay the project skeleton into a target, substituting the name. --privacy
+            sets the tracking mode (private default, public gates the project's own
+            knowledge local). A reinstall recalls the mode from the registry / archive.
+            <target-dir> --name <PROJECT> [--privacy <public | private>]
   help      Print this message.
 `);
 }
