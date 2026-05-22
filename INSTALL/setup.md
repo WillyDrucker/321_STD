@@ -48,7 +48,7 @@ The target holds content worth preserving. Land the canonical structure, then la
    ```bash
    node AIDOCS/tools/engine.mjs migrate-archive --name <PROJECT>
    ```
-   Known 321-shape paths - the data docs, `_index.json`, the root docs, and the project's `AIDOCS/automemory` - move into `AIDOCS/<PROJECT>_SETUP_ARCHIVE/` (move, never delete - the recovery net). This always runs, so the canonical files and the project's own rules are safe no matter what the sweep finds.
+   Known 321-shape paths - the data docs, `_index.json`, the root docs, the project's `AIDOCS/automemory`, and any legacy `*_ARCHIVE` dirs (the old engine's auto-prune history) - move into `AIDOCS/<PROJECT>_SETUP_ARCHIVE/` (move, never delete - the recovery net). This always runs, so the canonical files and the project's own rules are safe no matter what the sweep finds.
 2. **Discovery sweep (AI judgement).** Scan the files the backstop does not cover and classify each into a verdict, a JSON array of `{path, type, confidence, action}` written to `TEMP/setup-verdict.json`. The vocab is fixed - type is one of handoff / design / memory / notes / scratch / env / other, action is one of move / copy / leave. See **Discovery sweep** below for scan breadth and the confidence bands that drive each action.
 3. **Apply the verdict.**
    ```bash

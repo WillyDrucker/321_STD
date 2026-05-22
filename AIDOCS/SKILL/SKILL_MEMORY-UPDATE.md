@@ -95,4 +95,4 @@ Two-phase: simulate, abort before any write on failure, then persist, stamp the 
 
 ## Deferred (land when their engine does)
 
-The `-FULL` update mode, surgical Big-6 edits + the LIFO-to-static promotion heuristic (refining a *filled* Big-6 section, vs. filling an empty one), and the qualified `### <Section> Decisions` sub-sections are not yet built. This lean body fills empty Big-6 sections and appends LIFO (with optional `[+]` EXTENDED depth, orphan-checked and auto-pruned at commit, the prune held while a reconcile is pending) plus BACKLOG through the pipeline.
+The `-FULL` update mode, surgical Big-6 edits, and the LIFO-to-static promotion heuristic (refining a *filled* Big-6 section, vs. filling an empty one) are not yet built. This lean body fills empty Big-6 sections and appends LIFO (with optional `[+]` EXTENDED depth, orphan-checked and auto-pruned at commit, the prune held while a reconcile is pending) plus BACKLOG through the pipeline.

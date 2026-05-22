@@ -25,6 +25,19 @@ function hasDataDoc(aidocsDir) {
   try { return readdirSync(aidocsDir).some((f) => /_(MEMORY|SESSION)\.md$/.test(f)); }
   catch { return false; }
 }
+// True when AIDOCS holds a data doc whose project prefix is not the target name - the
+// signature of a bootstrap rename (laying a new name over an existing differently-named
+// project). Used to skip laying empty new-name data scaffolds before migrate-archive
+// runs, so they never pollute the archive and shadow the real source at restore.
+function hasForeignDataDoc(aidocsDir, name) {
+  if (!existsSync(aidocsDir)) return false;
+  try {
+    return readdirSync(aidocsDir).some((f) => {
+      const m = f.match(/^(.+)_(?:MEMORY|SESSION)\.md$/);
+      return m && m[1] !== name;
+    });
+  } catch { return false; }
+}
 function recognizeTarget(target) {
   const has = (...p) => existsSync(join(target, ...p));
   if (has(".claude", "skills", "321") || has("AIDOCS", "_index.json") || hasDataDoc(join(target, "AIDOCS"))) {
@@ -52,6 +65,11 @@ export async function cmdInit(args) {
   const target = resolve(process.cwd(), targetArg);
   if (SOURCE_ROOT === target) { console.error("init: refusing to scaffold over the source project."); process.exit(5); }
   const kind = recognizeTarget(target);
+  // A bootstrap rename (a new name over an existing differently-named project) must not
+  // lay empty new-name data scaffolds: migrate-archive would sweep them into the archive,
+  // where they would shadow the real legacy-named source at restore. The reinstall pass
+  // (over the emptied post-archive tree) sees no foreign doc and lays them normally.
+  const renaming = hasForeignDataDoc(join(target, "AIDOCS"), name);
 
   const sourceIndex = join(SOURCE_ROOT, "AIDOCS", "_index.json");
   const source = JSON.parse(await readFile(sourceIndex, "utf8"));
@@ -103,9 +121,14 @@ export async function cmdInit(args) {
     scaffolds.push({ dst: join(target, f), body: sub(await readFile(join(SOURCE_ROOT, f), "utf8")) });
   }
   scaffolds.push({ dst: join(target, "AIDOCS", "_index.json"), body: sub(await readFile(sourceIndex, "utf8")) });
-  for (const rel of Object.values(source.files)) {
-    const srcAbs = join(SOURCE_ROOT, rel.replace(/^\.\//, ""));
-    scaffolds.push({ dst: join(target, sub(rel).replace(/^\.\//, "")), body: sub(await readFile(srcAbs, "utf8")) });
+  // Skip the data-doc scaffolds during a bootstrap rename (see `renaming` above): an
+  // empty new-name MEMORY / SESSION laid here would be archived and then shadow the real
+  // source at restore. They are laid on the post-archive reinstall instead.
+  if (!renaming) {
+    for (const rel of Object.values(source.files)) {
+      const srcAbs = join(SOURCE_ROOT, rel.replace(/^\.\//, ""));
+      scaffolds.push({ dst: join(target, sub(rel).replace(/^\.\//, "")), body: sub(await readFile(srcAbs, "utf8")) });
+    }
   }
   let wrote = 0, kept = 0;
   for (const { dst, body } of scaffolds) {

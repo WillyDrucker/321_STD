@@ -9,7 +9,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
-import { authoredTargets, scanBanned } from "./prose.mjs";
+import { authoredTargets, isFile, scanBanned } from "./prose.mjs";
 
 const BIG6 = ["Overview", "Stack", "Architecture", "Environment", "Pipeline", "Conventions"];
 
@@ -58,7 +58,9 @@ function checkRegistry(index) {
     if (!existsSync(fromRoot(p))) issues.push(`path "${k}" -> ${p} does not exist`);
   }
   for (const [k, p] of Object.entries(index.files || {})) {
-    if (!existsSync(fromRoot(p))) issues.push(`file "${k}" -> ${p} does not exist`);
+    const abs = fromRoot(p);
+    if (!existsSync(abs)) issues.push(`file "${k}" -> ${p} does not exist`);
+    else if (!isFile(abs)) issues.push(`file "${k}" -> ${p} is not a regular file`);
   }
   const src = index.auto_memory?.source;
   if (src && !existsSync(fromRoot(src))) issues.push(`auto_memory.source -> ${src} does not exist`);
@@ -76,7 +78,7 @@ function readReg(index, key) {
   const rel = index.files?.[key];
   if (!rel) return null;
   const abs = fromRoot(rel);
-  return existsSync(abs) ? readFileSync(abs, "utf8") : null;
+  return isFile(abs) ? readFileSync(abs, "utf8") : null;
 }
 
 function needPurpose(content, label, issues) {
@@ -182,7 +184,9 @@ function checkProse(index) {
   const issues = [];
   for (const abs of authoredTargets(index)) {
     const name = abs.split(/[\\/]/).pop();
-    for (const v of scanBanned(readFileSync(abs, "utf8"))) issues.push(`${name}:${v.line} ${v.kind}`);
+    let text;
+    try { text = readFileSync(abs, "utf8"); } catch { continue; }
+    for (const v of scanBanned(text)) issues.push(`${name}:${v.line} ${v.kind}`);
   }
   return issues;
 }

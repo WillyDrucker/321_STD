@@ -35,16 +35,22 @@ function mergeGitignore(canonical, archived, name) {
   return `${canonical.replace(/\n*$/, "")}\n\n# preserved from ${name} (pre-migration)\n${add.join("\n")}\n`;
 }
 
-// First archived file matching one of the suffixes, or null. The suffixes are tried
-// in order so DEV-AUDIT wins over the legacy DEV-STANDARDS when both somehow exist.
-function findArchived(aidocs, suffixes) {
-  if (!existsSync(aidocs)) return null;
+// Every archived file matching one of the suffixes, best candidate first. Suffixes
+// are tried in order (DEV-AUDIT before the legacy DEV-STANDARDS), and within a suffix
+// a legacy-named file sorts ahead of one already carrying the new name: a bootstrap
+// rename can leave an empty <newname>_ scaffold beside the real <oldname>_ source, and
+// the real one must win. restoreConfigSection walks these and takes the first with a
+// non-placeholder section.
+function findArchivedCandidates(aidocs, suffixes, name) {
+  if (!existsSync(aidocs)) return [];
   const files = readdirSync(aidocs);
+  const out = [];
   for (const suffix of suffixes) {
-    const hit = files.find((f) => f.endsWith(suffix));
-    if (hit) return join(aidocs, hit);
+    const hits = files.filter((f) => f.endsWith(suffix));
+    hits.sort((a, b) => Number(a.startsWith(`${name}_`)) - Number(b.startsWith(`${name}_`)));
+    for (const h of hits) out.push(join(aidocs, h));
   }
-  return null;
+  return out;
 }
 
 // Pull a section's body out of archived content, or null when the heading is absent
@@ -58,26 +64,29 @@ function extractSection(content, section) {
 }
 
 // Copy one config doc's project section from the archive into the freshly-laid live
-// doc, verbatim but for legacy + rename normalization. Returns a report string, or
-// null when there was no source to copy (the reconcile pass derives it instead).
+// doc, verbatim but for legacy + rename normalization. Walks the archive candidates
+// and takes the first whose section has real content, so an empty same-name scaffold
+// never shadows the real legacy-named source. Returns a report string, or null when
+// no candidate had a section to copy (the reconcile pass derives it instead).
 function restoreConfigSection(archiveAidocs, root, name, spec) {
-  const src = findArchived(archiveAidocs, spec.archiveSuffixes);
-  if (!src) return null;
-  let content = readFileSync(src, "utf8");
-  if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
-  const oldName = basename(src).replace(OLD_NAME, "");
-  content = normalizeLegacy(content);
-  if (oldName && oldName !== name) content = normalizeNames(content, oldName, name);
-  const body = extractSection(content, spec.section);
-  if (body === null) return null;
   const liveAbs = join(root, "AIDOCS", `${name}_${spec.live}.md`);
   if (!existsSync(liveAbs)) return null;
-  try {
-    writeFileSync(liveAbs, overwriteSection(readFileSync(liveAbs, "utf8"), spec.section, body), "utf8");
-  } catch {
-    return null;   // the live section heading is missing - leave it for the reconcile pass
+  for (const src of findArchivedCandidates(archiveAidocs, spec.archiveSuffixes, name)) {
+    let content = readFileSync(src, "utf8");
+    if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+    const oldName = basename(src).replace(OLD_NAME, "");
+    content = normalizeLegacy(content);
+    if (oldName && oldName !== name) content = normalizeNames(content, oldName, name);
+    const body = extractSection(content, spec.section);
+    if (body === null) continue;   // empty / placeholder section - try the next candidate
+    try {
+      writeFileSync(liveAbs, overwriteSection(readFileSync(liveAbs, "utf8"), spec.section, body), "utf8");
+    } catch {
+      return null;   // the live section heading is missing - leave it for the reconcile pass
+    }
+    return `${name}_${spec.live}.md ${spec.section} (from ${basename(src)})`;
   }
-  return `${name}_${spec.live}.md ${spec.section} (from ${basename(src)})`;
+  return null;
 }
 
 export function cmdMigrateRestore(args) {

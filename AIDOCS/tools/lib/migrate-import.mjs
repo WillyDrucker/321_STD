@@ -23,8 +23,10 @@ import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
 import { repoRoot, resolveFile, stagingDir } from "./paths.mjs";
 import { loadStaging } from "./state.mjs";
 
-// Headings that are an EXTENDED file's own authoring guide, not durable content.
-const META_HEADING = /^(what goes in|what doesn't|what does not|pruning.*|purpose|lifo)$/i;
+// Headings that are an EXTENDED file's own authoring guide, not durable content - plus
+// the Big-6 mirror headings a legacy EXTENDED carried at its top (overview ... conventions),
+// which are schema scaffold, so a legacy import never lands them as new LIFO bullets.
+const META_HEADING = /^(what goes in|what doesn't|what does not|pruning.*|purpose|lifo|overview|stack|architecture|environment|pipeline|conventions)$/i;
 // No code in EXTENDED. A fenced block becomes this marker so a code-only entry does
 // not collapse to an empty body, and the validator's no-fence rule on body_md holds.
 const CODE_MARKER = "(code example elided on import - summarize the takeaway in prose)";

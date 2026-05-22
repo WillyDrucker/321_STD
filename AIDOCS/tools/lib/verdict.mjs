@@ -52,7 +52,9 @@ function validateVerdict(entries, root) {
   entries.forEach((e, i) => {
     const at = `entry ${i}`;
     if (typeof e?.path !== "string" || !e.path) errors.push(`${at}: path required (string)`);
-    else { const pc = containmentError(e.path, root); if (pc) errors.push(`${at}: ${pc}`); }
+    // Only move / copy relocate a file, so only they need containment. A leave is a
+    // no-op, so a leave on a protected path (e.g. AIDOCS/ENV) is allowed, not an escape.
+    else if (e?.action === "move" || e?.action === "copy") { const pc = containmentError(e.path, root); if (pc) errors.push(`${at}: ${pc}`); }
     if (!TYPES.includes(e?.type)) errors.push(`${at}: unknown type ${JSON.stringify(e?.type)} (one of ${TYPES.join(" / ")})`);
     if (!ACTIONS.includes(e?.action)) errors.push(`${at}: unknown action ${JSON.stringify(e?.action)} (one of ${ACTIONS.join(" / ")})`);
     if (typeof e?.confidence !== "number" || e.confidence < 0 || e.confidence > 1) errors.push(`${at}: confidence required (number 0 to 1)`);

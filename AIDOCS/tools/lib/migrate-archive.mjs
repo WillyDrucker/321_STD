@@ -36,19 +36,24 @@ export function cmdMigrateArchive(args) {
     moved++;
   }
 
-  // The project's data docs: AIDOCS/*_*.md files (memory / session / backlog /
-  // audit and their extendeds), whatever their project prefix.
+  // The project's data docs (AIDOCS/*_*.md - memory / session / backlog / audit and
+  // their extendeds, whatever the prefix) and the legacy auto-prune archive dirs the old
+  // engine left behind (<NAME>_MEMORY_ARCHIVE / _SESSION_ARCHIVE / _BACKLOG_ARCHIVE, which
+  // are directories, not .md files). The current SETUP_ARCHIVE is the destination, so its
+  // _SETUP_ARCHIVE suffix is deliberately outside the match.
   const aidocs = join(root, "AIDOCS");
   if (existsSync(aidocs)) {
     for (const f of readdirSync(aidocs)) {
       const p = join(aidocs, f);
-      if (/_.+\.md$/.test(f) && statSync(p).isFile()) {
-        const dst = join(archive, "AIDOCS", f);
-        if (existsSync(dst)) continue;   // already archived - keep the first copy
-        mkdirSync(join(archive, "AIDOCS"), { recursive: true });
-        renameSync(p, dst);
-        moved++;
-      }
+      const st = statSync(p);
+      const isDataDoc = /_.+\.md$/.test(f) && st.isFile();
+      const isLegacyArchiveDir = /_(MEMORY|SESSION|BACKLOG)_ARCHIVE$/.test(f) && st.isDirectory();
+      if (!isDataDoc && !isLegacyArchiveDir) continue;
+      const dst = join(archive, "AIDOCS", f);
+      if (existsSync(dst)) continue;   // already archived - keep the first copy
+      mkdirSync(join(archive, "AIDOCS"), { recursive: true });
+      renameSync(p, dst);
+      moved++;
     }
   }
 

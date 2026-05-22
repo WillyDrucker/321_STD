@@ -1,32 +1,6 @@
 # PROJECTNAME - MEMORY (Extended)
 
-**Purpose:** Longer-form prose and anchored detail for `PROJECTNAME_MEMORY.md`. Six static sections at the top mirror MEMORY with deeper narrative. Below the divider, LIFO (newest on top) holds anchored detail, one per MEMORY LIFO bullet that earns depth.
-
-## Overview
-
-(longer-form prose of the facts in MEMORY > Overview)
-
-## Stack
-
-(longer-form prose of the facts in MEMORY > Stack)
-
-## Architecture
-
-(longer-form prose of the facts in MEMORY > Architecture)
-
-## Environment
-
-(longer-form prose of the facts in MEMORY > Environment)
-
-## Pipeline
-
-(longer-form prose of the facts in MEMORY > Pipeline)
-
-## Conventions
-
-(longer-form prose of the facts in MEMORY > Conventions)
-
----
+**Purpose:** Anchored detail for `PROJECTNAME_MEMORY.md`. LIFO (newest on top) holds one sub-section per MEMORY LIFO bullet that earns depth - the why, the rationale, what was non-obvious. The Big 6 facts and the decisions behind them live in MEMORY itself, not here.
 
 ## LIFO
 
