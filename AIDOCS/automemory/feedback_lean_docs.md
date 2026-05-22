@@ -8,7 +8,7 @@ metadata:
 Read-order tiers, top to bottom:
 
 - `CLAUDE.md` / `AGENTS.md` - tight orchestrator + read order + hard rules. No detail.
-- `AIDOCS/<PROJECT>_MEMORY.md` - identity static six + qualified Decisions H3 + LIFO durable observations. Bullets only. No code rules.
+- `AIDOCS/<PROJECT>_MEMORY.md` - identity static six + LIFO durable observations. Bullets only. No code rules.
 - `AIDOCS/<PROJECT>_MEMORY_EXTENDED.md` - longer prose for MEMORY static + H3 anchored LIFO detail.
 - `AIDOCS/<PROJECT>_SESSION.md` - Current State (overwrite-each-pass) + LIFO backbone log of project-significant events.
 - `AIDOCS/<PROJECT>_SESSION_EXTENDED.md` - H3 anchored detail for SESSION LIFO bullets that earn depth.

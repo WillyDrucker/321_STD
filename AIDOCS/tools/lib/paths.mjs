@@ -1,97 +1,43 @@
-// paths.mjs - shared constants for memory.mjs and its lib modules.
-// All filesystem locations and skill vocabulary live here so other modules
-// stay path-agnostic and the entry point doesn't carry import boilerplate.
+// paths.mjs - filesystem locations and registry resolution. Owns "where things
+// live". Two roots: SOURCE_ROOT is the engine's own location (what init copies
+// the skeleton FROM), and the active root is the project the operate-on commands
+// act ON. The active root defaults to SOURCE_ROOT - a steady project runs its own
+// engine - and is overridable with --root, so a fetched onboarding engine can
+// operate on a separate target without being copied into it.
 
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// Internal-only: REPO_ROOT / STAGING_DIR / STATE_PATH derive from it below.
-const TOOLS_DIR = resolve(HERE, "..");
-// REPO_ROOT climbs two levels from TOOLS_DIR (AIDOCS/tools) to project root.
-export const REPO_ROOT = resolve(TOOLS_DIR, "..", "..");
-export const INDEX_PATH = join(REPO_ROOT, "AIDOCS", "_index.json");
-export const STAGING_DIR = join(TOOLS_DIR, "staging");
-export const STATE_PATH = join(TOOLS_DIR, "state.json");
-export const LOCK_PATH = join(STAGING_DIR, ".lock");
+// The engine's own project root (AIDOCS/tools/lib climbs three to the root).
+export const SOURCE_ROOT = resolve(HERE, "..", "..", "..");
 
-// Canonical upstream for fetch-from-git. The default for the `origin` pointer
-// and for fetch-engine when no explicit source is given. A version in a manifest
-// is fine (like package.json), this is not memory.
-export const ORIGIN_REPO = "https://github.com/WillyDrucker/321_STD.git";
-export const ORIGIN_REF = "main";
+let activeRoot = SOURCE_ROOT;
+export function setRoot(dir) { activeRoot = resolve(dir); }
+export function repoRoot() { return activeRoot; }
 
-// The ephemeral onboarding root. Created at bootstrap, it owns the fetched
-// engine + runbooks + scratch through install -> setup -> the start of reconcile,
-// and is removed at graduation (the reconcile pass). Gitignored, like TEMP.
-// engine/ holds the fetched 321_STD release (the full onboarding tier), work/
-// holds verdict JSON and setup scratch.
-export const INSTALL_DIR = join(REPO_ROOT, "INSTALL");
-export const INSTALL_ENGINE_DIR = join(INSTALL_DIR, "engine");
-export const INSTALL_WORK_DIR = join(INSTALL_DIR, "work");
+export function indexPath() { return join(activeRoot, "AIDOCS", "_index.json"); }
+export function stagingDir() { return join(activeRoot, "AIDOCS", "tools", "staging"); }
+export function statePath() { return join(activeRoot, "AIDOCS", "tools", "state.json"); }
+// The ephemeral fetch target for an engine update / re-setup (gitignored).
+export function installEngineDir() { return join(activeRoot, "INSTALL", "engine"); }
 
-// Onboarding-tier engine modules. These ship with the fetched INSTALL/ engine
-// and are NOT laid into a steady-state install: init excludes them when copying
-// lib/, and memory.mjs resolves them lazily so a steady project (which carries
-// only the steady tier) still loads for its daily commands. Absolute source
-// paths - memory.mjs imports via file URL, init excludes by path match.
-export const ONBOARDING_COMMAND_PATHS = {
-  "init": join(TOOLS_DIR, "lib", "commands", "init.mjs"),
-  "migrate-archive": join(TOOLS_DIR, "lib", "commands", "migrate-archive.mjs"),
-  "migrate-import": join(TOOLS_DIR, "lib", "commands", "migrate-import.mjs"),
-  "migrate-restore": join(TOOLS_DIR, "lib", "commands", "migrate-restore.mjs"),
-  "import-skills": join(TOOLS_DIR, "lib", "commands", "import-skills.mjs"),
-  "verdict": join(TOOLS_DIR, "lib", "commands", "verdict.mjs"),
-};
+// Absolute path for a registry-relative value ("./AIDOCS/x") against the active root.
+export function fromRoot(rel) { return join(activeRoot, rel.replace(/^\.\//, "")); }
 
-// Onboarding-tier files with no command of their own (init's content templates).
-export const ONBOARDING_FILE_PATHS = [
-  join(TOOLS_DIR, "lib", "scaffoldTemplates.mjs"),
-];
+// Read and parse the active project's _index.json. The registry is load-bearing,
+// so a missing or malformed registry fails loud rather than limping on.
+export function loadIndex() {
+  const p = indexPath();
+  if (!existsSync(p)) throw new Error(`registry not found at ${p}`);
+  return JSON.parse(readFileSync(p, "utf8"));
+}
 
-export const VALID_SKILLS = ["session-update", "memory-update"];
-
-// Routine-op section slugs by skill. session-update lands in current_state
-// (overwrite) or lifo. memory-update lands in lifo only via routine ops. The
-// static six are reachable only via promote_to_section, gap_fill_section, and
-// update_section_text - all mode=full.
-export const ROUTINE_SECTIONS_BY_SKILL = {
-  "session-update": ["current_state", "lifo"],
-  "memory-update": ["lifo"],
-};
-
-// MEMORY static-section slugs. Only writable via promote_to_section /
-// gap_fill_section / update_section_text in mode=full. Validator rejects any
-// routine op targeting these.
-export const STATIC_SECTIONS = [
-  "overview",
-  "stack",
-  "architecture",
-  "environment",
-  "pipeline",
-  "conventions",
-];
-
-// BACKLOG section slugs. Both are LIFO. memory-update is the only skill that
-// writes to the backlog file via routine ops on backlog_actions[]. The
-// validator rejects backlog_actions on session-update staging.
-export const BACKLOG_SECTIONS = ["features", "ideas"];
-
-// Display headings per slug. Internal-only: consumed by decisionsHeadingFor below.
-const SECTION_HEADINGS = {
-  current_state: "Current State",
-  lifo: "LIFO",
-  overview: "Overview",
-  stack: "Stack",
-  architecture: "Architecture",
-  environment: "Environment",
-  pipeline: "Pipeline",
-  conventions: "Conventions",
-  features: "Features",
-  ideas: "Ideas",
-};
-
-// Qualified Decisions sub-section heading for a static section. e.g., decisionsHeadingFor("stack") -> "Stack Decisions".
-export function decisionsHeadingFor(slug) {
-  return `${SECTION_HEADINGS[slug]} Decisions`;
+// Absolute path of a registered file by its domain-owned key (e.g.
+// "memoryupdate.memory"). Throws if the key is not registered.
+export function resolveFile(index, key) {
+  const rel = index.files?.[key];
+  if (!rel) throw new Error(`no file registered under key "${key}"`);
+  return fromRoot(rel);
 }

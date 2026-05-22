@@ -1,212 +1,149 @@
 ---
 name: update
-description: Optimized chain of session-track + memory-track in one shared-context pass. Mode passes through. -FULL: SessionUpdate verifies project state, MemoryUpdate auto-applies Big 6 maintenance + promotion.
+description: The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates.
 ---
 
 # /321 -Update
 
-**Purpose:** Update both tracks in a single pass when the session moved both. Shares the conversation walk, context gather, and mode detection across the two lanes (vs naive sub-skill re-invocation which would pay 2x reads). This is the one intentional composition skill in the `/321` set: it reads the two lane bodies for their per-item allocation rules rather than restating them. Lane specs: `SKILL_SESSION-UPDATE.md` (session) and `SKILL_MEMORY-UPDATE.md` (memory + BACKLOG). Engine spec: `AIDOCS/tools/staging/SCHEMA.json` + `AIDOCS/tools/lib/README.md`.
+**Purpose:** Refresh the project's whole memory surface in one pass - SESSION (the event backbone) then MEMORY plus BACKLOG (the durable distillation). This is the flag to run at a checkpoint. It is a thin orchestrator: it invokes the two lane skills and relays their summaries, holding no logic of its own. The `-Sync` mode is the separate engine-self-update path.
 
-**When to use which:**
+## Modes
 
-- `/321 -SessionUpdate` - session-only checkpoint (memory hasn't moved)
-- `/321 -MemoryUpdate` - memory is the primary focus (auto-chains SessionUpdate first as a precondition)
-- `/321 -Update` - both tracks moved meaningfully and the run benefits from shared classification
+- **default** - the two-lane memory chain.
+- **reconciliation** - gate-triggered, not a flag. When the post-migration `reconcile_pending` gate is set, the default invocation runs the reconciliation pass instead of the chain.
+- **-Sync** - update the engine itself from upstream, project data untouched.
 
-## Reconciliation gate (post-migration)
+## Reconciliation pass (post-migration gate)
 
-Before anything else, read the gate: `node AIDOCS/tools/memory.mjs state`. The `reconcile_pending` field is the Setup -> Update handoff. A migration (`/321 -Setup`) captures the prior project as a lossless raw import and stops, setting this gate. Update is where the deferred distillation actually happens.
+Read the gate before anything else: `node AIDOCS/tools/engine.mjs state`. The `reconcile_pending` field is the Setup-to-Update handoff. A migration (`/321 -Setup`) captures the prior project additively and stops, setting this gate. Reconciliation is the distillation Setup deferred, and this pass is where it happens.
 
-- **`reconcile_pending: true`** - this run is the reconciliation pass. Announce it ("Post-migration reconciliation - distilling the raw import."), force both lanes to `-FULL`, apply the reconciliation framing below, verify the reconciled files with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. If reconciliation does not verify clean, leave the gate set so the next `/321 -Update` resumes it. Once the gate clears, run **Phase 2: Graduate** (below) to tear down the onboarding tier.
-- **`reconcile_pending: false` (or the field absent)** - normal chain. **Do not mention the gate.** Proceed to Step 0 silently. The gate is plumbing, not something to narrate every routine update.
+- **`reconcile_pending: true`** - this run is the reconciliation pass. Announce it ("Post-migration reconciliation - distilling the raw capture."), then follow this section instead of the default chain.
+- **`reconcile_pending: false` (or absent)** - the normal chain. Do not mention the gate. Proceed to The chain (default) silently. The gate is plumbing, not something to narrate on a routine update.
 
-**Reconciliation framing (only when the gate is set).** Distillation is the assess half of "capture raw, then assess" - this is the ONLY pass that distills, everything Setup did preserved. Give both lanes this nudge before the conversation walk:
+**What the capture looks like.** Setup captured the prior project additively with the gate holding auto-prune, so every lane is over cap, often over-split (several entries where one would do), and cross-source duplicated (the same fact from more than one swept doc). The depth lanes carry one extra layer: `migrate-import` scavenged the archived EXTENDED files 1:1, so they hold import residue - code blocks elided to a marker, the odd positional `(import N)` title where a heading had no slug-able text, `(N)` suffixes on repeated titles, and any structureless doc imported as a single blob. Everything is in house format (`[+]` bullets paired with `### sub-section` headings, no dates), so the job is to distill the over-capture and resolve that residue together.
 
-> "Reconciliation after a migration. The EXTENDED depth was imported losslessly - over-split (one sub-section per entry), over-cap (dozens of anchored entries), with raw `[+]` headlines and the source project's migration trail intact. Treat the canonical scan as source of truth and restored content as supplemental. Distill the raw import to a steady state per the record conventions in `SKILL_MEMORY-UPDATE.md` (rewrite raw headlines into descriptive `[+]` bullets whose text matches the `### heading`, merge sub-sections the import over-split from one owner, drop exact duplicates and entries whose code no longer exists, summarize any elided-code markers into one-line prose - no code in EXTENDED, hold entries to ~10 lines unless genuinely important, give each MEMORY_EXTENDED entry a `Decision:` line where there is a resolution, keep every filled Big 6 `### <Section> Decisions` sub-section present). Strip the source migration trail (version stamps, provenance headers, resolved-blocker narration) so each entry reads as present-tense durable state. Sweep BACKLOG against the now-restored WDDOCS (`RELEASES/`, `PROPOSALS/`, `IDEAS/`, `FUTURE/`, `DESIGN/`). The import-vs-reconciled diff is the audit trail."
+**Distillation (the AI lane).** Treat the canonical scan of the project as the source of truth and the captured content as supplemental. Reshape the additive raw into a steady state:
 
-Bring MEMORY + MEMORY_EXTENDED back under cap through these intelligent edits (merge / drop / tighten), not by leaning on mechanical auto-prune, which drops bottom-most rather than least-valuable. Re-merging never loses content - you reshape the lossless raw into a curated steady state. Report merged / dropped / rewritten counts in the Step 5 summary so the user can spot over-aggressive distillation.
+- **Resolve the import residue first.** Replace every elided-code marker with a one-line prose takeaway, rename the positional `(import N)` titles, merge the `(N)` duplicates, and re-split any blob entry into real sub-sections. `doctor` warns while an elided marker survives, so the gate holds until they are all gone.
+- **Merge** the entries that cover one thing into a single one, keeping the clearest wording.
+- **Drop** exact duplicates and entries whose code no longer exists.
+- **Rewrite** any raw or over-long `[+]` headline into a descriptive bullet whose text matches its `### heading`. The engine slugifies the bullet text to resolve the anchor, so the two must read the same.
+- **Bring both lanes under cap by judgment**, not by leaning on auto-prune, which drops the bottom-most rather than the least valuable. Re-merging loses nothing, it reshapes the additive raw into a curated steady state.
+- **Sweep BACKLOG** against the restored `WDDOCS` (`RELEASES/`, `DESIGN/`, and the rest).
+- **Sort migration content to the bottom** of each LIFO. Captured history is older than the project's live history, so it sits below it. Routine updates after the migration land on top as usual.
 
-**Mechanism: direct curated edits, doctor as the gate.** A wholesale merge (e.g. 63 sub-sections -> 20) is far more reliable authored directly than as a hundred hand-written staging ops - the staging model is built for incremental bullet changes, not a full reshape. So edit `MEMORY` / `MEMORY_EXTENDED` / `SESSION_EXTENDED` directly, then verify with `doctor` (orphan links, caps, banned prose, Big-6 Decisions, residual migration markers) - doctor is the gate the staging commit would otherwise be. Distill both EXTENDED lanes evenly: `SESSION_EXTENDED` carries the same over-split and `elided on import` code markers as `MEMORY_EXTENDED`, so give it the same sweep, not a token pass - doctor flags any marker that survives a cleared gate. Bullet-shaped odds and ends (a BACKLOG sweep, a single Big-6 touch-up) can still go through staging if cleaner. Clearing the gate (`state --clear-reconcile`) refuses while any MAIN LIFO bullet still carries a `{#anchor}` or date (acceptance check 2), so a no-op reconcile cannot close the gate silently. It also stamps both lane watermarks to now, so state.json shows reconciliation brought the lanes current even though the reshape bypassed commit. This is the one sanctioned exception to "everything routes through staging" - it applies only to the gated reconciliation pass, never to routine updates.
+Distill both EXTENDED lanes evenly - `SESSION_EXTENDED` carries the same over-split as `MEMORY_EXTENDED`, so give it the same sweep. Hold entries to about ten lines unless one is genuinely important, give a `MEMORY_EXTENDED` entry a `Decision:` line where there is a resolution, and keep every filled Big-6 `### <Section> Decisions` sub-section present.
 
-**Acceptance checks (the reconciled steady state, verified before clearing the gate).** These describe where a good distillation lands. A capable pass meets them naturally. They exist so a lighter pass has concrete targets, not just principles:
+**Mechanism: direct curated edits, doctor as the gate.** A wholesale reshape (dozens of sub-sections down to a handful) is far more reliable authored directly than as hundreds of staging ops, since the staging pipeline is built for incremental bullets, not a full reshape. Edit `MEMORY`, `MEMORY_EXTENDED`, `SESSION`, `SESSION_EXTENDED`, and `BACKLOG` directly, then verify with `node AIDOCS/tools/engine.mjs doctor`. The hardened doctor is the mechanical gate: it fails (errors) on a broken `[+]`/`### ` pair and on the shape and house-voice checks (registry, memory and session shape, auto-memory pointers, banned prose), and it warns while a lane is over cap or an elided-import marker survives. Those warnings are the reconcile targets - a fully clean doctor, zero warnings, is the signal the distillation is done. Cross-source dedup and migration-content ordering are judgment doctor cannot see, so verify those by eye. Bullet-shaped odds and ends (a BACKLOG sweep, a single Big-6 touch-up) can still ride the staging pipeline where that is cleaner, keeping the orphan and cap checks. This is the one sanctioned exception to "everything routes through staging," and it applies only to the gated reconciliation pass, never to a routine update.
 
-1. **SESSION shipped work collapses to release arcs.** The raw import is one entry per source ship record. In the reconciled `SESSION_EXTENDED`, fold the entries that shipped under the same version into a single arc (per-commit detail lives in git and CHANGELOG, not the session backbone). If `SESSION_EXTENDED` comes out near its imported size, it was not distilled. A genuinely standalone milestone may keep its own entry, which is the exception rather than the default.
-2. **Every `[+]` bullet is clean prose.** Strip any `{#anchor}`, date, or version prefix from the bullet text. The engine slugifies the text to resolve the anchor, so the visible headline must read as a plain description that matches its `### heading`. This one is mechanically enforced: doctor reports any survivor as a structural `Reconcile residue` issue, and `state --clear-reconcile` refuses to close the gate while they remain. A refusal means the strip is unfinished, not a tooling error - fix the bullets and clear again.
-3. **Your own EXTENDED files leave doctor clean.** After the reshape, the only content/prose lint doctor reports is pre-existing user content (WDDOCS). Aim for zero over-length-anchor or `elided on import` warnings in the migration-written `MEMORY_EXTENDED` / `SESSION_EXTENDED`. A surviving warning there means under-distillation, so tighten that entry before clearing the gate rather than attributing it to user content.
-4. **No cross-project file refs survive.** The source project's doc-filename references (`<OldName>_MEMORY.md`, `_SESSION.md`, `_DEV-AUDIT.md`, and the rest) must be renamed to the current project. The migrate-import rename skips these `_`-joined refs by word-boundary, so they arrive as residue in MEMORY / SESSION and their EXTENDED files. Same enforcement as check 2: doctor flags each as a structural `Reconcile residue` issue and `state --clear-reconcile` refuses while any remain.
-5. **Cross-source duplicates merged.** The raw import can hold several overlapping sources - the 321 EXTENDED plus every swept scavenge doc (a `TEMP/` legacy dump, a prior project copied in), and on a re-migration even multiple similar projects. The same pitfall, convention, or shipped event often appears in more than one. Merge each into a single entry, keeping the clearest wording, rather than leaving near-duplicate LIFO bullets. This is judgment, not a gate (semantic dedup cannot be mechanically enforced), so it is on you: whenever the Step 1 sweep imported more than the canonical files, scan for cross-source repeats.
-6. **Imported-from-older-project content sorts to the bottom.** Migration content is older than the project's current processes, so in the reconciled LIFO it lands at the BOTTOM, below current-project history. Swept legacy docs (the oldest source) sort to the very bottom, beneath the more recent 321 import. Routine updates after the migration go on top as usual - the migration import never sits above live history.
+**Auto-memory merge (the archived rules).** Setup archived the project's `AIDOCS/automemory` and routed any scattered memory-like files into the same archive, then laid the canonical rules fresh. This pass decides what, if anything, from the archive earns a place back, and the default is nothing. It is the one sanctioned write to auto-memory (routine `-MemoryUpdate` never touches it), scoped to this gated pass.
 
-**Skills lane (project `/321` skills).** Setup's migration already did the no-conflict half mechanically: `import-skills` copied the project's net-new skill bodies into `AIDOCS/SKILL/` under the canonical `SKILL_<FUNC>.md` name VERBATIM, recorded each one's `customizations[]` provenance entry, and registered them on the Step 3 sync. It also reported any that collide with a canonical skill rather than overwriting it. So the net-new are done. This lane finalizes the collisions and any role-dedup. The source of truth for a collision's project delta is the archived legacy tree (`AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/SKILLS/`, plus any project-customized `SKILL_*.md`). Run `node AIDOCS/tools/memory.mjs import-skills --from AIDOCS/<X>_SETUP_ARCHIVE/AIDOCS/SKILLS --dry-run` once to get the classification and, for each collision, the canonical base hash. Then handle each case:
+- **Keep the user profile.** A filled `user_*.md` is project data, not a canonical rule - restore it from the archive, drop the blank `user_name.md` template the reinstall laid, and point the AGENTS Hard-rules entry at the real filename (doctor checks the pointer both ways).
+- **Weigh each archived or swept rule against the canonical set, default drop.** If a canonical rule already covers the point, drop it. Re-add only when the guidance is genuinely uncovered and earns its space, and then summarize it completely into an existing rule - never re-add a standalone rule file. If it finds no home, drop it.
+- **Keep AGENTS and the pointers in sync.** Every auto-memory file the merge keeps or renames needs its matching AGENTS Hard-rules pointer in both directions, which `doctor` checks. The archived copy stays in `SETUP_ARCHIVE` as the recovery net.
 
-- **Net-new (imported as-is, leave it)** - `import-skills` already copied the body VERBATIM and recorded its `customizations[]` provenance entry (no `base` - a body absent from the engine source is never overwritten by `init`). Do NOT rewrite the body. Optional cosmetic touches only: drop a project prefix from the frontmatter `name` for a cleaner dispatch key (the flag comes from the filename either way), and fix banned prose only if doctor flags it. Otherwise leave it exactly as imported.
-- **Overlap (canonical base + delta)** - the project skill shares a function with a canonical one (auto-push and the like). `import-skills` kept the canonical body and reported the collision. **First weigh how much of the project body is genuinely project-specific.** A body that is a thin orchestrator over the project's own scripts (a release flow calling `db-sync`, `changelog-promote`, `push-live`, and the like) is almost ALL delta: keep it nearly whole, treat the canonical as framing only (gate discipline, the AI-vs-script split), and NEVER swap a project step or script call for a canonical inline one. Only when the project body mostly restates what the generic already does should the canonical spine dominate. Author the merge that way: canonical base, fold in EVERY project-specific step, script call, and gate from the archived legacy body. **Then diff your result against the archived original and confirm no project step, script, or gate was dropped** - a merge that loses project behavior is wrong, not done. When the project flow substantially diverges from canonical (a different publish or deploy, a different release mechanic), surface it as a decision rather than silently adopting canonical. Apply the project rename and voice-scrub, then record a `customizations[]` entry with a `base` block naming the canonical skill and the hash from the report (`base: { "skill": "<dispatch-key>", "hash": "<canonical hash>" }`), so `init` nudges a re-merge once the canonical spine advances.
-- **Fold** - the generic engine now supersedes the body (it predates the staging engine and mostly restates what the generic skill plus the engine already do). The doc-distillation skills (`-SessionUpdate`, `-MemoryUpdate`, `-Update`) usually land here. Carry forward only genuine deviations - process rules into `<X>_MEMORY.md` (Pipeline / Conventions), code rules into `<X>_DEV-AUDIT.md` Project specifics - then drop the body (delete it from `AIDOCS/SKILL/` if Setup imported it as net-new). Do not fork a skill the engine drives.
-- **Role rename / dedup** - the project skill is its own name for a canonical role (for example `-DevStandards` is the project's DEV-AUDIT, auditing against `<X>_DEV-STANDARDS.md`, while `init` also scaffolded a generic `-DevAudit`). Resolve the duplication: either adopt the canonical name (merge the project's specifics into `SKILL_DEV-AUDIT.md` as an overlap, drop the duplicate body, reconcile the doc) or keep the project's name as a distinct skill. Surface the choice when it is a real workflow decision, not a mechanical merge.
-- **Surface a decision** - the divergence is a real workflow choice (whether SessionUpdate writes a `CHANGELOG [Unreleased]` block, whether MemoryUpdate is manual-only). Present it and let the user choose rather than silently adopting either side.
+**Config docs lane (DEV-AUDIT, AUTO-PUSH, CHANGELOG).** `migrate-restore` copied these back verbatim at setup, normalized for legacy tokens and the project rename. This pass finalizes each by direct edit:
 
-**Late scan (the finalize nudge).** After the bulk reconcile, with full context on the project's conventions and naming, scan for skill-shaped files OUTSIDE `AIDOCS/SKILL/` that could become `/321` skills - a real `.claude/skills/*` tree, ad-hoc `SKILL*.md` pipelines, loose runnable procedures. For each candidate, use AskUserQuestion to ask whether to convert it (recommend per candidate, never auto-adopt). On yes, hand it to the same importer (`node AIDOCS/tools/memory.mjs import-skills --from <dir>`) and finalize it through the cases above. This runs once, at the end of the process, as a nudge.
+- **DEV-AUDIT `## Project specifics`.** Walk each restored entry against the canonical baseline above the `---` (anchor principles, hard rules, audit dimensions, which `init` writes identically everywhere). Drop what duplicates the baseline or restates MEMORY (MEMORY owns codebase-identity rules), keep what is genuinely project-specific (build / lint commands, language version, framework gotchas) or extends the baseline, surface contradictions. Never touch the baseline above the divider.
+- **AUTO-PUSH `## Project release steps`.** Confirm the restored steps are the project's real cycle (version bump, CHANGELOG, build, deploy / publish), dropping generic restatement the baseline already covers. When nothing was restored (a non-321 source had no AUTO-PUSH doc), derive the steps from the archived release skill body, the CHANGELOG, and the build config, or leave the placeholder when there is no signal.
+- **CHANGELOG.** Voice-scrub to house style (`scrub --fix` rewrites em dashes and flags semicolons) and confirm the canonical structure. Invent no entries - AutoPush owns CHANGELOG composition at release, this pass only reformats what migrated.
 
-Then verify: `node AIDOCS/tools/memory.mjs sync` (refreshes dispatch from the edited bodies) then `node AIDOCS/tools/memory.mjs doctor` (its customization-manifest check confirms each `applies_to` path exists and each `base` block is well-formed, and its legacy-skills check confirms no live `AIDOCS/SKILLS/` tree remains). A standalone `import-skills` run outside the migration leaves the live legacy tree in place - remove it once every body is imported or folded. These are direct curated edits gated by doctor, same mechanism as the rest of this pass. Report the outcome per body in the Step 5 summary.
+**AGENTS / CLAUDE classification lane.** `migrate-archive` set the archived orchestrator files aside and `init` wrote the lean canonical skeleton over them. Fold each archived block into its right home, keeping `AGENTS.md` a lean index. Cold-start orientation, read-order, and Hard-rules pointers stay in the canonical `AGENTS.md`. Project conventions and durable architecture go to `<PROJECT>_MEMORY.md`. Code-applicable rules go to `<PROJECT>_DEV-AUDIT.md` `## Project specifics`. AGENTS keeps its own short `## Project Specifics` for the few cold-start must-knows a session needs before it reads anything else - a forever-fixed bundle ID, a hard "never run X" gate. This is a bounded visibility surface, like the Hard-rules copy: the full convention lives once in MEMORY or DEV-AUDIT and AGENTS carries the one-line flag, so the brief overlap is by design, not drift to reconcile away. Keep it to a handful, never a second copy of DEV-AUDIT. A duplicate of the canonical skeleton drops, and a contradiction surfaces for the user. `CLAUDE.md` stays the `@AGENTS.md` pointer - route any substantive archived CLAUDE content the same way. Doctor's auto-memory pointer check confirms the Hard-rules pointers still resolve.
 
-**AGENTS / CLAUDE classification lane.** The migration archived the project's old `AGENTS.md` and `CLAUDE.md` and `init` wrote the canonical lean skeleton over them. This lane folds the archived orchestrator content into the right home, keeping `AGENTS.md` a lean index. For each block in the archived files, apply the reconciliation principle (canonical scan wins on overlap, contradictions surface, complements keep):
+These lanes are direct curated edits gated by doctor, the same mechanism as the distillation. Routine (non-gated) updates touch none of them.
 
-- Cold-start orientation / read-order / Hard-rules pointer -> the canonical `AGENTS.md` (target ~50 lines, 80 ceiling, no routed block over ~10 lines, prefer a one-line pointer over an inlined block). Keep the canonical spine intact: Purpose header, Cold-start load order, layout / `_index.json` pointer.
-- Project conventions / product principles / durable architecture -> `<X>_MEMORY.md` (Conventions or the matching Big 6 section).
-- Code-applicable rules -> `<X>_DEV-AUDIT.md` Project specifics.
-- A duplicate of the canonical skeleton -> drop. A contradiction -> surface for the user.
+**Project rename (instance name vs codebase identity).** When the migration took a `--name` different from the prior name, two things are renamed differently - keep them separate. The **321 instance name** (the data-doc prefix and prose mentions) is renamed to the new name: the capture's normalize did the mechanical pass, so just confirm the reconciled docs read consistently as the new name with no stale doc-refs to the old one. The **codebase identity** (repo and remote URL, branch convention, bundle and package IDs, env-var and code-constant names) is left as it was, on purpose - it is the project's real identity, not the 321 instance name, and rewriting it would break the build. Surface that split rather than acting on it: list where the old name still lives as a real identifier (`package.json` name, the bundle IDs, the repo / remote, the branch convention, ENV doc names, code constants) so the user can decide. A genuine full rename of the codebase is a separate, deliberate code-level change the user drives, not something the reconcile attempts. When the names match (the common re-onboard), there is nothing to separate.
 
-`CLAUDE.md` stays the canonical `@AGENTS.md` import - route any substantive archived CLAUDE content the same way (the two orchestrator files are usually near-duplicates, so dedup them against each other). Confirm auto-memory Hard-rules pointers with doctor's Auto-memory pointers check.
+**Acceptance checks (the reconciled steady state).** A capable pass meets these naturally. They give a lighter pass concrete targets:
 
-**DEV-AUDIT Project-specifics dedup lane.** Setup restored the project's `## Project specifics` verbatim. Walk each restored sub-section against the canonical baseline (the Anchor principles / Hard rules / Audit dimensions above the divider, which `init` wrote identically across every project): DROP if it duplicates the baseline or restates MEMORY (MEMORY owns project-anchored rules), KEEP if it is purely project-specific (build / lint commands, language version, framework gotchas) or extends the baseline with real specifics, SURFACE contradictions. Only `## Project specifics` is reconciled - never dedup, rewrite, or contradiction-scan the baseline above the divider. The DEV-AUDIT Hard rules block is an intentional audit-facing copy of the auto-memory inventory (also surfaced in AGENTS Hard rules) - that triplication is by design for visibility, not drift to reconcile.
+1. **Both lanes are under cap.** MEMORY and SESSION LIFO sit at or below their `_index.json` `sizes` cap, reached by merge and drop, not by auto-prune.
+2. **Every `[+]` bullet is clean prose** matching its `### heading`, so the slugified anchor resolves. No raw or over-long headlines.
+3. **EXTENDED carries one sub-section per surviving `[+]` bullet** - no orphans, no over-split leftovers. Doctor's orphan-pairs check is an error, so a clean doctor confirms the pairing survived the reshape.
+4. **No import residue.** Every elided-code marker is resolved to prose, no `(import N)` or `(N)` titles remain, and no blob entry is left unsplit. Doctor warns on a surviving marker.
+5. **Cross-source duplicates are merged** into one entry. This is judgment, so whenever the capture drew from more than the canonical files, scan for repeats.
+6. **Migration content sits at the bottom** of each LIFO, below live project history.
+7. **Auto-memory is canonical plus the kept profile** - no re-added standalone rules, every pointer matched. Doctor's auto-memory check confirms the pointers both ways.
+8. **Config docs are reconciled.** DEV-AUDIT Project specifics deduped against the baseline, AUTO-PUSH release steps are the project's real cycle (or on placeholder when there is no signal), CHANGELOG in house voice.
+9. **AGENTS stays lean.** Archived orchestrator content folded into MEMORY / DEV-AUDIT, no routed block bloating the index, the Hard-rules pointers resolve (doctor confirms).
 
-All lanes are direct curated edits gated by doctor, the same mechanism as the distillation. The one step that stays the user's is deleting `AIDOCS/<X>_SETUP_ARCHIVE/` once they are satisfied - the archive is the recovery net, so its removal is a human call, not part of the gate.
+**Close the pass.** First audit each distilled lane against its archive - the verify of what took and what did not. Point `--audit` at the same archived EXTENDED Setup imported from:
+
+```bash
+node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION_EXTENDED.md --skill sessionupdate --audit
+node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_MEMORY_EXTENDED.md  --skill memoryupdate  --audit
+```
+
+Each run lists the archived entries with no surviving `### sub-section`. Confirm every one is a deliberate merge or drop, not a lost entry, and re-derive any that should have stayed. (Add the same `--old <OLD> --new <PROJECT>` the import used if the project was renamed, so the archive titles normalize before the diff.)
+
+Then run the full **archive-alignment check**: walk `AIDOCS/<PROJECT>_SETUP_ARCHIVE/` and confirm every archived source is accounted for - landed in the live structure or deliberately dropped. The `--audit` above covers the SESSION / MEMORY EXTENDED lanes mechanically. For the config docs, CHANGELOG, the archived AGENTS / CLAUDE, and any swept docs, confirm each by eye against the lanes above. A source that is neither reflected nor consciously dropped means the pass is unfinished - resolve it before clearing.
+
+Once doctor is fully clean (zero warnings) and the archive is accounted for:
+
+```bash
+node AIDOCS/tools/engine.mjs state --clear-reconcile
+```
+
+This clears the gate and stamps both lane watermarks current (the direct-edit reshape bypassed `commit`, which would otherwise stamp them). If doctor still warns, or an audit surfaces a lost entry, leave the gate set so the next `/321 -Update` resumes the reconciliation. Then run Phase 2 below.
 
 ## Phase 2: Graduate (onboarding teardown)
 
-Runs only after distillation verifies - the gate is cleared and doctor is clean. This is the graduation point: the project is steady, so tear down the onboarding tier it no longer needs. All A (one mechanical command), idempotent, and safe because the `origin` pointer makes `INSTALL/` re-fetchable - removal is not a one-way loss.
+Runs only after reconciliation verifies - the gate is cleared and doctor is clean. The project is steady, so tear down the onboarding tier it no longer needs:
 
 ```bash
-node AIDOCS/tools/memory.mjs graduate
-node AIDOCS/tools/memory.mjs sync
-node AIDOCS/tools/memory.mjs doctor
+node AIDOCS/tools/engine.mjs graduate
+node AIDOCS/tools/engine.mjs sync
+node AIDOCS/tools/engine.mjs doctor
 ```
 
-`graduate` deregisters `-Setup` (removes the body + its dispatch / installed entries), carves the engine back to steady (removes the onboarding modules a migration laid in-place via `init --with-onboarding`), removes `INSTALL/`, and marks the project `graduated` so a later `/321 -Sync` engine refresh does not re-introduce `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` then rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean (no dangling dispatch entries).
+`graduate` deregisters `-Setup` (drops its body and dispatch entry), removes `INSTALL/`, and marks the project `graduated` so a later `-Update -Sync` does not re-add `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean. The onboarding lib modules `init` laid stay in place, unused once `INSTALL/` and `-Setup` are gone - no skill invokes them after graduation (the `--root` model carries no engine carve).
 
-After this the project carries no onboarding machinery - lean skills, the steady engine, and the `origin` pointer for future `-Sync`. The `<X>_SETUP_ARCHIVE/` (project content, not re-fetchable) stays the user's separate deletion call.
+After this the project carries no onboarding machinery. The `<PROJECT>_SETUP_ARCHIVE/` holds project content that is not re-fetchable, so deleting it stays the user's separate call.
 
-## What this skill does differently
+## The chain (default)
 
-A naive chain (SessionUpdate then MemoryUpdate) walks the conversation twice and gathers context twice. This skill folds those into a single pass:
+1. **Run `-SessionUpdate`.** Read `AIDOCS/SKILL/SKILL_SESSION-UPDATE.md` and execute it. SESSION lands first so the memory lane reads a current backbone. If it fails, stop and report - do not proceed to the memory lane on a failed session commit.
 
-| Concern | Naive chain | This skill |
-|---|---|---|
-| Conversation walk | 2x | 1x (shared classification, finding routes to session / memory / both / drop) |
-| Context gather (SESSION + MEMORY + BACKLOG + AGENTS) | 2x reads | 1x reads, both lanes share the in-memory view |
-| Mode detection | 2x | 1x per lane |
-| Sub-skill commit | 2 separate two-phase commits | 2 separate two-phase commits (kept separate so a session-only or memory-only failure can be retried independently) |
+2. **Run `-MemoryUpdate`, skipping its Step 1.** Read `AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md` and execute it, but skip its Step 1 auto-invoke of `-SessionUpdate` - this chain already ran it, and re-running would re-walk the conversation against an already-current SESSION. Begin the memory lane at its context-gather step.
 
-Per-lane staging stays distinct so each lane's `state.json` watermark advances independently. Recovery is per-lane.
+Each lane stages and commits independently through the validate -> commit pipeline. `-Update` writes nothing itself.
 
-## Mode behavior
+## -Sync (engine self-update)
 
-| Mode | What runs | Touches Big 6 |
-|---|---|---|
-| default | Both lanes at default | no |
-| `-SKIM` | Both lanes at skim | no |
-| `-FULL` | Both lanes at full: SessionUpdate verifies Current State + project state, MemoryUpdate auto-applies gap-fill + promotion | yes (auto-applied, mechanically gated to `-FULL` only) |
+Keep the project's engine current with its upstream. This refreshes engine code, skills, and the router, never project data. Distinct from the `sync` engine command, which only rebuilds dispatch.
 
-## Roles (AI vs script)
+1. **Read the pointer.** Read `engine.version` and `engine.upstream` from `_index.json`. If `upstream` is empty, report "no upstream configured, nothing to sync" and stop. A project sets `upstream` to the repo it pulls its engine from.
 
-| Phase | AI | Script |
-|---|---|---|
-| Detect mode + gather context | One pass per lane, shared in-memory reads | Provides per-skill `last_committed_at` |
-| Classify + stage | One conversation walk, route each finding | Validates each staging on `validate` |
-| Commit | Issue commits sequentially (session then memory) | Two two-phase applies, separate state updates |
+2. **Fetch.**
+   ```bash
+   node AIDOCS/tools/engine.mjs fetch-engine --repo <engine.upstream>
+   ```
+   This lands the upstream engine in `INSTALL/engine`. Offline means a non-zero exit - report it and stop. The local engine keeps working.
 
-## Step 0: Parse flags + detect mode per lane
+3. **Compare.** Read `engine.version` from the fetched `INSTALL/engine/AIDOCS/_index.json`. Same as the local version means already current - clean up and stop. Newer means continue.
 
-Each lane detects mode independently:
+4. **Refresh engine-class files.** Copy from `INSTALL/engine` into the project, overwriting only the engine-class paths:
+   - `AIDOCS/tools/` - the engine. `staging/` and `state.json` are gitignored and absent from a cloned source, so the project's own staging and watermarks survive.
+   - `AIDOCS/SKILL/` - the skill bodies.
+   - `.claude/skills/321/SKILL.md` - the router.
 
-1. Compaction boundary in conversation -> auto-escalate to full.
-2. First run / bootstrap (`<skill>.last_committed_at` is null) -> auto-escalate to full.
-3. Per-skill signal:
-   - **session-update**: `git log main..HEAD --oneline` count. 0 + clean tree -> skim, 1-3 -> incremental, 4+ or uncertainty -> full.
-   - **memory-update**: durable-observation candidates in conversation + SESSION. 0 -> skim, 1-3 -> incremental, 4+ -> full.
+   Do NOT copy the data files (`<PROJECT>_*.md`), `_index.json`, `automemory/`, or `WDDOCS/` - those belong to the project. A graduated project (the `graduated` flag in `_index.json`) keeps `-Setup` deregistered - do not re-add its body. Then set `engine.version` in `_index.json` to the fetched version.
 
-Override flags `-FULL` / `-SKIM` force both lanes. The reconciliation gate (above) also forces both lanes to `-FULL` when `reconcile_pending` is set. Output `session=<mode>, memory=<mode>` at start (add `(reconciliation)` when the gate is set).
+5. **Verify and clean up.**
+   ```bash
+   node AIDOCS/tools/engine.mjs sync
+   node AIDOCS/tools/engine.mjs doctor
+   ```
+   Re-register skills, confirm the surface is clean, then remove `INSTALL/`.
 
-Null watermarks (`<skill>.last_committed_at` is null on first run / bootstrap) signal the full conversation is unread - already auto-escalated to full via rule 2 above.
+## Rules
 
-## Step 1: Shared context gather
+- **Reconciliation gate first, silent when off.** Read `reconcile_pending` before the chain. Set means this run is the post-migration reconciliation pass (direct-edit distillation, clear the gate, then graduate). Off means the normal chain, never mention the gate.
+- **Thin orchestrator (default).** No staging, no ops here - the lanes own their writes.
+- **Order is fixed.** SESSION first (events), then MEMORY (the state events imply), so the memory lane distills against a fresh backbone.
+- **Stop on a failed lane.** A failed SESSION commit halts the chain before MEMORY runs.
+- **-Sync touches only the engine.** Engine code, skills, and router refresh, never project data. Offline or no upstream is a clean no-op.
+- **Upstream owns the version.** The project pulls, it does not invent.
 
-Read once, hold for both lanes. Skip files already in current conversation context:
+## Deferred (land when their engine does)
 
-- `AIDOCS/<PROJECT>_SESSION.md` and `_SESSION_EXTENDED.md`
-- `AIDOCS/<PROJECT>_MEMORY.md` and `_MEMORY_EXTENDED.md`
-- `AIDOCS/<PROJECT>_BACKLOG.md`
-- `AGENTS.md`, auto-memory index (`MEMORY.md` at the path in `_index.json -> auto_memory.path`)
-- Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`, `git log main..HEAD --oneline`
-
-In `-FULL`, also gather project context (`package.json`, `_index.json`, framework / deploy configs, top-level layout). SessionUpdate uses it for Current State verification. MemoryUpdate uses it for Big 6 gap-fill.
-
-## Step 2: Shared conversation walk + classify
-
-Walk the conversation since `min(session_update.last_committed_at, memory_update.last_committed_at)` (whichever is older). If either watermark is null, walk the full conversation - that lane is bootstrapping. Classify each finding per the sub-skill allocation tables:
-
-- Session lane: see the allocation step in `SKILL_SESSION-UPDATE.md`.
-- Memory lane (including BACKLOG): see the routing step in `SKILL_MEMORY-UPDATE.md`.
-
-A finding can produce entries in both lanes when the rules call for it (rare). Findings matching neither lane drop here. Code-applicable patterns are DevAudit's lane.
-
-## Step 3: Stage + commit session-track
-
-In reconciliation mode these staging commits are replaced by the direct-edit reshape (see the Mechanism note above and Step 4's reconciliation clause). The normal chain runs Steps 3-4 as written.
-
-Build `AIDOCS/tools/staging/session-update.json` from the session-lane classifications. Run:
-
-```bash
-node AIDOCS/tools/memory.mjs validate --skill session-update
-node AIDOCS/tools/memory.mjs commit   --skill session-update
-```
-
-Auto-applies. Engine handles Last State demotion on `overwrite_section` of `current_state`. If commit fails, stop - memory-track does NOT run. Staging file preserved for retry.
-
-## Step 4: Stage + commit memory-track
-
-Build `AIDOCS/tools/staging/memory-update.json` from the memory-lane classifications + BACKLOG routing. In `-FULL`, also add gap-fill ops for empty Big 6 sections and promotion ops for LIFO entries that clear the heuristic gate. Run:
-
-```bash
-node AIDOCS/tools/memory.mjs validate --skill memory-update
-node AIDOCS/tools/memory.mjs commit   --skill memory-update
-```
-
-Auto-applies. AGENTS / auto-memory suggestion bullets stage as `lifo_insert` ops with `**Suggested for ...:**` prefix. User edits the target file to accept.
-
-If commit fails, SessionUpdate's commit already applied. Report MemoryUpdate failure with recovery guidance from `SKILL_MEMORY-UPDATE.md`.
-
-**Reconciliation mode only:** the wholesale reshape is direct curated edits (see the Mechanism note above), not the staging commits of Steps 3-4. Make the edits, verify with `node AIDOCS/tools/memory.mjs doctor`, then clear the gate: `node AIDOCS/tools/memory.mjs state --clear-reconcile`. Small bullet-shaped ops may still ride staging. If doctor does not pass, leave the gate set so the next `/321 -Update` resumes the reconciliation. Once the gate clears and doctor is clean, run **Phase 2: Graduate** (the onboarding teardown above).
-
-## Step 5: Combined summary
-
-```
-/321 -Update session=<mode>, memory=<mode> complete.
-
-session-update: <one-line summary>
-memory-update:  <one-line summary>
-
-Suggestions staged in MEMORY LIFO (user-confirm by editing the target file):
-  - <suggestion 1>
-  - <suggestion 2>
-```
-
-Empty suggestion list: omit the block entirely.
-
-**Reconciliation mode** appends a distillation report and the gate-cleared status:
-
-```
-Post-migration reconciliation complete. Gate cleared (reconcile_pending: false).
-  Distilled: <M> over-split merged, <D> duplicates / dead-code dropped,
-             <R> headlines rewritten to descriptive [+], <Q> trail stamps stripped
-  BACKLOG:   <K> items swept from WDDOCS
-  Skills:    <T> project skill(s) - <I> net-new imported as-is + provenance-recorded, <A> overlap(s) merged
-             (canonical base + delta, base hash recorded), <B> folded into MEMORY / DEV-AUDIT,
-             <C> surfaced for your decision. Late scan: <S> candidate(s) <converted | declined>
-  AGENTS:    <N> archived blocks classified (kept lean / -> MEMORY / -> DEV-AUDIT / dropped)
-  DEV-AUDIT: <N> Project-specifics sub-sections kept, <D> dropped as baseline / MEMORY dupes
-  Doctor:    0 structural, <N> content/prose (all pre-existing user WDDOCS,
-             migration-written files clean: 0 over-length anchors / markers)
-
-Only step left to you: delete AIDOCS/<X>_SETUP_ARCHIVE/ once satisfied (the recovery net).
-```
-
-## Rules (skill operation)
-
-- **Reconciliation gate first, silent when off.** Read `reconcile_pending` before Step 0. Set -> this run is the post-migration distillation pass (force `-FULL`, apply the framing, distill via direct edits, clear the gate after doctor verifies). Off -> normal chain, never mention the gate.
-- **Reconciliation re-homes everything the migration captured.** When the gate is set, beyond SESSION / MEMORY / BACKLOG it also runs the skills lane (Setup imported the net-new project skills verbatim and recorded their provenance, this lane merges overlaps as canonical base + delta with a recorded base hash, folds engine-superseded ones, handles role-dedup, and runs the late-scan finalize nudge), the AGENTS / CLAUDE classification lane (archived orchestrator content -> lean AGENTS / MEMORY / DEV-AUDIT), and the DEV-AUDIT Project-specifics dedup lane. All are direct edits gated by doctor. Routine (non-gated) updates touch none of these. The only manual step left is deleting the setup archive when satisfied.
-- **Single shared pass.** One conversation walk, one context gather. Per-lane commits stay separate for independent recovery.
-- **Session before Memory.** Session commits first so partial failures stay contained.
-- **`-FULL` auto-applies gap-fill + promotion.** No per-entry confirms.
-- **BACKLOG belongs to the memory lane.** Session does not route to BACKLOG.
-- **Never touches CHANGELOG.** AutoPush owns CHANGELOG composition at release.
+The `-FULL` mode pass-through (flowing to each lane on a routine run) is not yet built - it arrives with the update modes. The reconciliation pass above distills the core lanes (SESSION / MEMORY / BACKLOG and their EXTENDED), merges auto-memory, reconciles the config docs (DEV-AUDIT / AUTO-PUSH / CHANGELOG), and classifies the archived AGENTS / CLAUDE. The skills lane (a project's own `/321` skill bodies) lands with `import-skills`. For `-Sync`, customization preservation (keeping a project's edited skill body across a refresh) and a real version-compare plus upgrade-migration path land with the customizations manifest and a published upstream.

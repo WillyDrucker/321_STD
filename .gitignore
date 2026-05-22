@@ -3,9 +3,10 @@ TEMP/
 *.tmp
 *.log
 
-# Ephemeral onboarding root: the fetched engine + runbooks + setup scratch.
-# Created at bootstrap, removed by the reconcile pass at graduation.
-INSTALL/
+# Onboarding: INSTALL/install.md + setup.md are tracked source - init copies them
+# into a target and they ship in the repo clone. Ignore only the runtime artifacts
+# (the fetched engine, with INSTALL.log caught by *.log above). graduate removes INSTALL/.
+INSTALL/engine/
 
 # Setup migration archive: keep the empty folder for reference, ignore captured contents (transient, deleted after review)
 AIDOCS/*_SETUP_ARCHIVE/*
@@ -15,12 +16,9 @@ AIDOCS/*_SETUP_ARCHIVE/*
 AIDOCS/ENV/*
 !AIDOCS/ENV/.gitkeep
 
-# Staging files (transient, cleared on commit). SCHEMA.json and *.example.json are committed.
-AIDOCS/tools/staging/*.json
-!AIDOCS/tools/staging/SCHEMA.json
-!AIDOCS/tools/staging/session-update.example.json
-!AIDOCS/tools/staging/memory-update.example.json
-AIDOCS/tools/staging/.lock
+# Staging files (transient, written by the engine, cleared on commit). Keep the folder.
+AIDOCS/tools/staging/*
+!AIDOCS/tools/staging/.gitkeep
 
 # Persistent script state (machine-local). Auto-bootstrapped on first run.
 AIDOCS/tools/state.json

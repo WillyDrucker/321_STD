@@ -29,3 +29,5 @@ Do NOT add Purpose to:
 - Source code, `package.json`, configs
 - HTML or non-Markdown reference files
 - `CHANGELOG.md` (historical, has its own format)
+- A pure import-pointer file (e.g. `CLAUDE.md` when it only holds `@AGENTS.md`)
+- Auto-memory rule files (`AIDOCS/automemory/*.md`) - the frontmatter `description:` serves this role

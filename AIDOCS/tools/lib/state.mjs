@@ -1,152 +1,68 @@
-// state.mjs - I/O surface for _index.json, AIDOCS/tools/state.json, and per-skill
-// staging files. Plus small skill-key utilities (timestamp, flag formatter).
+// state.mjs - the engine's mutable-state I/O. Owns the two machine-local files:
+// the staging file a skill writes before commit, and state.json's per-skill
+// watermarks. Both live under the active root's AIDOCS/tools, so an engine driven
+// with --root reads and writes the target's state, not its own.
 
-import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
-import process from "node:process";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
-import { err } from "./cli.mjs";
-import { findCrossRefResidue, findLifoResidue } from "./markdown.mjs";
-import { INDEX_PATH, REPO_ROOT, STAGING_DIR, STATE_PATH } from "./paths.mjs";
+import { stagingDir, statePath } from "./paths.mjs";
 
-export async function loadIndex() {
-  if (!existsSync(INDEX_PATH)) {
-    err(`Index not found at ${INDEX_PATH}.`);
-    process.exit(5);
+// The skill domains that own a staging lane plus a state watermark.
+export const SKILLS = ["sessionupdate", "memoryupdate"];
+
+function stagingPath(skill) {
+  return join(stagingDir(), `${skill}.json`);
+}
+
+export function loadStaging(skill) {
+  const p = stagingPath(skill);
+  if (!existsSync(p)) return null;
+  return JSON.parse(readFileSync(p, "utf8"));
+}
+
+export function clearStaging(skill) {
+  const p = stagingPath(skill);
+  if (existsSync(p)) unlinkSync(p);
+}
+
+export function loadState() {
+  const p = statePath();
+  if (!existsSync(p)) return {};
+  try { return JSON.parse(readFileSync(p, "utf8")); } catch { return {}; }
+}
+
+export function saveState(state) {
+  const p = statePath();
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+export function reconcilePending() {
+  return loadState().reconcile_pending === true;
+}
+
+// state command: print state, or flip the reconcile_pending gate (the Setup ->
+// reconcile handoff). Setup sets it before the migration capture, so commit holds
+// auto-prune while it is set and the capture stays additive. The reconciliation
+// pass (the gated -Update, not built yet) curates the capture and clears the gate,
+// or clear it by hand with --clear-reconcile. Steady-state auto-prune resumes once
+// the gate is clear.
+export function cmdState(_index, args) {
+  if (args.includes("--set-reconcile") || args.includes("--clear-reconcile")) {
+    const value = args.includes("--set-reconcile");
+    const state = loadState();
+    state.reconcile_pending = value;
+    // Clearing the gate ends the reconciliation pass, whose direct-edit reshape
+    // bypasses commit's watermark stamp. Stamp both lanes current here so a routine
+    // -Update afterward does not re-walk from a pre-migration point.
+    if (!value) {
+      const now = new Date().toISOString();
+      for (const skill of SKILLS) state[skill] = { runs: state[skill]?.runs || 0, last_committed_at: now };
+    }
+    saveState(state);
+    console.log(`state: reconcile_pending = ${value}.${value ? "" : " Lanes stamped current."}`);
+    return;
   }
-  const raw = await readFile(INDEX_PATH, "utf8");
-  return JSON.parse(raw);
-}
-
-// Resolve a project-relative path and guarantee it stays inside REPO_ROOT.
-// _index.json mappings and CLI path args are attacker-controllable when the
-// engine runs on an untrusted project, so a `..` escape or an absolute path
-// could read or write outside the project. Reject those instead of resolving.
-export function resolveWithinRepo(rel, label) {
-  const abs = resolve(REPO_ROOT, rel);
-  const within = relative(REPO_ROOT, abs);
-  if (within === "" || within.startsWith("..") || isAbsolute(within)) {
-    err(`${label} "${rel}" resolves outside the project root - refusing (path traversal).`);
-    process.exit(5);
-  }
-  return abs;
-}
-
-export function resolveIndexFile(index, key) {
-  const rel = index.files?.[key];
-  if (!rel) {
-    err(`No file mapping for "${key}" in _index.json. Known keys: ${Object.keys(index.files || {}).join(", ")}`);
-    process.exit(6);
-  }
-  return resolveWithinRepo(rel, `_index.json files.${key}`);
-}
-
-// Pre-flight: source files must exist before any mutating command runs. Exit 16
-// is the canonical signal for "missing source file" (distinct from missing
-// mapping at exit 6). Loud error vs Node's ENOENT crash; points the user at the
-// two real recovery paths (init, or fix _index.json).
-export function assertFileExists(path, key) {
-  if (!existsSync(path)) {
-    err(`Source file not found: ${key} at ${path}`);
-    err(`Either the project has not been scaffolded (\`node AIDOCS/tools/memory.mjs init <target-dir>\`) or the path in _index.json -> files.${key} is wrong.`);
-    process.exit(16);
-  }
-}
-
-export function stagingPath(skill) {
-  return join(STAGING_DIR, `${skill}.json`);
-}
-
-export async function loadStaging(skill) {
-  const path = stagingPath(skill);
-  if (!existsSync(path)) return null;
-  const raw = await readFile(path, "utf8");
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`Staging file ${path} is not valid JSON: ${e.message}`);
-  }
-}
-
-export async function loadState() {
-  if (!existsSync(STATE_PATH)) return bootstrapState();
-  try {
-    const raw = await readFile(STATE_PATH, "utf8");
-    return JSON.parse(raw);
-  } catch (e) {
-    err(`state.json malformed: ${e.message}. Run \`node AIDOCS/tools/memory.mjs state --reset\` to bootstrap.`);
-    process.exit(15);
-  }
-}
-
-export function bootstrapState() {
-  return {
-    session_update: { run_count: 0, last_committed_at: null },
-    memory_update: { run_count: 0, last_committed_at: null },
-    reconcile_pending: false,
-  };
-}
-
-export async function saveState(state) {
-  await writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-}
-
-// Scan the engine-managed files for migrate-import residue the reconcile pass
-// should have cleared: anchors / dates left on MAIN LIFO bullets (findLifoResidue),
-// and un-renamed cross-project doc-file refs in MAIN or EXTENDED bodies
-// (findCrossRefResidue). Returns [{ key, line, kind, snippet }] with kind one of
-// anchor / date / cross-ref. Shared by doctor (reports a structural bucket) and the
-// clear-reconcile gate (refuses to close on an incomplete reconcile). Only
-// meaningful once reconcile_pending is false - callers own that gate check.
-export async function scanReconcileResidue(index) {
-  const out = [];
-  // The live project's filename prefix (e.g. "TEST321"), to tell its own doc refs
-  // from an un-renamed other-project ref. Derived from the memory file's basename.
-  const memRel = index?.files?.memory;
-  const currentName = memRel ? memRel.split(/[\\/]/).pop().replace(/_MEMORY\.md$/i, "") : null;
-  for (const key of ["memory", "session"]) {
-    const rel = index?.files?.[key];
-    if (!rel) continue;
-    const abs = resolve(REPO_ROOT, rel);
-    if (!existsSync(abs)) continue;
-    const content = await readFile(abs, "utf8");
-    for (const hit of findLifoResidue(content.split("\n"))) out.push({ key, ...hit });
-    for (const hit of findCrossRefResidue(content, currentName)) out.push({ key, ...hit });
-  }
-  for (const key of ["memory_extended", "session_extended"]) {
-    const rel = index?.files?.[key];
-    if (!rel) continue;
-    const abs = resolve(REPO_ROOT, rel);
-    if (!existsSync(abs)) continue;
-    const content = await readFile(abs, "utf8");
-    for (const hit of findCrossRefResidue(content, currentName)) out.push({ key, ...hit });
-  }
-  return out;
-}
-
-export function nowIsoUtc() {
-  return new Date().toISOString();
-}
-
-// Archive-filename stamp: YYYY-MM-DD_HH-MM in UTC (minute precision). The
-// in-file "Archived at:" header keeps full-precision nowIsoUtc. Same-minute
-// filename clashes are resolved by uniqueArchivePath.
-export function nowStampUtc() {
-  const d = new Date();
-  const p = n => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}_${p(d.getUTCHours())}-${p(d.getUTCMinutes())}`;
-}
-
-// Non-colliding archive path under `dir`: `<base>.md`, else `<base>-2.md`,
-// `<base>-3.md`, ... Keeps minute-precision stamps unique when one prune run
-// writes more than one archive in the same minute.
-export function uniqueArchivePath(dir, base) {
-  let candidate = join(dir, `${base}.md`);
-  let n = 2;
-  while (existsSync(candidate)) {
-    candidate = join(dir, `${base}-${n}.md`);
-    n += 1;
-  }
-  return candidate;
+  console.log(JSON.stringify(loadState(), null, 2));
 }

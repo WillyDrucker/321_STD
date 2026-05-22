@@ -1,188 +1,110 @@
 ---
-name: session-update
-description: Refresh SESSION (Current State + LIFO) and SESSION_EXTENDED. Project-history backbone log. Auto-applies. BACKLOG and CHANGELOG belong to other skills.
+name: sessionupdate
+description: Refresh SESSION (Current State + LIFO) from this conversation. The project-history backbone log. Writes through the staging pipeline (validate + commit). BACKLOG, MEMORY static, and CHANGELOG belong to other skills.
 ---
 
 # /321 -SessionUpdate
 
-**Purpose:** Refresh `<PROJECT>_SESSION.md` and `<PROJECT>_SESSION_EXTENDED.md` from this conversation. SESSION is the project's backbone log: the running history of everything project-significant. Standalone or delegated from `/321 -AutoPush` / `/321 -Update`. Auto-applies.
-
-Canonical shape lives in `<PROJECT>_SESSION.md`. Engine spec: `AIDOCS/tools/staging/SCHEMA.json` + `AIDOCS/tools/lib/README.md`.
+**Purpose:** Refresh `<PROJECT>_SESSION.md` from this conversation. SESSION is the project's backbone log - the running history of everything project-significant. Standalone or delegated from `-Update`. Writes only through the staging pipeline, never by direct edit.
 
 ## You drive the log
 
-You're logging project history for future sessions. For each turn of the conversation ask: **would a future contributor want to find this when reading SESSION as the project's record?**
+You are logging project history for future sessions. For each turn ask: **would a future contributor want to find this when reading SESSION as the project's record?**
 
 Suggests capture:
-- Something changed on the project (files, schema, behavior, structure)
+- Something changed (files, schema, behavior, structure)
 - A decision was made or reversed
 - A finding worth keeping (audit result, review outcome, external fact)
 - Friction notable enough to inform future work
-- A milestone hit
-- User said "remember this" or signaled significance
-- A pattern emerged across iterations worth marking
+- A milestone hit, or the user signaled significance
 
 Suggests drop:
-- Pure formatting / typo / whitespace fixes
+- Formatting / typo / whitespace fixes
 - Exploration without commitment
 - Conversation acknowledgments and tool-load confirmations
 - One-off info-gathering with no lasting effect
 - Already captured (dedupe)
 
-Scale with significance, not raw event count. Many iterations on one feature collapse to a few entries (the key arc). Many unrelated changes produce proportionally more. Judge by what a future reader needs, not a target number.
+Scale with significance, not raw event count. Many iterations on one feature collapse to a few entries (the key arc). Judge by what a future reader needs, not a target number.
 
 ## Granularity (arc-level, not iteration-level)
 
-RAW doesn't mean log everything. SESSION captures arcs:
-
 - **Aggregate the related** into one entry, not many.
 - **End-state captures the journey.** Intermediate "started X" entries are redundant once "finished X" lands.
-- **So-what test.** Would a future session reading this say "so what?" or "noted"? Drop on "so what."
-
-Detail vs bullet split: LIFO bullet = headline. EXTENDED `### sub-section` = technical narrative (why, how, what surprised us). If a bullet needs more than two lines of context to read, that context belongs in EXTENDED.
+- **So-what test.** Would a future session say "so what?" Drop on "so what."
 
 ## Event vs state (the duplication rule)
 
-SESSION captures events as they happen. MEMORY captures the timeless state events imply. The same fact often produces entries in both, but framings stay distinct:
+SESSION captures events as they happen. MEMORY captures the timeless state events imply. The same fact often produces entries in both, framings stay distinct:
 
 | SESSION (event lens) | MEMORY (state lens) |
 |---|---|
 | "Picked X over Y after testing Z" | "We use X for Z-shaped problems" |
-| "Friction with Y on Windows path separators" | "Y has cross-platform path issues - use Z instead" |
+| "Friction with Y on Windows paths" | "Y has cross-platform path issues - use Z" |
 
-**Capture SESSION raw.** Don't pre-filter to avoid overlap with MEMORY. Log the event. MemoryUpdate's distillation handles the abstracted lesson later when it earns it.
+**Capture SESSION raw.** Do not pre-filter to avoid overlap with MEMORY. Log the event. MemoryUpdate distills the abstracted lesson later. When uncertain, default SESSION raw.
 
-Crossing lanes looks like a SESSION entry stating a timeless rule with no event narrative, or a MEMORY entry narrating a moment with no abstracted lesson. When uncertain, default SESSION raw.
+## SESSION shape
 
-## Friction routing
+- **Current State** - operational snapshot, overwritten each pass. Branch, deploy / gate status, active focus, stack, local dev. Flat bullets or short prose.
+- **LIFO** - running history of project-significant events, newest first.
 
-- Active right now = state observation -> SESSION (here)
-- Pattern of recurring friction across multiple SESSION entries = durable lesson -> MEMORY (other skill picks it up)
-- One-off process noise = drop
+## Step 0: Gather context
 
-## Structural rules
-
-SESSION shape:
-
-- **Current State** - operational snapshot. Overwritten on update. Branch, deploy status, gate status, active focus, stack names, local dev. Flat bullets.
-- **LIFO** - running history of project-significant events. Newest-first.
-
-**Last State marker.** On every Current State overwrite, the engine demotes prior Current State bullets to LIFO with `**Last State:** <text>` prefix on the first one. Any prior marker has its prefix stripped (content stays as plain history). Exactly one marker exists once any overwrite has happened. Above the marker = "since last SessionUpdate," at and below = older history. First-ever overwrite creates no marker. AI doesn't write the marker - the engine does it on `overwrite_section` of `current_state`.
-
-EXTENDED uses `### sub-section` anchors under `## LIFO` with lowercase-kebab slugs. Each notable LIFO bullet can carry a sub-section. Commit simulation enforces forward orphan checks (a bullet linking to a non-existent anchor fails commit).
-
-Per-entry caps (advisory, surfaced by `node AIDOCS/tools/memory.mjs lint`):
-
-- **SESSION LIFO bullets: 2 physical lines.** A bullet with EXTENDED detail leads with the `[+]` marker (`- [+] <headline>`) and NO link - the headline must match its `### heading` in SESSION_EXTENDED (the engine derives the anchor by slugify). A bullet with no EXTENDED detail is plain `- <text>`.
-- **SESSION_EXTENDED `### sub-section`s:** identify the PAINPOINT, not the process - a thing fought multiple times to fix earns a note, standard procedure does not. NO code snippets - the validator REJECTS a `` ``` `` fence in any EXTENDED body (commit aborts pre-write), so summarize the takeaway in prose, the code lives in the source. Aim ~10 lines (advisory), over-length only when genuinely important.
-
-File size limits live in `_index.json -> sizes.session` / `sizes.session_extended` as `cap` + `prune_to`. **Auto-prune fires after every commit** when either file exceeds `cap`. It runs paired (drops bottom-most LIFO bullets alongside their anchored EXTENDED sub-sections, bundles both into one archive entry, drops the file down to `prune_to` lines). This commit's freshly-inserted bullets / sub-sections are skipped via fresh-content protection - new entries never archive on landing. The Last State marker is engine-protected from prune. No manual prune invocation is needed in normal use.
-
-## Roles (AI vs script)
-
-| Phase | AI | Script |
-|---|---|---|
-| Detect mode | Read state.json + git, pick mode | Provides `session_update.last_committed_at` |
-| Classify + stage | Walk conversation, route per allocation table, write staging JSON | Validates schema on `validate` |
-| Commit | Issue `commit` | Two-phase apply, engine handles Last State demotion |
-
-## Step 0: Detect update mode
-
-Three modes:
-
-- `skim` - verify cross-refs, no rewrites
-- `incremental` - read only new commits + conversation since last update
-- `full` - read everything, summarize, allocate, prune
-
-Override flags `-FULL` / `-SKIM` force the mode. Default bias: skim > incremental > full.
-
-Signal hierarchy (cheap first):
-
-1. Compaction boundary in conversation -> auto-escalate to full.
-2. First run / bootstrap (`session_update.last_committed_at` is null) -> auto-escalate to full.
-3. Commit-count gap (`git log main..HEAD --oneline`): 0 + clean tree -> skim, 1-3 -> incremental, 4+ or uncertainty -> full.
-4. Last State cross-check: bullets above the LIFO marker count as "since last SessionUpdate." If this count and git's disagree, use the higher.
-
-`-FULL` also unlocks:
-
-- **Current State verification.** Each bullet cross-checked against project reality (`package.json`, `git status`, gates, `_index.json`).
-- **More aggressive SESSION_EXTENDED prune.**
-
-Use `-FULL` deliberately - after a big arc, before a release, when Current State looks stale.
-
-Output the detected mode at start.
-
-## Step 1: Gather context
-
-Source of truth: the conversation. SESSION.md is a write target, not a source.
-
-Re-read only if not in current context:
+The conversation is the source of truth. SESSION.md is a write target, not a source. Re-read if not already in context:
 
 - `AIDOCS/<PROJECT>_SESSION.md`
-- `AIDOCS/<PROJECT>_SESSION_EXTENDED.md`
-- Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`, `git log main..HEAD --oneline`
+- Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`
+- The skill's watermark in `state.json` (`sessionupdate.last_committed_at`) marks the last refresh.
 
-Review the conversation for new work since `session_update.last_committed_at`.
+## Step 1: Allocate each finding
 
-## Step 2: Allocate each finding
-
-| Item | Destination | Mechanism |
+| Item | Destination | Op |
 |---|---|---|
-| Current operational reality (branch, deploy, gates, focus, stack, local dev) | `SESSION/Current State` | `overwrite_section` (engine handles Last State demotion) |
-| Project-significant event (change, decision, finding, friction, milestone, failed attempt) | `SESSION/LIFO` headline + optional `SESSION_EXTENDED ### <slug>` narrative | `lifo_insert` + matching `extended_action` |
-| Operational fact about a sibling project | `SESSION_EXTENDED ### <slug>` mention only | `extended_action` add |
-| Shipped on this branch | nothing - EXTENDED anchors retain technical detail. AutoPush composes CHANGELOG at release. | (n/a) |
-| Forward-looking work (feature ask, idea, "we should...") | DROP - belongs in MemoryUpdate / BACKLOG | (n/a) |
-| Durable observation / architectural shift / sticky rule | DROP - belongs in MemoryUpdate / MEMORY | (n/a) |
-| Code-applicable pattern enforceable by lint or grep | DROP - belongs in DevAudit | (n/a) |
-| Wishlist / speculation without intentionality | DROP - if it matters, it resurfaces | (n/a) |
+| Current operational reality (branch, deploy, gates, focus, stack) | Current State | `overwrite_section` |
+| Project-significant event (change, decision, finding, friction, milestone, failed attempt) | LIFO | `lifo_insert` |
+| Forward-looking work, durable rule, code-applicable pattern | DROP - belongs in MemoryUpdate / DevAudit | (n/a) |
 
-**Migration exception:** when Setup migration capture (the runbook at `AIDOCS/runbooks/SETUP.md`) drives this skill, ambiguous-home archive content routes to SESSION LIFO instead of dropping - capture loses nothing, reconciliation re-homes it later. The DROP rows above apply to routine runs.
+**Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), capture additively - the DROP row and arc-level aggregation are routine-run rules, not migration ones. Ambiguous-home content routes to SESSION LIFO rather than dropping. `migrate-import` has already scavenged the archived SESSION_EXTENDED depth 1:1, so do not re-derive those entries - add only Current State and the main LIFO bullets the import did not carry. The reconciliation pass distills the additive capture later.
 
-## Step 3: Prune before appending (relevance, not size)
+## Step 2: Stage
 
-This is a relevance pass, not a size pass. Size is the engine's job: post-commit auto-prune trims to `prune_to` and archives the overflow (see Structural rules). Never hand-trim to hit a line count - drop only what a cold-start AI would not benefit from.
+Write `AIDOCS/tools/staging/sessionupdate.json`. Never edit SESSION directly. Actions use the project's domain-owned file keys:
 
-Keep-test: would an AI starting cold benefit from this? Load-bearing or non-obvious? Yes -> keep. Re-derivable from code or git -> drop.
-
-- SESSION LIFO: resolved blockers and stale observations drop. Current State is overwritten, not pruned.
-- SESSION_EXTENDED: anchors whose parent LIFO bullet was dropped -> drop. Free-standing anchors past their useful window (3 shipped releases unless `<!-- LOAD_BEARING -->`) -> drop.
-
-## Step 4: Stage
-
-Build `AIDOCS/tools/staging/session-update.json` per `AIDOCS/tools/staging/SCHEMA.json`. Never edit SESSION / SESSION_EXTENDED directly.
-
-- Current State: `overwrite_section` on `section: "current_state"`. Engine demotes prior bullets to LIFO with marker.
-- SESSION LIFO: `lifo_insert` / `replace` / `remove` on `section: "lifo"`. Use `replace` when an existing entry has fresh state to add (the arc moved forward, the friction got worse, the decision flipped) - the updated bullet floats to the top to signal progress. Use `lifo_insert` only when the event is genuinely new with no prior entry to update.
-- SESSION_EXTENDED: `extended_actions[]`.
-
-When a LIFO bullet has EXTENDED detail: set `extended_anchor: "<slug>"` on the action AND emit a matching `extended_actions` entry whose `### heading` slugifies to that anchor. The engine renders the bullet with a `[+]` marker (no link) and re-derives the anchor from the bullet text, so the bullet text and the `### heading` must read the same.
-
-`backlog_actions[]` on this skill is rejected by the validator (cross-skill firewall).
-
-## Step 5: Commit
-
-```bash
-node AIDOCS/tools/memory.mjs validate --skill session-update            # schema check
-node AIDOCS/tools/memory.mjs commit   --skill session-update --preview  # simulate + diff
-node AIDOCS/tools/memory.mjs commit   --skill session-update            # apply
+```json
+{
+  "actions": [
+    { "op": "overwrite_section", "file": "sessionupdate.session", "section": "Current State", "body": "<operational snapshot>" },
+    { "op": "lifo_insert", "file": "sessionupdate.session", "section": "LIFO", "bullet": "<one project-significant event>" },
+    { "op": "lifo_insert", "file": "sessionupdate.session", "section": "LIFO", "bullet": "<event that earns depth>", "extended_anchor": "<slug-of-the-bullet>" },
+    { "op": "add", "file": "sessionupdate.session_extended", "anchor": "<slug-of-the-bullet>", "heading": "<event that earns depth>", "body_md": "<why / how / what surprised us>" }
+  ]
+}
 ```
 
-Two-phase: simulate first, abort before any writes if any op fails. Auto-commits. Relay the script summary verbatim.
+One `lifo_insert` per event (newest lands on top). `overwrite_section` replaces the whole Current State body.
 
-Common failures (all caught at simulation):
+**Extended detail (the `[+]` pair).** When a bullet needs more than a line or two of narrative, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `sessionupdate.session_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
-- Missing required field / unknown op -> fix staging shape
-- Orphan `extended_anchor` -> ensure matching `extended_actions` entry
-- Fenced code in an EXTENDED `body_md` / `replace` -> rejected, summarize the takeaway in prose
-- `replace_text` no-match / multi-match -> adjust find text for uniqueness
-- Static-section op or `backlog_actions` -> wrong skill, those belong in MemoryUpdate
-- Lockfile present -> wait, or remove `AIDOCS/tools/staging/.lock` if confirmed stale
+**Last State (engine-written).** On an `overwrite_section` of Current State, the engine demotes the prior snapshot's bullets to the top of LIFO and marks the first `**Last State:**` (stripping any prior marker, so exactly one exists). Put the Current State overwrite first in `actions` so this run's new LIFO events land above the marker. Never write the marker yourself.
 
-## Rules (skill operation)
+## Step 3: Validate + commit
 
-- **You're logging project history.** Future-session usefulness is the bar.
-- **Capture SESSION raw.** MEMORY's distillation handles the abstracted lesson later.
-- **Arc-level, not iteration-level.** One entry per arc, end-state captures the journey.
-- **Auto-applies.** Session work is operational, not consequential.
-- **Project work only.** BACKLOG, MEMORY static, CHANGELOG, code patterns route elsewhere via their own skills.
+```bash
+node AIDOCS/tools/engine.mjs validate --skill sessionupdate
+node AIDOCS/tools/engine.mjs commit   --skill sessionupdate
+```
+
+Two-phase: commit simulates every op first and aborts before any write on failure, then persists, stamps the watermark, and clears staging. Relay the summary.
+
+## Rules
+
+- **You are logging project history.** Future-session usefulness is the bar.
+- **Capture SESSION raw.** MemoryUpdate distills the abstracted lesson later.
+- **Arc-level, not iteration-level.** One entry per arc. End-state captures the journey.
+- **Staging only.** Never edit SESSION by hand - validate then commit.
+- **Project work only.** BACKLOG, MEMORY static, CHANGELOG, and code patterns route through their own skills.
+
+## Deferred (land when their engine does)
+
+The `-FULL` update mode is not yet built. This lean body refreshes Current State + LIFO (with optional `[+]` EXTENDED depth orphan-checked at commit, engine-written Last State demotion, and post-commit auto-prune that is held while a reconcile is pending) through the staging pipeline.

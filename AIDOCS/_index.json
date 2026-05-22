@@ -1,124 +1,100 @@
 {
-  "project_name": "<PROJECT>",
-  "project_type": "project",
-  "release_profile": "standards",
+  "project_name": "PROJECTNAME",
   "paths": {
     "root": ".",
-    "claude_md": "./CLAUDE.md",
     "agents_md": "./AGENTS.md",
+    "claude_md": "./CLAUDE.md",
     "aidocs": "./AIDOCS",
-    "automemory": "./AIDOCS/automemory",
     "wddocs": "./WDDOCS",
-    "skills_router": "./.claude/skills/321/SKILL.md",
-    "skills_bodies": "./AIDOCS/SKILL",
-    "changelog": "./CHANGELOG.md",
+    "env": "./AIDOCS/ENV",
     "temp": "./TEMP",
-    "tools": "./AIDOCS/tools"
+    "changelog": "./CHANGELOG.md",
+    "skills_router": "./.claude/skills/321/SKILL.md",
+    "skills_bodies": "./AIDOCS/SKILL"
   },
   "files": {
-    "memory": "./AIDOCS/_PROJECT_MEMORY.md",
-    "memory_extended": "./AIDOCS/_PROJECT_MEMORY_EXTENDED.md",
-    "session": "./AIDOCS/_PROJECT_SESSION.md",
-    "session_extended": "./AIDOCS/_PROJECT_SESSION_EXTENDED.md",
-    "backlog": "./AIDOCS/_PROJECT_BACKLOG.md",
-    "dev_audit": "./AIDOCS/_PROJECT_DEV-AUDIT.md",
-    "changelog": "./CHANGELOG.md",
-    "memory_archive": "./AIDOCS/_PROJECT_MEMORY_ARCHIVE",
-    "session_archive": "./AIDOCS/_PROJECT_SESSION_ARCHIVE",
-    "backlog_archive": "./AIDOCS/_PROJECT_BACKLOG_ARCHIVE",
-    "env": "./AIDOCS/ENV"
+    "memoryupdate.memory": "./AIDOCS/PROJECTNAME_MEMORY.md",
+    "memoryupdate.memory_extended": "./AIDOCS/PROJECTNAME_MEMORY_EXTENDED.md",
+    "memoryupdate.backlog": "./AIDOCS/PROJECTNAME_BACKLOG.md",
+    "sessionupdate.session": "./AIDOCS/PROJECTNAME_SESSION.md",
+    "sessionupdate.session_extended": "./AIDOCS/PROJECTNAME_SESSION_EXTENDED.md",
+    "devaudit.audit": "./AIDOCS/PROJECTNAME_DEV-AUDIT.md",
+    "autopush.config": "./AIDOCS/PROJECTNAME_AUTO-PUSH.md"
   },
   "buckets": {
-    "memory": [
+    "memoryupdate.memory": [
       "lifo"
     ],
-    "session": [
+    "sessionupdate.session": [
       "lifo"
     ],
-    "backlog": [
+    "memoryupdate.backlog": [
       "features",
       "ideas"
     ]
   },
   "sizes": {
-    "memory": {
+    "memoryupdate.memory": {
       "cap": 150,
       "prune_to": 75
     },
-    "memory_extended": {
+    "memoryupdate.memory_extended": {
       "cap": 400,
       "prune_to": 200
     },
-    "session": {
+    "sessionupdate.session": {
       "cap": 100,
       "prune_to": 50
     },
-    "session_extended": {
+    "sessionupdate.session_extended": {
       "cap": 400,
       "prune_to": 200
     },
-    "backlog": {
+    "memoryupdate.backlog": {
       "cap": 100,
       "prune_to": 50
     }
   },
   "auto_memory": {
-    "path": "C:\\Users\\<USER>\\.claude\\projects\\c--Dev-<PROJECT>\\memory",
-    "sync_from_template": false
+    "source": "./AIDOCS/automemory"
+  },
+  "engine": {
+    "version": "0.1.0",
+    "upstream": ""
   },
   "skills": {
     "router": "/321",
-    "installed": [
-      "auto-push",
-      "dev-audit",
-      "memory-update",
-      "session-update",
-      "update",
-      "setup",
-      "sync"
-    ],
     "dispatch": {
-      "auto-push": {
+      "autopush": {
         "flag": "-AutoPush",
         "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
-        "description": "Project release pipeline. Delegates to SessionUpdate, runs pre-flight, commits, composes CHANGELOG entry from git + SESSION_EXTENDED, builds, pushes, tags, creates GitHub release, deploys (project-specific), verifies, rolls over."
+        "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at setup / reconcile."
       },
-      "dev-audit": {
+      "devaudit": {
         "flag": "-DevAudit",
         "body": "./AIDOCS/SKILL/SKILL_DEV-AUDIT.md",
-        "description": "Code audit against <PROJECT>_DEV-AUDIT.md. Modes - default, -READ, -FULL. No build / test gates here. AutoPush owns those."
+        "description": "Audit the source against DEV-AUDIT.md - anchor principles, hard rules, audit dimensions, project specifics. The skill is thin, with the substance in the audit file, which setup / reconcile enrich over time. Default reports findings, -FULL audits and refactors."
       },
-      "memory-update": {
+      "memoryupdate": {
         "flag": "-MemoryUpdate",
         "body": "./AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md",
-        "description": "Capture durable observations into MEMORY LIFO + BACKLOG. Auto-invokes SessionUpdate first. -FULL auto-applies Big 6 maintenance (gap-fill / refine / replace) + LIFO-to-static promotion. AGENTS / auto-memory candidates surface as suggestive LIFO bullets."
+        "description": "Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes SessionUpdate first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline."
       },
-      "session-update": {
+      "sessionupdate": {
         "flag": "-SessionUpdate",
         "body": "./AIDOCS/SKILL/SKILL_SESSION-UPDATE.md",
-        "description": "Refresh SESSION (Current State + LIFO) and SESSION_EXTENDED. Project-history backbone log. Auto-applies. BACKLOG and CHANGELOG belong to other skills."
-      },
-      "update": {
-        "flag": "-Update",
-        "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
-        "description": "Optimized chain of session-track + memory-track in one shared-context pass. Mode passes through. -FULL: SessionUpdate verifies project state, MemoryUpdate auto-applies Big 6 maintenance + promotion."
+        "description": "Refresh SESSION (Current State + LIFO) from this conversation. The project-history backbone log. Writes through the staging pipeline (validate + commit). BACKLOG, MEMORY static, and CHANGELOG belong to other skills."
       },
       "setup": {
         "flag": "-Setup",
         "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
-        "description": "First-run wizard or migration for a 321_STD project, auto-detecting fresh-install vs existing-project. Thin pointer - reads and executes the onboarding runbook at INSTALL/engine/AIDOCS/runbooks/SETUP.md (fetched at install, removed by the reconcile pass at graduation). Fresh - Big 6 fill from code signals, release_profile, auto_memory.path, optional ENV + first commit. Migration - archive existing content, reinstall canonical 321_STD, capture losslessly, restore, set reconcile_pending and stop for /321 -Update. Idempotent."
+        "description": "Make a project usable. Auto-detects fresh-install vs migration. Fresh fills the Big 6 from code signals through the normal skills. Migration archives existing content, reinstalls the canonical structure, captures it back, and sets the reconcile gate for -Update. Deregistered at graduation."
       },
-      "sync": {
-        "flag": "-Sync",
-        "body": "./AIDOCS/SKILL/SKILL_SYNC.md",
-        "description": "Engine self-sync. Fetches the latest 321_STD release into INSTALL/engine, compares the project's installed engine_version against it, and brings the steady engine current - a minor update refreshes the engine + canonical skills (customizations preserved), a major update follows the release's upgrade notes and reruns the migrate-to-reconcile spine where needed. Updates the origin pointer and cleans up INSTALL/. Offline is a clean no-op on the local engine. Steady-tier, survives graduation."
+      "update": {
+        "flag": "-Update",
+        "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
+        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates."
       }
     }
-  },
-  "customizations": [],
-  "origin": {
-    "repo": "https://github.com/WillyDrucker/321_STD.git",
-    "ref": "main",
-    "engine_version": "5cad323"
   }
 }

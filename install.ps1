@@ -1,128 +1,106 @@
-# 321_STD installer for Windows / PowerShell.
+# 321 installer for Windows / PowerShell.
 #
-# Usage (one-line, current directory):
-#   iwr -useb https://raw.githubusercontent.com/WillyDrucker/321_STD/main/install.ps1 | iex
+# Lays the 321 skeleton into a target project: init -> register -> doctor -> git init.
+# Run it from a clone of the 321 repo (the engine ships in the repo), or pipe the
+# published one-liner, which clones the repo into a temp dir first.
 #
-# Configure via env vars before piping:
-#   $env:STD321_NAME = "MyProject"; iwr -useb URL | iex
+#   Local (you have the repo):
+#     .\install.ps1 -Target ..\my-project -Name MyProject
+#   Remote (one line):
+#     iwr -useb <raw-install-url> | iex
 #
-# Or save and run directly:
-#   .\install.ps1 -Name MyProject [-Profile standards] [-Target .] [-Force]
-#
-# Env vars (all optional):
-#   STD321_NAME     project name (letters/digits/underscore/hyphen, starts with letter)
-#                   Defaults to the target directory's basename.
-#   STD321_PROFILE  release profile - standards | npm-package | vscode-extension |
-#                                       cloudflare-worker | cloudflare-pages | static-site | none
-#                   Defaults to auto-detect (package.json / wrangler.toml / config files).
-#   STD321_TARGET   target directory. Defaults to current directory.
-#   STD321_FORCE    "true" to rewrite scaffold files even if they already exist
-#                   (engine files are always rewritten; user content is preserved by default).
+# Options / env (all optional):
+#   -Target DIR / STD321_TARGET   where to install. Default: current directory.
+#   -Name NAME  / STD321_NAME     project name (letter, then letters / digits / _ / -).
+#                                 Default: target directory basename.
+#   -Repo URL   / STD321_REPO     engine repo to clone when no local engine is found.
 
 $ErrorActionPreference = "Stop"
 
-# Defaults from env. Profile left empty so init.mjs can auto-detect.
-$Name    = $env:STD321_NAME
-$ReleaseProfile = $env:STD321_PROFILE
-$Target  = if ($env:STD321_TARGET)  { $env:STD321_TARGET }  else { "." }
-$Force   = $env:STD321_FORCE -eq "true"
+$Name   = $env:STD321_NAME
+$Target = if ($env:STD321_TARGET) { $env:STD321_TARGET } else { "." }
+$Repo   = if ($env:STD321_REPO)   { $env:STD321_REPO }   else { "https://github.com/WillyDrucker/321_STD.git" }
 
-# Parse positional args (for saved-file invocation)
+function Require-Value($flagName, $value) {
+  if ($null -eq $value -or $value -like '-*') { Write-Host "Missing value for $flagName" -ForegroundColor Red; exit 1 }
+}
 for ($i = 0; $i -lt $args.Count; $i++) {
   switch ($args[$i]) {
-    "-Name"    { $Name    = $args[++$i] }
-    "-Profile" { $ReleaseProfile = $args[++$i] }
-    "-Target"  { $Target  = $args[++$i] }
-    "-Force"   { $Force   = $true }
+    "-Name"   { $v = $args[++$i]; Require-Value "-Name"   $v; $Name   = $v }
+    "-Target" { $v = $args[++$i]; Require-Value "-Target" $v; $Target = $v }
+    "-Repo"   { $v = $args[++$i]; Require-Value "-Repo"   $v; $Repo   = $v }
+    default   { Write-Host "Unknown argument: $($args[$i])" -ForegroundColor Red; exit 1 }
   }
 }
 
-# Sanity: Node + git required
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Write-Host "Node.js is required. Install from https://nodejs.org and re-run." -ForegroundColor Red
-  exit 1
+  Write-Host "Node.js is required. Install from https://nodejs.org and re-run." -ForegroundColor Red; exit 1
 }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-  Write-Host "git is required. Install from https://git-scm.com and re-run." -ForegroundColor Red
-  exit 1
+  Write-Host "git is required. Install from https://git-scm.com and re-run." -ForegroundColor Red; exit 1
 }
 
-# Resolve target (create if missing)
-if (-not (Test-Path $Target)) {
-  New-Item -ItemType Directory -Path $Target -Force | Out-Null
-}
+if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Path $Target -Force | Out-Null }
 $Target = (Resolve-Path $Target).Path
-
-# Default name to target dir's basename if not provided
-if (-not $Name) {
-  $Name = Split-Path -Leaf $Target
-}
+if (-not $Name) { $Name = Split-Path -Leaf $Target }
 if (-not ($Name -match '^[A-Za-z][A-Za-z0-9_-]*$')) {
-  Write-Host "Invalid project name: '$Name'. Must start with a letter and contain only letters / digits / underscore / hyphen." -ForegroundColor Red
+  Write-Host "Invalid project name: '$Name'. Start with a letter, then letters / digits / _ / - only." -ForegroundColor Red
   Write-Host "Pass -Name <NAME> or rename the target directory." -ForegroundColor Yellow
   exit 1
 }
 
-# Validate profile only if explicitly set. Empty -> init.mjs auto-detects.
-$validProfiles = @("standards", "npm-package", "vscode-extension", "cloudflare-worker", "cloudflare-pages", "static-site", "none")
-if ($ReleaseProfile -and ($validProfiles -notcontains $ReleaseProfile)) {
-  Write-Host "Invalid profile: '$ReleaseProfile'. Must be one of: $($validProfiles -join ', ')" -ForegroundColor Red
-  exit 1
+# Did the target already hold project content (checked before init writes)? Then
+# doctor's pre-migration findings are expected - a legacy AGENTS without the canonical
+# Hard-rules, unscrubbed CHANGELOG voice - and /321 -Setup reconciles them, so they
+# report without failing the install. A fresh scaffold must still pass doctor cleanly.
+$existing = $false
+foreach ($marker in @(".claude/skills/321", "AIDOCS", "AGENTS.md", "CLAUDE.md", "package.json", "src")) {
+  if (Test-Path (Join-Path $Target $marker)) { $existing = $true; break }
 }
 
-Write-Host ""
-Write-Host "Installing 321_STD" -ForegroundColor Cyan
-Write-Host "  Target:  $Target"
-Write-Host "  Name:    $Name"
-if ($ReleaseProfile) {
-  Write-Host "  Profile: $ReleaseProfile"
+# Engine source: the repo this script ships in if it carries the engine,
+# otherwise a shallow clone of Repo into a temp dir we remove afterward.
+$cloneTmp = $null
+$engine = $null
+if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "AIDOCS/tools/engine.mjs"))) {
+  $engine = $PSScriptRoot
 } else {
-  Write-Host "  Profile: (auto-detect)"
+  $cloneTmp = Join-Path ([System.IO.Path]::GetTempPath()) ("321-" + [System.Guid]::NewGuid().ToString("N"))
+  New-Item -ItemType Directory -Path $cloneTmp -Force | Out-Null
+  Write-Host "Fetching the 321 engine..."
+  git clone --depth 1 --quiet $Repo $cloneTmp
+  if ($LASTEXITCODE -ne 0) { Write-Host "Failed to clone $Repo." -ForegroundColor Red; exit 1 }
+  $engine = $cloneTmp
 }
+
 Write-Host ""
-
-# Shallow clone into the target's ephemeral INSTALL/engine. This is the
-# onboarding tier (init, migrate-*, import-skills, runbooks); it persists
-# through setup and is removed by the reconcile pass at graduation. Gitignored.
-$engineDir = Join-Path $Target "INSTALL/engine"
-if (Test-Path $engineDir) { Remove-Item -Recurse -Force $engineDir }
-New-Item -ItemType Directory -Path (Join-Path $Target "INSTALL") -Force | Out-Null
-Write-Host "Fetching 321_STD..."
-git clone --depth 1 --quiet https://github.com/WillyDrucker/321_STD.git $engineDir
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "Failed to clone 321_STD repository." -ForegroundColor Red
-  exit 1
-}
-
-# Build init args. Only pass --release-profile if user set it explicitly.
-$initArgs = @($Target, "--name", $Name)
-if ($ReleaseProfile) { $initArgs += @("--release-profile", $ReleaseProfile) }
-if ($Force)   { $initArgs += "--force" }
+Write-Host "Installing 321" -ForegroundColor Cyan
+Write-Host "  Target: $Target"
+Write-Host "  Name:   $Name"
+Write-Host ""
 
 Write-Host "Scaffolding..."
-& node "$engineDir/AIDOCS/tools/memory.mjs" init @initArgs
+& node (Join-Path $engine "AIDOCS/tools/engine.mjs") init $Target --name $Name
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "Init failed." -ForegroundColor Red
-  exit 1
+  if ($cloneTmp) { Remove-Item -Recurse -Force $cloneTmp }
+  Write-Host "Init failed." -ForegroundColor Red; exit 1
 }
+if ($cloneTmp) { Remove-Item -Recurse -Force $cloneTmp }
 
-# Sync + doctor in the new project. Also git init if not already a repo.
 Push-Location $Target
 $failed = $null
 try {
-  Write-Host ""
-  Write-Host "Registering skills..."
-  & node "AIDOCS/tools/memory.mjs" sync
+  Write-Host ""; Write-Host "Registering skills..."
+  & node "AIDOCS/tools/engine.mjs" sync
   if ($LASTEXITCODE -ne 0) { throw "sync failed" }
-
-  Write-Host ""
-  Write-Host "Health check..."
-  & node "AIDOCS/tools/memory.mjs" doctor --structural-only
-  if ($LASTEXITCODE -ne 0) { throw "doctor failed" }
-
-  if (-not (Test-Path ".git")) {
-    Write-Host ""
-    Write-Host "Initializing git..."
+  Write-Host ""; Write-Host "Health check..."
+  & node "AIDOCS/tools/engine.mjs" doctor
+  if ($LASTEXITCODE -ne 0) {
+    if ($existing) { Write-Host "doctor reports pre-migration issues - expected for an existing project, /321 -Setup reconciles them." -ForegroundColor Yellow }
+    else { throw "doctor failed" }
+  }
+  if (-not $existing -and -not (Test-Path ".git")) {
+    Write-Host ""; Write-Host "Initializing git..."
     git init --quiet
     if ($LASTEXITCODE -ne 0) { throw "git init failed" }
   }
@@ -131,16 +109,11 @@ try {
 } finally {
   Pop-Location
 }
-if ($failed) {
-  Write-Host $failed -ForegroundColor Red
-  exit 1
-}
+if ($failed) { Write-Host $failed -ForegroundColor Red; exit 1 }
 
 Write-Host ""
-Write-Host "321_STD installed at $Target" -ForegroundColor Green
-Write-Host "  INSTALL/ holds the onboarding engine for setup (gitignored, removed by reconcile)."
+Write-Host "321 engine installed at $Target" -ForegroundColor Green
 Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  cd `"$Target`""
-Write-Host "  Open in your editor"
-Write-Host "  Run /321 -Setup (optional - first-run wizard or migration, auto-detected. Project is usable as-is)"
+Write-Host "Next: setup (fresh fill or migration) finishes onboarding and is part of the install."
+Write-Host "  An assistant driving this install continues into INSTALL/setup.md now."
+Write-Host "  Standalone: open the project and have your assistant run INSTALL/setup.md."

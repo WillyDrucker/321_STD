@@ -1,0 +1,235 @@
+// migrate-import.mjs - the mechanical 1:1 scavenge of an archived doc into a staging
+// file the standard commit pipeline applies. The migration capture uses this so depth
+// content lands verbatim (one anchored ### sub-section per entry, with its paired [+]
+// main bullet) instead of distilled at capture. It is the script half of a hybrid:
+// the script grabs the text and emits a landing report, the AI verifies what landed
+// and re-feeds any gap through -SessionUpdate / -MemoryUpdate using the archived text.
+// Deep verification, including the --audit diff of archive-vs-distilled, is the
+// reconciliation pass (the gated /321 -Update).
+//
+// Robust by design - it handles the common blockers so a scavenge does not stall:
+// BOM and CRLF, fenced code (elided to a one-line marker, since the validator rejects
+// fences in body_md), a heading with no slug-able text (a positional fallback anchor),
+// and a structureless doc (imported as one blob). Both sides derive from one slug
+// list, so the commit orphan check passes by construction.
+
+import { existsSync, readFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, join, resolve, sep } from "node:path";
+
+import { installLog } from "./installLog.mjs";
+import { slugify } from "./markdown.mjs";
+import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
+import { repoRoot, resolveFile, stagingDir } from "./paths.mjs";
+import { loadStaging } from "./state.mjs";
+
+// Headings that are an EXTENDED file's own authoring guide, not durable content.
+const META_HEADING = /^(what goes in|what doesn't|what does not|pruning.*|purpose|lifo)$/i;
+// No code in EXTENDED. A fenced block becomes this marker so a code-only entry does
+// not collapse to an empty body, and the validator's no-fence rule on body_md holds.
+const CODE_MARKER = "(code example elided on import - summarize the takeaway in prose)";
+
+function flag(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+function stripTrailingPeriod(s) { return s.endsWith(".") ? s.slice(0, -1) : s; }
+
+// migrate-import --from <archived doc> --skill <sessionupdate | memoryupdate>
+//   [--old <NAME> --new <NAME>] [--append] [--dry-run]
+//   --audit re-reads the archive and diffs it against the distilled EXTENDED.
+export async function cmdMigrateImport(index, args) {
+  const from = flag(args, "--from");
+  const skill = flag(args, "--skill");
+  const oldName = flag(args, "--old");
+  const newName = flag(args, "--new");
+  const append = args.includes("--append");
+  const dryRun = args.includes("--dry-run");
+  const audit = args.includes("--audit");
+
+  if (!from) { console.error("migrate-import needs --from <archived doc>"); process.exit(5); }
+  if (!skill) { console.error("migrate-import needs --skill <sessionupdate | memoryupdate>"); process.exit(5); }
+
+  // Resolve the lane's main + EXTENDED file keys from the registry (the spine), so the
+  // staging carries real keys the validator and commit accept.
+  const extKey = Object.keys(index.files || {}).find((k) => k.startsWith(`${skill}.`) && k.endsWith("_extended"));
+  const mainKey = extKey ? extKey.replace(/_extended$/, "") : null;
+  if (!extKey || !mainKey || !index.files[mainKey]) {
+    console.error(`migrate-import: --skill must be a lane with a main + _extended pair (got "${skill}").`);
+    process.exit(11);
+  }
+
+  const root = repoRoot();
+  const fromAbs = resolve(root, from);
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  if (!fromAbs.startsWith(prefix)) { console.error(`migrate-import: --from "${from}" escapes the project root.`); process.exit(5); }
+  if (!existsSync(fromAbs)) { console.error(`migrate-import: source not found: ${from}`); process.exit(16); }
+
+  let content = await readFile(fromAbs, "utf8");
+  if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);   // strip BOM
+  content = content.replace(/\r\n/g, "\n");
+  if (oldName && newName) content = normalizeNames(content, oldName, newName);
+  content = normalizeLegacy(content);
+
+  let entries = parseEntries(content);
+  let blob = false;
+  if (entries.length === 0) {
+    // No headings or bold-leads to split on (a hand-written doc, loose notes). Import
+    // the whole doc as one entry so nothing is lost - the AI re-splits it on verify or
+    // the reconciliation pass distills it. Title from the H1, else the filename.
+    const title = (content.match(/^#\s+(.+?)\s*$/m)?.[1] || basename(fromAbs).replace(/\.md$/i, "")).trim();
+    const body = elideFences(content.replace(/^#\s+.+$/m, "")).trim();
+    if (title && body) { entries = [{ title: stripTrailingPeriod(title), body }]; blob = true; }
+  }
+  if (entries.length === 0) { console.error(`migrate-import: no importable content in ${from}.`); process.exit(17); }
+
+  if (audit) { auditImport(index, extKey, entries, from); return; }
+
+  const stagingFile = join(stagingDir(), `${skill}.json`);
+  const existing = append ? loadStaging(skill) : null;
+  if (!append && existsSync(stagingFile)) {
+    console.error(`migrate-import: staging already exists at ${stagingFile}. Commit it, remove the staging file, or pass --append to merge.`);
+    process.exit(14);
+  }
+
+  // Seed used-anchors from existing staging so appended entries get collision-free -N
+  // suffixes against what is already staged.
+  const used = new Set();
+  if (existing) for (const a of existing.actions || []) { if (a.op === "add" && a.anchor) used.add(a.anchor); }
+  const actions = [];
+  const report = { nonText: [], thin: [], elided: 0 };
+  entries.forEach((entry, i) => {
+    // A heading with no slug-able text (all symbols, non-Latin) would yield an empty
+    // anchor the validator rejects. Fall back to a positional anchor and re-title so
+    // the bullet still reads, and flag it for the AI to verify.
+    let baseSlug = slugify(entry.title);
+    let baseHeading = entry.title;
+    if (!baseSlug) { baseSlug = `import-${i + 1}`; baseHeading = `${entry.title} (import ${i + 1})`.trim(); report.nonText.push(baseSlug); }
+    // Disambiguate slug and heading together when a title repeats - a " (N)" suffix on
+    // the heading yields the matching "-N" anchor, keeping the pair resolvable.
+    let slug = baseSlug, heading = baseHeading, n = 2;
+    while (used.has(slug)) { slug = `${baseSlug}-${n}`; heading = `${baseHeading} (${n})`; n++; }
+    used.add(slug);
+    actions.push({ op: "lifo_insert", file: mainKey, section: "LIFO", bullet: heading, extended_anchor: slug });
+    actions.push({ op: "add", file: extKey, anchor: slug, heading, body_md: entry.body });
+    report.elided += entry.body.split(CODE_MARKER).length - 1;
+    if (entry.body.split(CODE_MARKER).join("").trim().length < 15) report.thin.push(slug);
+  });
+
+  const staging = existing ? { skill, actions: [...(existing.actions || []), ...actions] } : { skill, actions };
+
+  if (dryRun) {
+    console.log(`migrate-import (dry run): ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${from}`);
+    for (const a of actions) if (a.op === "add") console.log(`  ### ${a.heading}  (#${a.anchor})`);
+    reportLanding(report, blob);
+    return;
+  }
+  await writeFile(stagingFile, `${JSON.stringify(staging, null, 2)}\n`, "utf8");
+  installLog(root, `migrate-import: ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${from} into ${skill} staging.`);
+  console.log(`migrate-import: ${existing ? "appended" : "wrote"} ${entries.length} entr${entries.length === 1 ? "y" : "ies"} (${actions.length} actions) -> ${stagingFile}`);
+  reportLanding(report, blob);
+  console.log(`  next: validate --skill ${skill}, then commit --skill ${skill}, then verify what landed.`);
+}
+
+// --audit (read-only): re-parse the archive and diff it against the distilled
+// EXTENDED, surfacing archived entries with no surviving ### sub-section. A rewrite
+// (kept under a new title) shows up alongside true merges and drops, so this lists
+// candidates to confirm, not a clean loss list - the AI judges each.
+function auditImport(index, extKey, entries, from) {
+  const extPath = resolveFile(index, extKey);
+  if (!existsSync(extPath)) { console.error(`migrate-import --audit: ${extKey} not found on disk`); process.exit(16); }
+  const surviving = new Set();
+  for (const line of readFileSync(extPath, "utf8").split("\n")) {
+    const m = line.match(/^###\s+(.+?)\s*$/);
+    if (m) surviving.add(slugify(m[1]));
+  }
+  const gone = entries.filter((e) => !surviving.has(slugify(e.title))).map((e) => e.title);
+  const survived = entries.length - gone.length;
+  console.log(`migrate-import --audit: ${entries.length} archived entr${entries.length === 1 ? "y" : "ies"} from ${from}, ${survived} survive verbatim, ${gone.length} not found.`);
+  if (gone.length === 0) { console.log("  every archived entry has a verbatim survivor."); return; }
+  console.log("  not found verbatim (merged, rewritten, or intentionally dropped) - confirm each:");
+  for (const g of gone) console.log(`  - ${g}`);
+}
+
+// The hybrid handoff - what the script could not land cleanly, for the AI to verify
+// and re-feed through the normal skill using the archived text. Silent-clean when the
+// scavenge was uneventful.
+function reportLanding(report, blob) {
+  const notes = [];
+  if (blob) notes.push("the source had no headings or bold-leads - imported as one blob entry, verify it reads coherently or re-split it");
+  if (report.nonText.length) notes.push(`${report.nonText.length} heading(s) had no slug-able text - a fallback anchor was used (${report.nonText.join(", ")}), check the bullet reads well`);
+  if (report.thin.length) notes.push(`${report.thin.length} entr${report.thin.length === 1 ? "y" : "ies"} captured little body (${report.thin.join(", ")}) - check the source for detail that did not land`);
+  if (report.elided) notes.push(`${report.elided} code block(s) elided - summarize the takeaway in prose at reconcile`);
+  if (notes.length === 0) { console.log("  landing report: clean - every entry captured with a body, no anomalies."); return; }
+  console.log("  landing report (verify these, re-feed any gap via -SessionUpdate / -MemoryUpdate from the archived text):");
+  for (const note of notes) console.log(`  - ${note}`);
+}
+
+// Replace each fenced code block with a one-line marker. Used for the blob fallback,
+// where parseEntries' line walk does not run.
+function elideFences(text) {
+  let inFence = false;
+  return text.split("\n").map((line) => {
+    if (/^```/.test(line.trim())) { const opening = !inFence; inFence = !inFence; return opening ? CODE_MARKER : null; }
+    return inFence ? null : line;
+  }).filter((l) => l !== null).join("\n");
+}
+
+// Walk the normalized content. Emit one entry per archive heading (##/###) with a
+// body, and one per H2-child bold-lead ("**Title.** body"). List-item bolds and inline
+// bold stay in the current entry's body. Meta headings and the H1 are skipped. Fenced
+// code is elided so a "**" inside a fence never starts an entry.
+function parseEntries(content) {
+  const lines = content.split("\n");
+  const entries = [];
+  let current = null, skipping = false, inFence = false, currentDepth = 0;
+
+  const flush = () => {
+    if (current) {
+      current.body = current.bodyLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      delete current.bodyLines;
+      entries.push(current);
+    }
+    current = null;
+  };
+
+  for (const line of lines) {
+    if (/^```/.test(line.trim())) {
+      const opening = !inFence;
+      inFence = !inFence;
+      if (opening && current && !skipping) current.bodyLines.push(CODE_MARKER);
+      continue;
+    }
+    if (inFence) continue;
+
+    const h1 = line.match(/^#\s+/);
+    const heading = line.match(/^(#{2,3})\s+(.+?)\s*$/);
+    const boldLead = line.match(/^\*\*(.+?)\*\*\s*(.*)$/);
+
+    if (h1) { flush(); skipping = true; continue; }
+    if (heading) {
+      flush();
+      currentDepth = heading[1].length;
+      const title = heading[2].trim();
+      if (META_HEADING.test(title)) { skipping = true; continue; }
+      skipping = false;
+      current = { title: stripTrailingPeriod(title), bodyLines: [] };
+      continue;
+    }
+    if (line.trim() === "---") continue;
+
+    // A bold-lead becomes its own entry only as a direct child of an H2 (a flat
+    // multi-entry section). Under an H3 the ### sub-section is the coherent unit, so
+    // bold-leads inside it stay as body and the narrative holds.
+    if (boldLead && !skipping && currentDepth === 2) {
+      flush();
+      currentDepth = 2;
+      current = { title: stripTrailingPeriod(boldLead[1].trim()), bodyLines: [] };
+      if (boldLead[2].trim()) current.bodyLines.push(boldLead[2].trim());
+      continue;
+    }
+    if (current && !skipping) current.bodyLines.push(line);
+  }
+  flush();
+
+  // Drop contentless group headers (a heading with no prose of its own) - their
+  // bold-lead children were captured as their own entries, so no detail is lost.
+  return entries.filter((e) => e.title.length > 0 && e.body.length > 0);
+}

@@ -6,4 +6,5 @@
 - [TEMP folder usage](feedback_temp_folder_usage.md) - TEMP/ at project root is the single home for all temporary files.
 - [No em dashes](feedback_no_em_dashes.md) - no em dashes or semicolons under our authorship: public-facing copy, marketing prose, AI-formatted output, memory files, code comments.
 - [No dates in memory](feedback_no_dates_in_memory.md) - no dates or version stamps in memory or session files. LIFO carries the time signal.
+- [Naming and renaming](feedback_naming.md) - names state what a thing owns. Renames stay in-domain and move the name, its registry key, and every reference in one pass.
 - [User profile](user_name.md) - one-line summary (role, scope, working style). Rename file on use.

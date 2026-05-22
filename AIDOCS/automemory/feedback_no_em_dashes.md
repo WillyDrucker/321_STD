@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-Never use em dashes (—) or semicolons (;) in anything under our authorship:
+Never use em dashes (`—`) or semicolons (`;`) in anything under our authorship:
 
 - Website copy (headings, hero text, marketing prose, project descriptions)
 - AI-formatted output the user will paste into copy (release notes, landing-page drafts)
