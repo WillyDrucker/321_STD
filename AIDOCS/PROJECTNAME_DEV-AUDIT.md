@@ -9,7 +9,7 @@ These override every individual rule below.
 1. **Cohesion over count.** One concept per file. If the file's job needs "and" to describe, inspect. A 600-line cohesive file beats three fragmented 200-line files.
 2. **Names are contracts.** Intuitive domain vocabulary. A name should let a reader predict the function's signature before opening it. No generic labels (`utils`, `helpers`, `misc`).
 3. **One canonical home per concern.** A rule, token, or pattern lives in exactly one file. Cross-reference, do not duplicate. Promote a shared helper when the same logic appears in two places.
-4. **Index registries as the spine.** `_index.json` owns paths, sizes, skill bodies, customizations, release profile. Code reads from it. Nothing hardcodes a path.
+4. **Index registries as the spine.** `_index.json` owns paths, sizes, skill bodies, and the engine pointer. Code reads from it. Nothing hardcodes a path.
 5. **Greppable + intuitive structure.** When grep alone falls short, parent-folder plus filename compensates. Folder names carry domain too.
 6. **Fail at gates, not everywhere.** Loud failures concentrated at boundaries (validator, pre-flight checks, strict-uniqueness matches). Normal logic stays quiet.
 7. **Anti-speculation.** No half-finished implementations. No design for hypothetical future requirements. Cut events with no subscriber, exports with no caller, abstractions for the imagined third instance. Reach for an abstraction when the third concrete instance lands.

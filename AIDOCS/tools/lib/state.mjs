@@ -45,9 +45,9 @@ export function reconcilePending() {
 // state command: print state, or flip the reconcile_pending gate (the Setup ->
 // reconcile handoff). Setup sets it before the migration capture, so commit holds
 // auto-prune while it is set and the capture stays additive. The reconciliation
-// pass (the gated -Update, not built yet) curates the capture and clears the gate,
-// or clear it by hand with --clear-reconcile. Steady-state auto-prune resumes once
-// the gate is clear.
+// pass (the gated -Update) curates the capture and clears the gate, or clear it by
+// hand with --clear-reconcile. Steady-state auto-prune resumes once the gate is
+// clear.
 export function cmdState(_index, args) {
   if (args.includes("--set-reconcile") || args.includes("--clear-reconcile")) {
     const value = args.includes("--set-reconcile");

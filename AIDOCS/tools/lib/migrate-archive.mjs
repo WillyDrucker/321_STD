@@ -9,6 +9,7 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
@@ -20,7 +21,7 @@ import { repoRoot } from "./paths.mjs";
 const KNOWN = ["AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore", "AIDOCS/_index.json", "AIDOCS/automemory", "WDDOCS"];
 
 export function cmdMigrateArchive(args) {
-  const name = args[args.indexOf("--name") + 1];
+  const name = flag(args, "--name");
   if (!name || name.startsWith("--")) { console.error("migrate-archive needs --name <PROJECT>"); process.exit(5); }
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);

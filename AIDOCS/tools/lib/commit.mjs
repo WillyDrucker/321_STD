@@ -5,6 +5,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
+import { flag } from "./args.mjs";
 import { lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
 import { applyExtendedAction, findOrphanBullets } from "./mutatorsExtended.mjs";
 import { resolveFile } from "./paths.mjs";
@@ -26,7 +27,7 @@ function applyOp(content, action) {
 }
 
 export function cmdCommit(index, args) {
-  const skill = args[args.indexOf("--skill") + 1];
+  const skill = flag(args, "--skill");
   if (!SKILLS.includes(skill)) { console.error(`commit: --skill must be one of ${SKILLS.join(" / ")}`); process.exit(11); }
   const staging = loadStaging(skill);
   if (!staging) { console.error(`commit: no staging file for ${skill}. Nothing to commit.`); process.exit(12); }

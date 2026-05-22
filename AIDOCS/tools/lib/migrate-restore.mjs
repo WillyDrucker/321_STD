@@ -11,6 +11,7 @@
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
+import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { findSectionBounds, isPlaceholderBody } from "./markdown.mjs";
 import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
@@ -90,7 +91,7 @@ function restoreConfigSection(archiveAidocs, root, name, spec) {
 }
 
 export function cmdMigrateRestore(args) {
-  const name = args[args.indexOf("--name") + 1];
+  const name = flag(args, "--name");
   if (!name || name.startsWith("--")) { console.error("migrate-restore needs --name <PROJECT>"); process.exit(5); }
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);

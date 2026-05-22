@@ -9,6 +9,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { SOURCE_ROOT } from "./paths.mjs";
 
@@ -55,8 +56,7 @@ export async function cmdInit(args) {
     console.error("init requires a target directory as the first argument. Usage: init <target-dir> --name <PROJECT>");
     process.exit(5);
   }
-  const nameIdx = args.indexOf("--name");
-  const name = nameIdx >= 0 ? args[nameIdx + 1] : null;
+  const name = flag(args, "--name");
   if (!name || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(name)) {
     console.error("init requires --name <PROJECT> (start with a letter, then letters / digits / _ / - only).");
     process.exit(5);
@@ -78,16 +78,23 @@ export async function cmdInit(args) {
 
   await mkdir(join(target, "AIDOCS"), { recursive: true });
 
-  // 1. Project-agnostic, verbatim: the engine, the skill bodies + router, and the
-  // auto-memory rules. Skill bodies reference files by domain-owned key, not by
-  // project name, so they need no substitution.
+  // 1. Project-agnostic, verbatim: the engine, the skill bodies, and the router. Skill
+  // bodies reference files by domain-owned key, not by project name, so they need no
+  // substitution. Auto-memory follows as the one write-if-missing exception.
   // The engine, minus machine-local runtime files: a dogfooded source may carry a
   // staging/ or state.json, which belong to the source project, not a fresh one.
   await cp(join(SOURCE_ROOT, "AIDOCS", "tools"), join(target, "AIDOCS", "tools"), {
     recursive: true,
     filter: (src) => { const b = src.split(/[\\/]/).pop(); return b !== "state.json" && b !== "staging"; },
   });
-  await cp(join(SOURCE_ROOT, "AIDOCS", "automemory"), join(target, "AIDOCS", "automemory"), { recursive: true });
+  // Auto-memory carries project data (a filled profile, edited or custom rules), so it
+  // is write-if-missing, not an unconditional overwrite: a bootstrap install over an
+  // existing project must keep the project's rules intact for migrate-archive to
+  // capture, since the bootstrap init runs before it. A fresh target (or --force) lays
+  // the canonical set, and the post-archive reinstall sees an emptied tree and lays it
+  // fresh too.
+  const automemoryDst = join(target, "AIDOCS", "automemory");
+  if (force || !existsSync(automemoryDst)) await cp(join(SOURCE_ROOT, "AIDOCS", "automemory"), automemoryDst, { recursive: true });
   await cp(join(SOURCE_ROOT, "AIDOCS", "SKILL"), join(target, "AIDOCS", "SKILL"), { recursive: true });
   const routerSrc = join(SOURCE_ROOT, ".claude", "skills", "321", "SKILL.md");
   if (existsSync(routerSrc)) {
@@ -98,12 +105,13 @@ export async function cmdInit(args) {
   // The onboarding reference files (INSTALL/setup.md and friends): read-and-execute
   // runbooks the -Setup runner follows. Project-agnostic (they use the <PROJECT>
   // placeholder in command examples), and removed wholesale at graduation. Skip a
-  // fetched engine if one is staged in the source - that is runtime, not template.
+  // fetched engine and the INSTALL.log audit trail if either is staged in the source -
+  // those are runtime, not template.
   const installSrc = join(SOURCE_ROOT, "INSTALL");
   if (existsSync(installSrc)) {
     await cp(installSrc, join(target, "INSTALL"), {
       recursive: true,
-      filter: (src) => src.split(/[\\/]/).pop() !== "engine",
+      filter: (src) => { const b = src.split(/[\\/]/).pop(); return b !== "engine" && b !== "INSTALL.log"; },
     });
   }
 

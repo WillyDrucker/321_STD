@@ -6,6 +6,7 @@
 
 import process from "node:process";
 
+import { cmdBigsix } from "./lib/bigsix.mjs";
 import { cmdCommit } from "./lib/commit.mjs";
 import { cmdDoctor } from "./lib/doctor.mjs";
 import { cmdFetchEngine } from "./lib/fetch-engine.mjs";
@@ -21,7 +22,7 @@ import { cmdSync } from "./lib/sync.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "validate", "commit", "state", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "validate", "commit", "state", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -51,6 +52,8 @@ async function main() {
   if (cmd === "migrate-archive") { cmdMigrateArchive(args); return; }
   if (cmd === "migrate-restore") { cmdMigrateRestore(args); return; }
   if (cmd === "verdict") { cmdVerdict(args); return; }
+  // bigsix reads package.json and the obvious configs, no registry needed.
+  if (cmd === "bigsix") { cmdBigsix(args); return; }
   const index = loadIndex();
   switch (cmd) {
     case "doctor":   cmdDoctor(index); break;
@@ -102,6 +105,9 @@ Commands:
   verdict   Validate or apply a migration verdict (the AI's scan result), a JSON
             array of {path, type, confidence, action}: --validate <file>, or
             --apply <file> --name <PROJECT> (move / copy to the archive, or leave).
+            --suggest drafts a candidate verdict from a heuristic scan, for AI review.
+  bigsix    --suggest    Draft the two script-readable Big-6 sections (Stack +
+            Pipeline) from package.json, for the MemoryUpdate fill to refine.
   graduate  Tear down onboarding: deregister -Setup, remove INSTALL/, mark graduated.
             Refuses while reconcile_pending is set ([--force] overrides).
   init      Lay the project skeleton into a target, substituting the name.

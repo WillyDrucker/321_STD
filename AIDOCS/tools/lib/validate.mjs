@@ -3,6 +3,7 @@
 // carries the field its op needs. Shared by the `validate` command and commit's
 // pre-write gate (DEV-AUDIT: fail at gates - a bad action never reaches disk).
 
+import { flag } from "./args.mjs";
 import { slugify } from "./markdown.mjs";
 import { loadStaging, SKILLS } from "./state.mjs";
 
@@ -39,7 +40,7 @@ export function validateStaging(index, staging, skill) {
 }
 
 export function cmdValidate(index, args) {
-  const skill = args[args.indexOf("--skill") + 1];
+  const skill = flag(args, "--skill");
   if (!SKILLS.includes(skill)) { console.error(`validate: --skill must be one of ${SKILLS.join(" / ")}`); process.exit(11); }
   const staging = loadStaging(skill);
   if (!staging) { console.error(`validate: no staging file for ${skill}. Nothing to validate.`); process.exit(12); }

@@ -8,11 +8,10 @@ import { existsSync, rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 
+import { flag } from "./args.mjs";
 import { installEngineDir } from "./paths.mjs";
 
 const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules"]);
-
-function flag(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
 
 export async function cmdFetchEngine(args) {
   const from = flag(args, "--from");

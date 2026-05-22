@@ -32,6 +32,8 @@ export function authoredTargets(index) {
   }
   const installDir = fromRoot("./INSTALL");
   if (existsSync(installDir)) for (const f of readdirSync(installDir).filter((f) => /\.md$/.test(f))) set.add(join(installDir, f));
+  // feedback_no_em_dashes.md is the one self-reference excluded: it documents the
+  // banned glyphs by showing them, so scanning it would flag its own examples.
   return [...set].filter((abs) => isFile(abs) && !/feedback_no_em_dashes\.md$/.test(abs));
 }
 

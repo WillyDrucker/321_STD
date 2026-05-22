@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 
+import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { slugify } from "./markdown.mjs";
 import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
@@ -31,7 +32,6 @@ const META_HEADING = /^(what goes in|what doesn't|what does not|pruning.*|purpos
 // not collapse to an empty body, and the validator's no-fence rule on body_md holds.
 const CODE_MARKER = "(code example elided on import - summarize the takeaway in prose)";
 
-function flag(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
 function stripTrailingPeriod(s) { return s.endsWith(".") ? s.slice(0, -1) : s; }
 
 // migrate-import --from <archived doc> --skill <sessionupdate | memoryupdate>

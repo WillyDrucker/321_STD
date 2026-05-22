@@ -5,7 +5,7 @@
 // Warnings (LIFO over cap, unresolved import markers) are expected mid-migration
 // and clear as the reconcile pass distills (DEV-AUDIT anchor: fail at gates).
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
@@ -136,8 +136,8 @@ function checkAutoMemory(index) {
 }
 
 // Every [+] bullet in a main file pairs with a ### sub-section in its EXTENDED. The
-// commit gate enforces this on staged writes; doctor enforces it on a direct-edit
-// reconcile, which bypasses commit.
+// commit gate enforces this on staged writes. Doctor enforces it on a direct-edit
+// reconcile, which bypasses commit. The pairing is checked main-to-extended only.
 function checkOrphans(index) {
   const issues = [];
   for (const key of Object.keys(index.files || {})) {

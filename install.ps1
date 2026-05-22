@@ -69,7 +69,7 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "AIDOCS/tools/engine.
   New-Item -ItemType Directory -Path $cloneTmp -Force | Out-Null
   Write-Host "Fetching the 321 engine..."
   git clone --depth 1 --quiet $Repo $cloneTmp
-  if ($LASTEXITCODE -ne 0) { Write-Host "Failed to clone $Repo." -ForegroundColor Red; exit 1 }
+  if ($LASTEXITCODE -ne 0) { Remove-Item -Recurse -Force $cloneTmp; Write-Host "Failed to clone $Repo." -ForegroundColor Red; exit 1 }
   $engine = $cloneTmp
 }
 
