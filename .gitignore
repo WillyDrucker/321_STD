@@ -49,11 +49,20 @@ pnpm-debug.log*
 .mcp.json
 .claude/settings.local.json
 
-# Session handoff scratch (local-only between sessions)
-WDDOCS/SESSION_HANDOFF.md
-
-# Local-only maintainer deploy runbook for the install site (machine paths, account-specific). Never commit.
-WDDOCS/RELEASES/STD_PAGE_DEPLOY.md
+# WDDOCS is local-only working docs (design, ideas, archive, releases, handoff).
+# The folder skeleton (ARCHIVE / DESIGN / IDEAS) is published empty via .gitkeep,
+# no content is published. This covers SESSION_HANDOFF.md and the RELEASES deploy
+# runbook (machine paths) too.
+/WDDOCS/*
+!/WDDOCS/ARCHIVE/
+!/WDDOCS/DESIGN/
+!/WDDOCS/IDEAS/
+/WDDOCS/ARCHIVE/*
+/WDDOCS/DESIGN/*
+/WDDOCS/IDEAS/*
+!/WDDOCS/ARCHIVE/.gitkeep
+!/WDDOCS/DESIGN/.gitkeep
+!/WDDOCS/IDEAS/.gitkeep
 
 # Build artifacts (none yet, reserved)
 dist/
