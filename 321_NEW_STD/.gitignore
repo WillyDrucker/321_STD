@@ -18,3 +18,23 @@ INSTALL/
 
 # Node (if tooling grows)
 node_modules/
+
+# Secrets - never commit
+.env
+.env.local
+.env.*.local
+
+# Machine-local config (paths, IDs, tokens) - never commit
+.mcp.json
+.claude/settings.local.json
+
+# OS / editor cruft - never committed
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# Editor project config - public-safe default, a private repo may version these
+.vscode/
+.idea/

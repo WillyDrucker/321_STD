@@ -92,7 +92,7 @@
       "update": {
         "flag": "-Update",
         "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
-        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator - each lane owns its own logic and its own staging commit."
+        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates."
       }
     }
   }

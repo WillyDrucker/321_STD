@@ -53,8 +53,15 @@ export function cmdState(_index, args) {
     const value = args.includes("--set-reconcile");
     const state = loadState();
     state.reconcile_pending = value;
+    // Clearing the gate ends the reconciliation pass, whose direct-edit reshape
+    // bypasses commit's watermark stamp. Stamp both lanes current here so a routine
+    // -Update afterward does not re-walk from a pre-migration point.
+    if (!value) {
+      const now = new Date().toISOString();
+      for (const skill of SKILLS) state[skill] = { runs: state[skill]?.runs || 0, last_committed_at: now };
+    }
     saveState(state);
-    console.log(`state: reconcile_pending = ${value}.`);
+    console.log(`state: reconcile_pending = ${value}.${value ? "" : " Lanes stamped current."}`);
     return;
   }
   console.log(JSON.stringify(loadState(), null, 2));
