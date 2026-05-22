@@ -5,15 +5,36 @@
 // substituted to the target name - this is where the <PROJECT> prefix is finally
 // instantiated to a real name.
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+import { installLog } from "./installLog.mjs";
 import { SOURCE_ROOT } from "./paths.mjs";
 
 const VERBATIM_ROOT = ["CLAUDE.md", ".gitignore"];   // no project name inside
 const SUBSTITUTED_ROOT = ["AGENTS.md", "CHANGELOG.md"]; // project name in content
-const STOCK_DIRS = ["WDDOCS/DESIGN", "WDDOCS/ARCHIVE", "AIDOCS/ENV", "AIDOCS/tools/staging", "TEMP"];
+const STOCK_DIRS = ["WDDOCS/DESIGN", "WDDOCS/ARCHIVE", "WDDOCS/RELEASES", "WDDOCS/IDEAS", "AIDOCS/ENV", "AIDOCS/tools/staging", "TEMP"];
+
+// Coarse, content-free recognition of what already sits at the target, so the install can
+// report what it found and point at the right next step. Existence-only, never parses, so a
+// malformed _index.json or a half-written data file still reads as "existing". The real
+// per-file determination is the AI's job in -Setup, made safe there by migrate-archive.
+function hasDataDoc(aidocsDir) {
+  if (!existsSync(aidocsDir)) return false;
+  try { return readdirSync(aidocsDir).some((f) => /_(MEMORY|SESSION)\.md$/.test(f)); }
+  catch { return false; }
+}
+function recognizeTarget(target) {
+  const has = (...p) => existsSync(join(target, ...p));
+  if (has(".claude", "skills", "321") || has("AIDOCS", "_index.json") || hasDataDoc(join(target, "AIDOCS"))) {
+    return "existing-321";
+  }
+  if (has("AGENTS.md") || has("CLAUDE.md") || has("README.md") || has("package.json") || has("src") || has("AIDOCS")) {
+    return "generic-existing";
+  }
+  return "fresh";
+}
 
 export async function cmdInit(args) {
   const targetArg = args[0];
@@ -27,8 +48,10 @@ export async function cmdInit(args) {
     console.error("init requires --name <PROJECT> (start with a letter; letters / digits / _ / - only).");
     process.exit(5);
   }
+  const force = args.includes("--force");
   const target = resolve(process.cwd(), targetArg);
   if (SOURCE_ROOT === target) { console.error("init: refusing to scaffold over the source project."); process.exit(5); }
+  const kind = recognizeTarget(target);
 
   const sourceIndex = join(SOURCE_ROOT, "AIDOCS", "_index.json");
   const source = JSON.parse(await readFile(sourceIndex, "utf8"));
@@ -66,32 +89,49 @@ export async function cmdInit(args) {
     });
   }
 
-  // 2. Root files with no project name: copy verbatim.
+  // 2-4. Scaffold-class files: the root docs (verbatim plus name-substituted), the
+  // registry, and the registered data files. Write-if-missing so an install over an
+  // existing project never clobbers content - the engine and runbooks above always
+  // overwrite because they hold no project data, but these may. --force rewrites the
+  // scaffold too. An existing data file is left for the -Setup migration to archive.
+  const scaffolds = [];
   for (const f of VERBATIM_ROOT) {
-    if (existsSync(join(SOURCE_ROOT, f))) await cp(join(SOURCE_ROOT, f), join(target, f));
+    const srcAbs = join(SOURCE_ROOT, f);
+    if (existsSync(srcAbs)) scaffolds.push({ dst: join(target, f), body: await readFile(srcAbs, "utf8") });
   }
-
-  // 3. Docs that carry the project name: substitute it.
   for (const f of SUBSTITUTED_ROOT) {
-    await writeFile(join(target, f), sub(await readFile(join(SOURCE_ROOT, f), "utf8")), "utf8");
+    scaffolds.push({ dst: join(target, f), body: sub(await readFile(join(SOURCE_ROOT, f), "utf8")) });
   }
-  await writeFile(join(target, "AIDOCS", "_index.json"), sub(await readFile(sourceIndex, "utf8")), "utf8");
-
-  // 4. The registered data files: rename (source name -> target name) + substitute.
+  scaffolds.push({ dst: join(target, "AIDOCS", "_index.json"), body: sub(await readFile(sourceIndex, "utf8")) });
   for (const rel of Object.values(source.files)) {
     const srcAbs = join(SOURCE_ROOT, rel.replace(/^\.\//, ""));
-    const dstRel = sub(rel).replace(/^\.\//, "");
-    const dstAbs = join(target, dstRel);
-    await mkdir(dirname(dstAbs), { recursive: true });
-    await writeFile(dstAbs, sub(await readFile(srcAbs, "utf8")), "utf8");
+    scaffolds.push({ dst: join(target, sub(rel).replace(/^\.\//, "")), body: sub(await readFile(srcAbs, "utf8")) });
   }
+  let wrote = 0, kept = 0;
+  for (const { dst, body } of scaffolds) {
+    if (!force && existsSync(dst)) { kept++; continue; }
+    await mkdir(dirname(dst), { recursive: true });
+    await writeFile(dst, body, "utf8");
+    wrote++;
+  }
+  console.log(`  scaffold: ${wrote} written, ${kept} preserved${force ? " (--force)" : ""}.`);
+  installLog(target, `init: ${kind} target, scaffold ${wrote} written, ${kept} preserved${force ? " (--force)" : ""}.`);
 
-  // 5. Stock empty dirs (kept by a .gitkeep so they survive a commit).
-  for (const d of STOCK_DIRS) {
+  // 5. Stock empty dirs (kept by a .gitkeep so they survive a commit). The
+  // name-based SETUP_ARCHIVE is the migration recovery-net home, preseeded so
+  // migrate-archive has a place to move content into.
+  for (const d of [...STOCK_DIRS, `AIDOCS/${name}_SETUP_ARCHIVE`]) {
     await mkdir(join(target, d), { recursive: true });
     await writeFile(join(target, d, ".gitkeep"), "", "utf8");
   }
 
   console.log(`init: laid ${sourceName} skeleton into ${target} as "${name}".`);
-  console.log(`  next: node "${join(target, "AIDOCS", "tools", "engine.mjs")}" doctor`);
+  if (kind === "fresh") {
+    console.log(`  fresh project. Next: /321 -Setup to fill the Big 6 from your code.`);
+  } else if (kind === "existing-321") {
+    console.log(`  recognized an existing 321 project. Existing content preserved. Next: /321 -Setup to migrate it.`);
+  } else {
+    console.log(`  recognized an existing project (no 321 yet). Your files are untouched. Next: /321 -Setup to capture it.`);
+  }
+  console.log(`  doctor: node "${join(target, "AIDOCS", "tools", "engine.mjs")}" doctor`);
 }

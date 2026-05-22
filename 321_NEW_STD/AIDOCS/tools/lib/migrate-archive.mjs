@@ -9,6 +9,7 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
 // Known 321-shape paths moved aside (relative to the root). Engine and
@@ -49,4 +50,5 @@ export function cmdMigrateArchive(args) {
   }
 
   console.log(`migrate-archive: moved ${moved} path(s) into ${archive} (move, not delete - the recovery net).`);
+  installLog(root, `migrate-archive: moved ${moved} path(s) into AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

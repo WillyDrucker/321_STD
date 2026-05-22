@@ -9,6 +9,7 @@
 import { cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
 // Keep every canonical line, append the archived lines the canonical set does not
@@ -44,4 +45,5 @@ export function cmdMigrateRestore(args) {
 
   console.log(`migrate-restore: restored ${done.length ? done.join(", ") : "nothing"} from ${archive}.`);
   console.log("  knowledge files (MEMORY / SESSION / Big-6) are captured via /321 -Update, not restored here.");
+  installLog(root, `migrate-restore: restored ${done.length ? done.join(", ") : "nothing"} from AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

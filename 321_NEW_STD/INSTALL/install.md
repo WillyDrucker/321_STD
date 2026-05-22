@@ -24,6 +24,16 @@ From a clone of the 321 repo (the engine ships in the repo):
 
 The project is usable immediately. `/321 -Setup` is the optional first-run step (fresh fill or migration), and it follows `INSTALL/setup.md`.
 
+## Existing projects
+
+The same command serves a fresh or an existing project, and it is non-destructive. `init` recognizes what is already there before it writes, and reports it:
+
+- **Existing 321 project** (a `.claude/skills/321/`, an `_index.json`, or `*_MEMORY` / `*_SESSION` data docs, even malformed) - existing content is preserved in place. Migration runs next, in `/321 -Setup` (it follows `setup.md`: archive the known shape, sweep the rest, reinstall fresh, restore, then capture).
+- **Existing project, no 321 yet** - your files are untouched, the canonical structure is laid around them, and `-Setup` captures the project into the Big 6.
+- **Fresh** - the full skeleton is written and `-Setup` fills the Big 6 from your code.
+
+`init` writes scaffold files only if missing - the engine and these runbooks always refresh, but data files (AGENTS, `_index.json`, MEMORY / SESSION / BACKLOG and the rest) are never clobbered. `--force` rewrites the scaffold anyway. Each mechanical step records to `INSTALL/INSTALL.log` (what ran, what moved where), an onboarding audit trail that `graduate` removes with `INSTALL/`.
+
 ## Manual / recovery drive
 
 If the scripts cannot run, or you are recovering, run the engine steps directly from a target that already has the engine:

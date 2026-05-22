@@ -6,6 +6,16 @@
 
 Read the target. **Fresh** when the Big 6 are still on their `(fill in ...)` placeholders and there is no prior project content. **Migration** when there is existing content worth preserving (filled docs, a populated SESSION / MEMORY, user docs in WDDOCS, a hand-rolled CLAUDE.md). Any one migration signal flips to migration - a false-positive migration is safe (it archives a fresh scaffold and reinstalls the same), a false-negative would overwrite content.
 
+## File classes (what gets shuffled vs replaced)
+
+Migration shuffles the files that can hold project content and leaves the rest alone. Three classes, by whether a file carries data:
+
+- **Engine (always replaced, never archived).** Scripts (`AIDOCS/tools`), skill bodies (`AIDOCS/SKILL`), auto-memory (`AIDOCS/automemory`), the router (`.claude/skills/321`), and these runbooks (`INSTALL/`). They hold no project data, so `init` always overwrites them and `migrate-archive` never touches them. They just refresh to current.
+- **Data (archived, relaid, recaptured) - the shuffle.** `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, `AIDOCS/_index.json`, and the data docs `AIDOCS/<PROJECT>_*.md` (MEMORY / SESSION / BACKLOG / DEV-AUDIT / AUTO-PUSH and their extendeds). `init` preserves these on install (write-if-missing), `migrate-archive` moves them aside by name, the reinstall lays them fresh, and the capture step re-derives their content from the archive. Pruned overflow (`*_ARCHIVE.md`) is swept the same way, so prior history is preserved too.
+- **User-owned (archived, restored).** `WDDOCS` is restored verbatim and `.gitignore` is union-merged so custom ignores survive. `AIDOCS/ENV` is left in place the whole time (it may hold secrets) and is never archived.
+
+The authoritative lists live in the engine, which needs them to run at any time: `init` derives the data docs from `_index.json`, and `migrate-archive` carries the known-shape list plus the `AIDOCS/*_*.md` sweep. The two sets match by design, so every file install preserves is one migration relays fresh - nothing is left stale. This section documents the split for the migration and is discarded with `INSTALL/` at graduation, while the engine keeps the mechanical truth.
+
 ## Fresh path
 
 1. **Register + health.**
@@ -18,7 +28,7 @@ Read the target. **Fresh** when the Big 6 are still on their `(fill in ...)` pla
 
 ## Migration path
 
-The target holds content worth preserving. Land the canonical structure, then layer the project's knowledge back in. Two archiving lanes feed one `SETUP_ARCHIVE` - a deterministic backstop for the known shape, and an AI sweep for everything else.
+The target holds content worth preserving. Land the canonical structure, then layer the project's knowledge back in. Two archiving lanes feed one `SETUP_ARCHIVE` - a deterministic backstop for the known shape, and an AI sweep for everything else. Each mechanical step below (archive, sweep apply, reinstall, restore) appends what it did and where content went to `INSTALL/INSTALL.log`, so you can read that trail to confirm the migration's mechanical history before judging content.
 
 1. **Archive the known shape (deterministic backstop).**
    ```bash
@@ -80,7 +90,8 @@ Step 2 of the migration path is where Setup's judgement lives, on top of the det
 - **Skills are the writer.** Setup orchestrates and delegates capture to `-MemoryUpdate` / `-SessionUpdate` through the staging pipeline.
 - **Two lanes, one archive.** The deterministic backstop (`migrate-archive`) covers the known shape and is re-runnable, the AI sweep covers the rest, and the sweep can route anything into the same `SETUP_ARCHIVE` or fall back to the backstop when judgement is uncertain.
 - **Migration captures, never distills.** It sets the reconcile gate (which holds auto-prune, so the capture stays additive) and stops. Distillation is the `-Update` reconcile pass, which curates under cap and clears the gate.
-- **The archive is the recovery net**, kept until the user deletes it.
+- **The install log is the mechanical record.** The archive / relay / restore commands append what they did and where content went to `INSTALL/INSTALL.log`. Read it to confirm what moved where before judging content. It rides in `INSTALL/`, so `graduate` removes it with the rest.
+- **The archive is the recovery net**, kept until the user deletes it. Existing archived data is never overwritten - both archiving lanes (`migrate-archive` and `verdict`) keep the first copy, and `init` never writes into archive folders. Pruned history (`*_ARCHIVE.md`) and content from a prior migration survive a re-run intact.
 
 ## Deferred (land when their engine does)
 

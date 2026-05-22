@@ -18,7 +18,8 @@
     "memoryupdate.backlog": "./AIDOCS/PROJECTNAME_BACKLOG.md",
     "sessionupdate.session": "./AIDOCS/PROJECTNAME_SESSION.md",
     "sessionupdate.session_extended": "./AIDOCS/PROJECTNAME_SESSION_EXTENDED.md",
-    "devaudit.audit": "./AIDOCS/PROJECTNAME_DEV-AUDIT.md"
+    "devaudit.audit": "./AIDOCS/PROJECTNAME_DEV-AUDIT.md",
+    "autopush.config": "./AIDOCS/PROJECTNAME_AUTO-PUSH.md"
   },
   "buckets": {
     "memoryupdate.memory": [
@@ -67,7 +68,7 @@
       "autopush": {
         "flag": "-AutoPush",
         "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
-        "description": "Generic commit-and-push baseline - get the project's work committed and pushed to its anchored git remote, with .gitignore as the public/private gate. Release specifics (version bump, CHANGELOG, build, deploy) are project fill-ins, set in this body to match the project's actual push cycle."
+        "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at setup / reconcile."
       },
       "devaudit": {
         "flag": "-DevAudit",

@@ -11,6 +11,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
+import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
 const TYPES = ["handoff", "design", "memory", "notes", "scratch", "env", "other"];
@@ -76,15 +77,17 @@ export function cmdVerdict(args) {
   const name = flag(args, "--name");
   if (!name || name.startsWith("--")) { console.error("verdict --apply needs --name <PROJECT>"); process.exit(5); }
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
-  const counts = { move: 0, copy: 0, leave: 0, missing: 0 };
+  const counts = { move: 0, copy: 0, leave: 0, kept: 0, missing: 0 };
   for (const e of entries) {
     if (e.action === "leave") { counts.leave++; continue; }
     const src = join(root, e.path);
     if (!existsSync(src)) { counts.missing++; continue; }
     const dst = join(archive, e.path);
+    if (existsSync(dst)) { counts.kept++; continue; }   // recovery net keeps the first copy - never overwrite archived data
     mkdirSync(dirname(dst), { recursive: true });
     if (e.action === "move") { renameSync(src, dst); counts.move++; }
     else { cpSync(src, dst, { recursive: true }); counts.copy++; }
   }
-  console.log(`verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.missing ? `, ${counts.missing} missing` : ""} -> ${archive} (move, not delete).`);
+  console.log(`verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.kept ? `, ${counts.kept} kept (already archived)` : ""}${counts.missing ? `, ${counts.missing} missing` : ""} -> ${archive} (move, not delete).`);
+  installLog(root, `verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.kept ? `, ${counts.kept} kept (already archived)` : ""}${counts.missing ? `, ${counts.missing} missing` : ""} into AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

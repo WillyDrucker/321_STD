@@ -53,6 +53,7 @@ pnpm-debug.log*
 
 # Session handoff scratch (local-only between sessions)
 WDDOCS/SESSION_HANDOFF.md
+WDDOCS/SESSION_HANDOFF_EXTENDED.md
 
 # Local-only maintainer deploy runbook for the install site (machine paths, account-specific). Never commit.
 WDDOCS/RELEASES/STD_PAGE_DEPLOY.md
