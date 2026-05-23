@@ -354,6 +354,24 @@ PCOUT="$(node "$PRENG" commit --skill memoryupdate 2>&1)"; PCC=$?
 grep -q 'legacy bullet' "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md" 2>/dev/null && pass "pruned bullets archived (recovery net intact)" || fail "no pruned content in archive"
 grep -q 'a fresh protected bullet' "$PR/AIDOCS/PruneTest_MEMORY.md" && pass "fresh bullet protected from prune" || fail "fresh bullet was wrongly pruned"
 
+echo "=== T23: clear-reconcile drops legacy watermark keys, keeps the canonical shape ==="
+SN="$BASE/statenorm"
+node "$RENG" init "$SN" --name StateNorm >/dev/null 2>&1
+SNENG="$SN/AIDOCS/tools/engine.mjs"
+node "$SNENG" state --set-reconcile >/dev/null 2>&1
+# plant a pre-rebuild engine's underscored watermark keys beside the gate
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.session_update={run_count:1};j.memory_update={run_count:1};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SN/AIDOCS/tools/state.json"
+node "$SNENG" state --clear-reconcile --force >/dev/null 2>&1
+SJ="$(cat "$SN/AIDOCS/tools/state.json")"
+echo "$SJ" | grep -q 'session_update' && fail "legacy session_update survived clear-reconcile" || pass "legacy session_update dropped on clear-reconcile"
+echo "$SJ" | grep -q 'memory_update' && fail "legacy memory_update survived clear-reconcile" || pass "legacy memory_update dropped on clear-reconcile"
+echo "$SJ" | grep -q '"sessionupdate"' && pass "canonical sessionupdate kept" || fail "canonical sessionupdate missing after normalize"
+echo "$SJ" | grep -q '"reconcile_pending": false' && pass "reconcile_pending cleared" || fail "reconcile_pending not false after clear"
+
+echo "=== T24: migrate-import --from rejects a path escaping the root (isContained) ==="
+node "$ENG" migrate-import --from "../../../etc/passwd" --skill memoryupdate >/dev/null 2>&1; RC=$?
+[ "$RC" = "5" ] && pass "migrate-import --from rejects an escaping path (exit 5)" || fail "migrate-import --from accepted an escaping path (exit $RC)"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED

@@ -9,11 +9,11 @@
 // they land.
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { flag, validName } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
-import { repoRoot } from "./paths.mjs";
+import { isContained, repoRoot } from "./paths.mjs";
 
 const TYPES = ["handoff", "design", "memory", "notes", "scratch", "env", "other"];
 const ACTIONS = ["move", "copy", "leave"];
@@ -41,9 +41,7 @@ function containmentError(p, root) {
     if (norm === `AIDOCS/${d}` || norm.startsWith(`AIDOCS/${d}/`)) return `path "${p}" targets a protected location (AIDOCS/${d})`;
   }
   if (/^AIDOCS\/[^/]+_SETUP_ARCHIVE(\/|$)/.test(norm)) return `path "${p}" targets the migration archive`;
-  const abs = resolve(root, p);
-  const prefix = root.endsWith(sep) ? root : root + sep;
-  if (!abs.startsWith(prefix)) return `path "${p}" escapes the project root`;
+  if (!isContained(root, resolve(root, p))) return `path "${p}" escapes the project root`;
   return null;
 }
 
@@ -130,8 +128,7 @@ function suggestVerdict(args) {
   // the same way verdict entries are - it must not escape the root.
   const outArg = flag(args, "--out");
   const outFile = outArg ? resolve(root, outArg) : join(root, "TEMP", "setup-verdict.json");
-  const prefix = root.endsWith(sep) ? root : root + sep;
-  if (!outFile.startsWith(prefix)) { console.error(`verdict --suggest: --out "${outArg}" escapes the project root`); process.exit(5); }
+  if (!isContained(root, outFile)) { console.error(`verdict --suggest: --out "${outArg}" escapes the project root`); process.exit(5); }
   const entries = suggestEntries(root);
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, `${JSON.stringify(entries, null, 2)}\n`, "utf8");

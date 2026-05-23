@@ -15,13 +15,13 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { slugify } from "./markdown.mjs";
 import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
-import { repoRoot, resolveFile, stagingDir } from "./paths.mjs";
+import { isContained, repoRoot, resolveFile, stagingDir } from "./paths.mjs";
 import { loadStaging } from "./state.mjs";
 
 // Headings that are an EXTENDED file's own authoring guide, not durable content - plus
@@ -60,8 +60,7 @@ export async function cmdMigrateImport(index, args) {
 
   const root = repoRoot();
   const fromAbs = resolve(root, from);
-  const prefix = root.endsWith(sep) ? root : root + sep;
-  if (!fromAbs.startsWith(prefix)) { console.error(`migrate-import: --from "${from}" escapes the project root.`); process.exit(5); }
+  if (!isContained(root, fromAbs)) { console.error(`migrate-import: --from "${from}" escapes the project root.`); process.exit(5); }
   if (!existsSync(fromAbs)) { console.error(`migrate-import: source not found: ${from}`); process.exit(16); }
 
   let content = await readFile(fromAbs, "utf8");

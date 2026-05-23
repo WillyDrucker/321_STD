@@ -5,8 +5,8 @@
 // engine - and is overridable with --root, so a fetched onboarding engine can
 // operate on a separate target without being copied into it.
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -40,4 +40,30 @@ export function resolveFile(index, key) {
   const rel = index.files?.[key];
   if (!rel) throw new Error(`no file registered under key "${key}"`);
   return fromRoot(rel);
+}
+
+// Canonicalize a path: realpath its longest existing ancestor (resolving symlinks,
+// junctions, and case) and re-append the not-yet-created tail lexically. A symlink in
+// the existing part then cannot redirect the result outside an intended root, which a
+// plain resolve (lexical only) would miss. Best-effort: an un-realpathable ancestor
+// falls back to the lexical form.
+export function canonicalPath(p) {
+  let abs = resolve(p);
+  const tail = [];
+  while (!existsSync(abs)) {
+    tail.unshift(basename(abs));
+    const parent = dirname(abs);
+    if (parent === abs) break;   // hit the filesystem root
+    abs = parent;
+  }
+  try { abs = realpathSync(abs); } catch { /* best-effort */ }
+  return tail.length ? join(abs, ...tail) : abs;
+}
+
+// True when candidate is root itself or contained within it, compared on canonical
+// (symlink-resolved) paths. The containment gate the migration sweep and fetch write
+// through, so a crafted path cannot escape the project via a symlink or junction.
+export function isContained(root, candidate) {
+  const rel = relative(canonicalPath(root), canonicalPath(candidate));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }

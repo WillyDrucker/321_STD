@@ -86,16 +86,16 @@ export function cmdState(_index, args) {
         process.exit(13);
       }
     }
-    state.reconcile_pending = value;
-    // Clearing the gate ends the reconciliation pass, whose direct-edit reshape
-    // bypasses commit's watermark stamp. Stamp both lanes current here so a routine
-    // -Update afterward does not re-walk from a pre-migration point.
-    if (!value) {
-      const now = new Date().toISOString();
-      for (const skill of SKILLS) state[skill] = { runs: state[skill]?.runs || 0, last_committed_at: now };
-    }
-    saveState(state);
-    console.log(`state: reconcile_pending = ${value}.${value ? "" : " Lanes stamped current."}`);
+    if (value) { state.reconcile_pending = true; saveState(state); console.log("state: reconcile_pending = true."); return; }
+    // Clearing the gate ends the reconciliation pass, whose direct-edit reshape bypasses
+    // commit's watermark stamp. Stamp both lanes current, and reduce to the canonical
+    // shape so a legacy migration's pre-rebuild watermark keys (session_update /
+    // memory_update) do not linger beside the new ones.
+    const now = new Date().toISOString();
+    const normalized = { reconcile_pending: false };
+    for (const skill of SKILLS) normalized[skill] = { runs: state[skill]?.runs || 0, last_committed_at: now };
+    saveState(normalized);
+    console.log("state: reconcile_pending = false. Lanes stamped current.");
     return;
   }
   console.log(JSON.stringify(loadState(), null, 2));
