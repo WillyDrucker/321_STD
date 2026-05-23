@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { hasPrivacyBlock } from "./gitignore.mjs";
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
-import { authoredTargets, isFile, scanBanned } from "./prose.mjs";
+import { authoredTargets, isFile, scanBanned, wddocsTargets } from "./prose.mjs";
 
 const BIG6 = ["Overview", "Stack", "Architecture", "Environment", "Pipeline", "Conventions"];
 
@@ -34,6 +34,7 @@ export function cmdDoctor(index) {
     "Size caps":      checkCaps(index),
     "Import residue": checkResidue(index),
     "Privacy gate":   checkPrivacy(index),
+    "WDDOCS prose":   checkWddocsProse(index),
   };
   let errors = 0, warns = 0;
   for (const [name, issues] of Object.entries(errorChecks)) {
@@ -228,11 +229,27 @@ function checkPrivacy(index) {
   return issues;
 }
 
-// Em dashes and semicolons in authored prose (prose.mjs owns the target set and
-// the scanner that skips code fences and inline code).
+// Em dashes and semicolons in our authored prose (prose.mjs owns the target set and
+// the scanner that skips code fences and inline code). Error-tier: this is the output
+// the engine and the AI write, so banned glyphs here are a real house-voice miss.
 function checkProse(index) {
   const issues = [];
   for (const abs of authoredTargets(index)) {
+    const name = abs.split(/[\\/]/).pop();
+    let text;
+    try { text = readFileSync(abs, "utf8"); } catch { continue; }
+    for (const v of scanBanned(text)) issues.push(`${name}:${v.line} ${v.kind}`);
+  }
+  return issues;
+}
+
+// Banned prose in user-owned WDDOCS (design / business / working docs). Warning-tier,
+// not error: it is the user's authorship, not ours, so the no-em-dash / no-semicolon
+// rule does not gate on it. A migration restores these verbatim, so without this split
+// a project with user docs that use semicolons could never reach a clean doctor.
+function checkWddocsProse(index) {
+  const issues = [];
+  for (const abs of wddocsTargets(index)) {
     const name = abs.split(/[\\/]/).pop();
     let text;
     try { text = readFileSync(abs, "utf8"); } catch { continue; }

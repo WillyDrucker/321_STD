@@ -32,11 +32,25 @@ export function authoredTargets(index) {
   }
   const installDir = fromRoot("./INSTALL");
   if (existsSync(installDir)) for (const f of readdirSync(installDir).filter((f) => /\.md$/.test(f))) set.add(join(installDir, f));
-  // README (the public front door) and the WDDOCS docs. ARCHIVE is frozen legacy
-  // prose, and the gitignored handoff / deploy scratch is local-only, so skip both.
+  // README (the public front door) is ours. WDDOCS is scanned separately at warning-
+  // tier (wddocsTargets) - it is user / working content (design, business, research),
+  // not our authored output, so banned prose there does not gate.
   const readme = fromRoot("./README.md");
   if (existsSync(readme)) set.add(readme);
-  const wddocs = fromRoot("./WDDOCS");
+  // feedback_no_em_dashes.md is the one self-reference excluded: it documents the
+  // banned glyphs by showing them, so scanning it would flag its own examples.
+  return [...set].filter((abs) => isFile(abs) && !/feedback_no_em_dashes\.md$/.test(abs));
+}
+
+// The WDDOCS docs - user / working content (design, business, research notes). Scanned
+// only at warning-tier (doctor reports, never fails), because banned prose here is the
+// user's authorship, not ours, so the house-voice rule does not gate on it. A migration
+// restores these verbatim, so they would otherwise trip the error gate on every run.
+// ARCHIVE is frozen legacy prose, and the gitignored handoff / deploy scratch is
+// local-only, so skip both.
+export function wddocsTargets(index) {
+  const set = new Set();
+  const wddocs = fromRoot(index.paths?.wddocs || "./WDDOCS");
   if (existsSync(wddocs)) {
     const walk = (dir) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -46,9 +60,7 @@ export function authoredTargets(index) {
     };
     walk(wddocs);
   }
-  // feedback_no_em_dashes.md is the one self-reference excluded: it documents the
-  // banned glyphs by showing them, so scanning it would flag its own examples.
-  return [...set].filter((abs) => isFile(abs) && !/feedback_no_em_dashes\.md$/.test(abs));
+  return [...set].filter((abs) => isFile(abs));
 }
 
 // Banned characters in authored prose, skipping code fences and inline code.

@@ -81,17 +81,17 @@ Each run lists the archived entries with no surviving `### sub-section`. Confirm
 
 Then run the full **archive-alignment check**: walk `AIDOCS/<PROJECT>_SETUP_ARCHIVE/` and confirm every archived source is accounted for - landed in the live structure or deliberately dropped. The `--audit` above covers the SESSION / MEMORY EXTENDED lanes mechanically. For the config docs, CHANGELOG, the archived AGENTS / CLAUDE, and any swept docs, confirm each by eye against the lanes above. A source that is neither reflected nor consciously dropped means the pass is unfinished - resolve it before clearing.
 
-Once doctor is fully clean (zero warnings) and the archive is accounted for:
+Once doctor's errors are zero and its reconcile warnings are cleared (no import residue, every lane under cap), and the archive is accounted for - WDDOCS-prose warnings are user authorship and do not block:
 
 ```bash
 node AIDOCS/tools/engine.mjs state --clear-reconcile
 ```
 
-This clears the gate and stamps both lane watermarks current (the direct-edit reshape bypassed `commit`, which would otherwise stamp them). If doctor still warns, or an audit surfaces a lost entry, leave the gate set so the next `/321 -Update` resumes the reconciliation. Then run Phase 2 below.
+This clears the gate and stamps both lane watermarks current (the direct-edit reshape bypassed `commit`, which would otherwise stamp them). If doctor still reports a reconcile warning (a surviving import marker or an over-cap lane) or an error, or an audit surfaces a lost entry, leave the gate set so the next `/321 -Update` resumes the reconciliation. A WDDOCS-prose warning is not a reason to hold - it is the user's own docs. Then run Phase 2 below.
 
 ## Phase 2: Graduate (onboarding teardown)
 
-Runs only after reconciliation verifies - the gate is cleared and doctor is clean. The project is steady, so tear down the onboarding tier it no longer needs:
+Runs only after reconciliation verifies - the gate is cleared and doctor's errors are zero (a WDDOCS-prose warning is user content, not a blocker). The project is steady, so tear down the onboarding tier it no longer needs:
 
 ```bash
 node AIDOCS/tools/engine.mjs graduate
