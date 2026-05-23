@@ -372,6 +372,18 @@ echo "=== T24: migrate-import --from rejects a path escaping the root (isContain
 node "$ENG" migrate-import --from "../../../etc/passwd" --skill memoryupdate >/dev/null 2>&1; RC=$?
 [ "$RC" = "5" ] && pass "migrate-import --from rejects an escaping path (exit 5)" || fail "migrate-import --from accepted an escaping path (exit $RC)"
 
+echo "=== T25: migrate-archive snapshots AIDOCS/SKILL (copy, not move) for in-place customization recovery ==="
+SS="$BASE/skillsnap"
+node "$RENG" init "$SS" --name SkillSnap >/dev/null 2>&1
+SSENG="$SS/AIDOCS/tools/engine.mjs"
+# customize a skill body in place (the legacy pre-data-doc model)
+printf '\nCUSTOM_SKILL_MARKER: project-specific in-place edit.\n' >> "$SS/AIDOCS/SKILL/SKILL_AUTO-PUSH.md"
+node "$SSENG" migrate-archive --name SkillSnap >/dev/null 2>&1
+SARCH="$SS/AIDOCS/SkillSnap_SETUP_ARCHIVE/AIDOCS/SKILL"
+[ -f "$SARCH/SKILL_AUTO-PUSH.md" ] && pass "SKILL snapshotted into the archive" || fail "SKILL not snapshotted into archive"
+grep -q 'CUSTOM_SKILL_MARKER' "$SARCH/SKILL_AUTO-PUSH.md" 2>/dev/null && pass "in-place customization preserved in the snapshot" || fail "customization not in the snapshot"
+[ -f "$SS/AIDOCS/SKILL/SKILL_AUTO-PUSH.md" ] && grep -q 'CUSTOM_SKILL_MARKER' "$SS/AIDOCS/SKILL/SKILL_AUTO-PUSH.md" && pass "live SKILL kept (copy, not move)" || fail "live SKILL was moved, not copied"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED
