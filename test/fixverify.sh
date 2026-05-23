@@ -1,0 +1,352 @@
+#!/usr/bin/env bash
+# fixverify.sh - the 321 engine regression suite. Drives the engine against a scratch
+# migration fixture (a legacy OLD321 project renamed to NEW321, the shape of a real
+# migration) plus isolated per-feature projects, covering migrate-archive / restore /
+# import, verdict containment, privacy gates, auto-prune, init validation, and the
+# doctor prose tiers. Operate-on commands run through the SCRATCH engine (its
+# SOURCE_ROOT is the scratch), so a run can never touch the real repo. init runs
+# through the REAL engine with an explicit scratch target. Scratch output lands in
+# TEMP/ (disposable). Run from the repo root: bash test/fixverify.sh
+set -u
+REAL="/c/Dev/321_STD"
+RENG="$REAL/AIDOCS/tools/engine.mjs"
+BASE="$REAL/TEMP/fixverify"
+PROJ="$BASE/proj"
+FRESH="$BASE/fresh"
+ENG="$PROJ/AIDOCS/tools/engine.mjs"
+FAILED=0
+pass(){ echo "  PASS: $1"; }
+fail(){ echo "  FAIL: $1"; FAILED=1; }
+
+rm -rf "$BASE"; mkdir -p "$PROJ/AIDOCS/ENV" "$PROJ/WDDOCS"
+cd "$PROJ"
+
+# --- Build the legacy OLD321 fixture (pre-bootstrap) ---
+mkdir -p AIDOCS/OLD321_MEMORY_ARCHIVE AIDOCS/OLD321_SESSION_ARCHIVE AIDOCS/OLD321_BACKLOG_ARCHIVE
+printf 'pruned memory history\n' > AIDOCS/OLD321_MEMORY_ARCHIVE/pruned.md
+printf 'pruned session history\n' > AIDOCS/OLD321_SESSION_ARCHIVE/pruned.md
+printf 'pruned backlog history\n' > AIDOCS/OLD321_BACKLOG_ARCHIVE/pruned.md
+
+cat > AIDOCS/OLD321_MEMORY.md <<'EOF'
+# OLD321 - MEMORY
+
+**Purpose:** identity.
+
+## Overview
+A real product overview.
+## Stack
+Node, ESM.
+## Architecture
+Engine in AIDOCS/tools.
+## Environment
+Local dev only.
+## Pipeline
+Manual deploy.
+## Conventions
+No em dashes.
+
+---
+
+## LIFO
+
+- a durable note
+EOF
+
+cat > AIDOCS/OLD321_MEMORY_EXTENDED.md <<'EOF'
+# OLD321 - MEMORY (Extended)
+
+**Purpose:** longer prose for MEMORY static + LIFO detail.
+
+## Overview
+Deeper overview narrative that must NOT become a LIFO bullet.
+## Stack
+Deeper stack narrative that must NOT become a LIFO bullet.
+## Architecture
+Deeper architecture narrative.
+## Environment
+Deeper environment narrative.
+## Pipeline
+Deeper pipeline narrative.
+## Conventions
+Deeper conventions narrative.
+
+---
+
+## LIFO
+
+### A Real Durable Decision
+We chose ESM because the runtime is modern. This is real depth.
+EOF
+
+printf '# OLD321 - SESSION\n\n**Purpose:** events.\n\n## Current State\n\nidle.\n\n---\n\n## LIFO\n\n- an event\n' > AIDOCS/OLD321_SESSION.md
+printf '# OLD321 - SESSION (Extended)\n\n**Purpose:** depth.\n\n## LIFO\n\n### Some Event\nbody\n' > AIDOCS/OLD321_SESSION_EXTENDED.md
+printf '# OLD321 - BACKLOG\n\n**Purpose:** forward.\n\n## Features\n\n- MARKER_BACKLOG_FEATURE shipping item\n\n## Ideas\n\n- MARKER_BACKLOG_IDEA exploratory item\n' > AIDOCS/OLD321_BACKLOG.md
+
+cat > AIDOCS/OLD321_DEV-AUDIT.md <<'EOF'
+# OLD321 - DEV-AUDIT
+
+**Purpose:** audit.
+
+## Project specifics
+
+MARKER_DEVAUDIT_REAL: build with `npm run build`, lint with eslint, 4-space indents.
+EOF
+
+cat > AIDOCS/OLD321_AUTO-PUSH.md <<'EOF'
+# OLD321 - AUTO-PUSH
+
+**Purpose:** release.
+
+## Project release steps
+
+MARKER_AUTOPUSH_REAL: bump version, update CHANGELOG, npm run build, wrangler deploy.
+EOF
+
+printf 'SECRET_KEY=do-not-touch-me\n' > AIDOCS/ENV/keys.md
+# A project-customized auto-memory: an edited canonical rule (marker) plus a custom-only rule.
+mkdir -p AIDOCS/automemory
+printf 'CUSTOM_RULE_MARKER: this project edited this canonical rule in place.\n' > AIDOCS/automemory/feedback_code_comments.md
+printf 'a project-only custom rule\n' > AIDOCS/automemory/feedback_project_custom.md
+printf '# OLD321\n\n@AGENTS.md\n' > CLAUDE.md
+printf '# OLD321\n\nlegacy agents.\n' > AGENTS.md
+printf '# Changelog\n\n## v1\n- legacy entry\n' > CHANGELOG.md
+printf 'node_modules/\n.env\nOLD_CUSTOM_IGNORE/\n' > .gitignore
+printf '# user doc\n\nkept verbatim.\n' > WDDOCS/userdoc.md
+mkdir -p .cursor
+printf 'ai rules\n' > .cursor/rules.md
+printf '# notes\n\nstray knowledge.\n' > NOTES.md
+printf '{"name":"old321","private":true,"engines":{"node":">=22"},"devDependencies":{"typescript":"^6"},"scripts":{"build":"tsc","lint":"eslint src"}}' > package.json
+
+echo "=== T1: init renaming - bootstrap over a foreign-named project skips data scaffolds ==="
+node "$RENG" init "$PROJ" --name NEW321 >/dev/null 2>&1
+[ ! -f AIDOCS/NEW321_MEMORY.md ] && pass "no NEW321_MEMORY.md laid at bootstrap rename" || fail "NEW321_MEMORY.md was laid at bootstrap (pollution)"
+[ ! -f AIDOCS/NEW321_DEV-AUDIT.md ] && pass "no NEW321_DEV-AUDIT.md laid at bootstrap rename" || fail "NEW321_DEV-AUDIT.md was laid at bootstrap (pollution)"
+[ -f AIDOCS/OLD321_MEMORY.md ] && pass "OLD321_MEMORY.md preserved at bootstrap" || fail "OLD321_MEMORY.md missing after bootstrap"
+[ -f "$ENG" ] && pass "engine copied into scratch at bootstrap" || fail "engine not copied into scratch"
+
+echo "=== T1c: bootstrap init preserves project auto-memory (write-if-missing, not overwrite) ==="
+grep -q 'CUSTOM_RULE_MARKER' AIDOCS/automemory/feedback_code_comments.md && pass "edited canonical rule preserved at bootstrap" || fail "edited canonical rule overwritten by canonical (data loss)"
+[ -f AIDOCS/automemory/feedback_project_custom.md ] && pass "custom-only rule preserved at bootstrap" || fail "custom-only rule lost at bootstrap"
+
+echo "=== T1b: init fresh - empty project DOES get data scaffolds ==="
+mkdir -p "$FRESH"
+node "$RENG" init "$FRESH" --name NEW321 >/dev/null 2>&1
+[ -f "$FRESH/AIDOCS/NEW321_MEMORY.md" ] && pass "fresh install lays NEW321_MEMORY.md" || fail "fresh install did not lay NEW321_MEMORY.md"
+
+echo "=== T2: migrate-archive sweeps data docs AND legacy *_ARCHIVE dirs ==="
+node "$ENG" migrate-archive --name NEW321 >/dev/null 2>&1
+ARCH="AIDOCS/NEW321_SETUP_ARCHIVE/AIDOCS"
+[ -z "$(ls AIDOCS | grep '^OLD321_' )" ] && pass "no OLD321_* left at AIDOCS root" || fail "OLD321_* still at AIDOCS root: $(ls AIDOCS | grep '^OLD321_')"
+[ -d "$ARCH/OLD321_MEMORY_ARCHIVE" ] && pass "legacy OLD321_MEMORY_ARCHIVE dir swept to archive" || fail "OLD321_MEMORY_ARCHIVE dir not swept"
+[ -d "$ARCH/OLD321_SESSION_ARCHIVE" ] && pass "legacy OLD321_SESSION_ARCHIVE dir swept" || fail "OLD321_SESSION_ARCHIVE dir not swept"
+[ -d "$ARCH/OLD321_BACKLOG_ARCHIVE" ] && pass "legacy OLD321_BACKLOG_ARCHIVE dir swept" || fail "OLD321_BACKLOG_ARCHIVE dir not swept"
+[ -f "$ARCH/OLD321_DEV-AUDIT.md" ] && pass "OLD321_DEV-AUDIT.md swept to archive" || fail "OLD321_DEV-AUDIT.md not in archive"
+[ -d "AIDOCS/NEW321_SETUP_ARCHIVE" ] && [ ! -d "$ARCH/NEW321_SETUP_ARCHIVE" ] && pass "SETUP_ARCHIVE itself not swept into itself" || fail "SETUP_ARCHIVE recursed into itself"
+[ -f AIDOCS/ENV/keys.md ] && pass "ENV/keys.md left in place (not archived)" || fail "ENV/keys.md was moved"
+
+echo "=== T3 (defense-in-depth): plant an empty NEW321_DEV-AUDIT.md beside the real OLD321 one in the archive ==="
+cat > "$ARCH/NEW321_DEV-AUDIT.md" <<'EOF'
+# NEW321 - DEV-AUDIT
+
+**Purpose:** audit.
+
+## Project specifics
+
+(fill in)
+EOF
+
+echo "=== reinstall (post-archive empty tree) ==="
+node "$RENG" init "$PROJ" --name NEW321 >/dev/null 2>&1
+[ -f AIDOCS/NEW321_MEMORY.md ] && pass "reinstall lays NEW321_MEMORY.md (renaming=false now)" || fail "reinstall did not lay NEW321_MEMORY.md"
+
+echo "=== T1d: project auto-memory archived for reconcile; reinstall lays canonical fresh ==="
+grep -q 'CUSTOM_RULE_MARKER' "$ARCH/automemory/feedback_code_comments.md" && pass "edited rule preserved in archive for reconcile merge" || fail "edited rule not in archive"
+[ -f AIDOCS/automemory/feedback_code_comments.md ] && ! grep -q 'CUSTOM_RULE_MARKER' AIDOCS/automemory/feedback_code_comments.md && pass "reinstall laid canonical auto-memory fresh (marker gone)" || fail "reinstall did not lay canonical auto-memory"
+
+echo "=== T5: reinstalled MEMORY_EXTENDED has no Big-6 mirror, has LIFO ==="
+if grep -qE '^## (Overview|Stack|Architecture|Environment|Pipeline|Conventions)$' AIDOCS/NEW321_MEMORY_EXTENDED.md; then fail "NEW321_MEMORY_EXTENDED still has Big-6 sections"; else pass "NEW321_MEMORY_EXTENDED has no Big-6 sections"; fi
+grep -q '^## LIFO' AIDOCS/NEW321_MEMORY_EXTENDED.md && pass "NEW321_MEMORY_EXTENDED has ## LIFO" || fail "NEW321_MEMORY_EXTENDED missing ## LIFO"
+grep -qE '^## (Overview|Stack|Architecture)$' AIDOCS/NEW321_MEMORY.md && pass "NEW321_MEMORY keeps Big-6 (correct)" || fail "NEW321_MEMORY lost its Big-6"
+
+echo "=== T3: migrate-restore picks the REAL OLD321 DEV-AUDIT content, not the empty NEW321 scaffold ==="
+node "$ENG" migrate-restore --name NEW321 >/dev/null 2>&1
+grep -q 'MARKER_DEVAUDIT_REAL' AIDOCS/NEW321_DEV-AUDIT.md && pass "DEV-AUDIT Project specifics restored from real source" || fail "DEV-AUDIT specifics NOT restored (empty scaffold shadowed it)"
+grep -q 'MARKER_AUTOPUSH_REAL' AIDOCS/NEW321_AUTO-PUSH.md && pass "AUTO-PUSH release steps restored from real source" || fail "AUTO-PUSH steps NOT restored"
+grep -q 'OLD_CUSTOM_IGNORE' .gitignore && pass ".gitignore union-merged (custom ignore preserved)" || fail ".gitignore custom ignore lost"
+grep -q 'kept verbatim' WDDOCS/userdoc.md && pass "WDDOCS restored verbatim" || fail "WDDOCS not restored"
+grep -q 'MARKER_BACKLOG_FEATURE' AIDOCS/NEW321_BACKLOG.md && pass "BACKLOG Features restored from archive" || fail "BACKLOG Features NOT restored"
+grep -q 'MARKER_BACKLOG_IDEA' AIDOCS/NEW321_BACKLOG.md && pass "BACKLOG Ideas restored from archive" || fail "BACKLOG Ideas NOT restored"
+
+echo "=== T4: migrate-import skips the legacy Big-6 mirror, keeps the real LIFO entry ==="
+IMP="$(node "$ENG" migrate-import --from "$ARCH/OLD321_MEMORY_EXTENDED.md" --skill memoryupdate --old OLD321 --new NEW321 --dry-run 2>&1)"
+echo "$IMP" | grep -q 'A Real Durable Decision' && pass "real LIFO entry imported" || fail "real LIFO entry NOT imported"
+if echo "$IMP" | grep -qiE '#\s+(Overview|Stack|Architecture|Environment|Pipeline|Conventions)'; then fail "Big-6 mirror section was imported as a bullet"; else pass "Big-6 mirror sections skipped on import"; fi
+
+echo "=== T6: verdict allows leave on a protected path (ENV), still rejects move on it ==="
+printf '[{"path":"AIDOCS/ENV/keys.md","type":"env","confidence":0.9,"action":"leave"}]\n' > "$BASE/v_leave.json"
+node "$ENG" verdict --validate "$BASE/v_leave.json" >/dev/null 2>&1 && pass "leave on AIDOCS/ENV accepted" || fail "leave on AIDOCS/ENV wrongly rejected"
+printf '[{"path":"AIDOCS/ENV/keys.md","type":"env","confidence":0.9,"action":"move"}]\n' > "$BASE/v_move.json"
+node "$ENG" verdict --validate "$BASE/v_move.json" >/dev/null 2>&1 && fail "move on AIDOCS/ENV wrongly accepted" || pass "move on AIDOCS/ENV still rejected (containment holds)"
+
+echo "=== T7: doctor does not crash (EISDIR) when a registry file resolves to a directory ==="
+rm -f AIDOCS/NEW321_BACKLOG.md && mkdir -p AIDOCS/NEW321_BACKLOG.md
+DOUT="$(node "$ENG" doctor 2>&1)"; DCODE=$?
+echo "$DOUT" | grep -q 'is not a regular file' && pass "doctor reports 'is not a regular file'" || fail "doctor did not report the dir-as-file"
+[ "$DCODE" = "20" ] && pass "doctor exits 20 (graceful), not 99 (crash)" || fail "doctor exit code was $DCODE (expected 20)"
+echo "$DOUT" | grep -qi 'EISDIR' && fail "doctor output contains EISDIR (crash)" || pass "no EISDIR in doctor output"
+
+echo "=== T8: verdict --suggest drafts stray AI-state, skips protected/source ==="
+SUGG="$PROJ/TEMP/suggest.json"
+node "$ENG" verdict --suggest --out "$SUGG" >/dev/null 2>&1
+grep -q '"\.cursor"' "$SUGG" && pass "verdict --suggest flags .cursor (move)" || fail ".cursor not suggested"
+grep -q 'NOTES.md' "$SUGG" && pass "verdict --suggest flags NOTES.md (copy)" || fail "NOTES.md not suggested"
+grep -q 'AIDOCS/ENV' "$SUGG" && fail "AIDOCS/ENV wrongly suggested" || pass "AIDOCS/ENV not suggested (protected)"
+grep -q 'package.json' "$SUGG" && fail "package.json wrongly suggested" || pass "package.json left unlisted (source/config)"
+node "$ENG" verdict --validate "$SUGG" >/dev/null 2>&1 && pass "suggested verdict validates clean" || fail "suggested verdict invalid"
+
+echo "=== T8b: verdict --suggest --out is contained to the project root ==="
+node "$ENG" verdict --suggest --out "$BASE/escape.json" >/dev/null 2>&1 && fail "out-of-root --out wrongly accepted" || pass "out-of-root --out rejected (containment)"
+[ ! -f "$BASE/escape.json" ] && pass "no draft written outside the root" || fail "escape.json written outside the root"
+
+echo "=== T8c: validate rejects an absolute verdict path on move ==="
+printf '[{"path":"%s/NOTES.md","type":"notes","confidence":0.6,"action":"move"}]\n' "$PROJ" > "$PROJ/TEMP/v_abs.json"
+node "$ENG" verdict --validate "$PROJ/TEMP/v_abs.json" >/dev/null 2>&1 && fail "absolute verdict path wrongly accepted" || pass "absolute verdict path rejected (must be relative)"
+
+echo "=== T9: bigsix drafts Stack/Pipeline from package.json ==="
+BS="$(node "$ENG" bigsix --suggest 2>&1)"
+echo "$BS" | grep -q 'Language: TypeScript' && pass "bigsix detects TypeScript" || fail "bigsix missed TypeScript"
+echo "$BS" | grep -q 'npm run build' && pass "bigsix lists the build script" || fail "bigsix missed the build script"
+
+echo "=== T10: doctor flags a skill body missing frontmatter description ==="
+SK="$PROJ/AIDOCS/SKILL/SKILL_SESSION-UPDATE.md"
+cp "$SK" "$SK.bak"
+grep -v '^description:' "$SK.bak" > "$SK"
+node "$ENG" doctor 2>&1 | grep -q "frontmatter missing description" && pass "doctor flags missing skill description" || fail "missing skill description not flagged"
+mv "$SK.bak" "$SK"
+
+echo "=== T11: doctor flags a fenced code block in EXTENDED (direct-edit hole) ==="
+EXT="$PROJ/AIDOCS/NEW321_MEMORY_EXTENDED.md"
+cp "$EXT" "$EXT.bak"
+printf '\n### Stray Code\n```js\nconst x = 1\n```\n' >> "$EXT"
+node "$ENG" doctor 2>&1 | grep -q "fenced code block" && pass "doctor flags code fence in EXTENDED" || fail "code fence in EXTENDED not flagged"
+mv "$EXT.bak" "$EXT"
+
+echo "=== T12: clear-reconcile refuses on a stale cross-project ref, --force overrides ==="
+node "$ENG" state --set-reconcile >/dev/null 2>&1
+MEM="$PROJ/AIDOCS/NEW321_MEMORY.md"
+cp "$MEM" "$MEM.bak"
+printf '\n- see OLD321_MEMORY.md for prior context\n' >> "$MEM"
+node "$ENG" state --clear-reconcile >/dev/null 2>&1 && fail "clear-reconcile wrongly cleared on cross-project ref" || pass "clear-reconcile refused on stale OLD321 ref"
+node "$ENG" state 2>&1 | grep -q '"reconcile_pending": true' && pass "gate stays set after refusal" || fail "gate did not stay set"
+node "$ENG" state --clear-reconcile --force >/dev/null 2>&1 && pass "clear-reconcile --force overrides" || fail "--force did not override"
+mv "$MEM.bak" "$MEM"
+
+echo "=== T13: doctor banned-prose scans restored WDDOCS ==="
+WD="$PROJ/WDDOCS/userdoc.md"
+cp "$WD" "$WD.bak"
+printf '\nThis line has an em dash \xe2\x80\x94 right here.\n' >> "$WD"
+node "$ENG" doctor 2>&1 | grep -q "em dash" && pass "doctor flags em dash in WDDOCS" || fail "em dash in WDDOCS not flagged"
+mv "$WD.bak" "$WD"
+
+echo "=== T14: init --privacy generates a tier-aware .gitignore (public gates, private tracks) ==="
+PUB="$BASE/pub"; PRIV="$BASE/priv"
+node "$RENG" init "$PUB"  --name PubProj  --privacy public  >/dev/null 2>&1
+node "$RENG" init "$PRIV" --name PrivProj --privacy private >/dev/null 2>&1
+grep -q '"privacy": "public"' "$PUB/AIDOCS/_index.json" && pass "public install records privacy public" || fail "public privacy not recorded"
+grep -q 'Privacy gate (public) - BEGIN' "$PUB/.gitignore" && pass "public .gitignore carries the gate" || fail "public .gitignore missing the gate"
+grep -q 'AIDOCS/automemory/\*' "$PUB/.gitignore" && pass "public gates auto-memory" || fail "public does not gate auto-memory"
+grep -q 'AIDOCS/\*_ARCHIVE\.md' "$PUB/.gitignore" && pass "public gates pruned <doc>_ARCHIVE.md" || fail "public does not gate the pruned archive files"
+[ -f "$PUB/AIDOCS/automemory/.gitkeep" ] && pass "public lays automemory/.gitkeep skeleton" || fail "no automemory/.gitkeep on public"
+grep -q '"privacy": "private"' "$PRIV/AIDOCS/_index.json" && pass "private install records privacy private" || fail "private privacy not recorded"
+grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && fail "private .gitignore wrongly carries the gate" || pass "private .gitignore has no gate"
+grep -qE '^TEMP/$' "$PRIV/.gitignore" && pass "private still ignores TEMP (Tier C)" || fail "private dropped the Tier C TEMP ignore"
+grep -qE '/WDDOCS/RELEASES/\*' "$PRIV/.gitignore" && pass "private keeps RELEASES always-local" || fail "private dropped the always-local RELEASES ignore"
+
+echo "=== T14b: init with no --privacy defaults to private ==="
+DEF="$BASE/def"
+node "$RENG" init "$DEF" --name DefProj >/dev/null 2>&1
+grep -q '"privacy": "private"' "$DEF/AIDOCS/_index.json" && pass "no-flag install defaults private" || fail "default privacy is not private"
+
+echo "=== T15: privacy --set flips the gate, preserves custom ignores, updates the registry ==="
+printf '\nCUSTOM_USER_IGNORE/\n' >> "$PRIV/.gitignore"
+node "$PRIV/AIDOCS/tools/engine.mjs" privacy --set public >/dev/null 2>&1
+grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && pass "privacy --set public adds the gate" || fail "set public did not add the gate"
+grep -q '"privacy": "public"' "$PRIV/AIDOCS/_index.json" && pass "set public updates the registry" || fail "set public did not update the registry"
+node "$PRIV/AIDOCS/tools/engine.mjs" privacy --set private >/dev/null 2>&1
+grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && fail "set private left the gate behind" || pass "privacy --set private removes the gate"
+grep -q 'CUSTOM_USER_IGNORE' "$PRIV/.gitignore" && pass "custom ignore survived the flip" || fail "custom ignore lost on flip"
+
+echo "=== T16: doctor warns (not fails) on privacy drift - registry public, .gitignore has no gate ==="
+DRIFT="$BASE/drift"
+node "$RENG" init "$DRIFT" --name DriftProj --privacy private >/dev/null 2>&1
+node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f));j.privacy="public";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$DRIFT/AIDOCS/_index.json"
+DR="$(node "$DRIFT/AIDOCS/tools/engine.mjs" doctor 2>&1)"
+echo "$DR" | grep -qi "no public gate" && pass "doctor warns on public-mode drift" || fail "doctor missed the public drift"
+echo "$DR" | grep -q "structure clean" && pass "drift is a warning, doctor still passes" || fail "drift wrongly failed doctor"
+
+echo "=== T17: a 'full' project (the template repo) is exempt from the drift check and refuses --set ==="
+FULLP="$BASE/fullp"
+node "$RENG" init "$FULLP" --name FullProj --privacy private >/dev/null 2>&1
+node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f));j.privacy="full";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FULLP/AIDOCS/_index.json"
+node "$FULLP/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -A1 "Privacy gate" | grep -q "ok" && pass "full project: Privacy gate ok (exempt)" || fail "full project flagged by the privacy check"
+node "$FULLP/AIDOCS/tools/engine.mjs" privacy --set public >/dev/null 2>&1 && fail "privacy --set wrongly flipped a full project" || pass "privacy --set refused on a full project"
+grep -q '"privacy": "full"' "$FULLP/AIDOCS/_index.json" && pass "full registry unchanged after the refusal" || fail "full registry was modified"
+
+echo "=== T18: init --force is refused on an existing 321 project (data-loss guard), allowed on fresh ==="
+FRC="$BASE/forced"
+node "$RENG" init "$FRC" --name ForcedProj >/dev/null 2>&1            # fresh -> becomes a 321 project
+FOUT="$(node "$RENG" init "$FRC" --name ForcedProj --force 2>&1)"; FCODE=$?
+[ "$FCODE" != "0" ] && pass "init --force refused on existing-321 (exit $FCODE)" || fail "init --force wrongly accepted on existing-321"
+echo "$FOUT" | grep -qi "data-loss path" && pass "refusal explains the data-loss reason" || fail "refusal message unclear"
+FRF="$BASE/forcefresh"; mkdir -p "$FRF"
+node "$RENG" init "$FRF" --name FreshForce --force >/dev/null 2>&1 && pass "init --force still accepted on a fresh target" || fail "init --force wrongly refused on a fresh target"
+
+echo "=== T19: WDDOCS prose is warning-tier (doctor stays clean); core authored prose is error-tier ==="
+TP="$BASE/prosetier"
+node "$RENG" init "$TP" --name ProseTier >/dev/null 2>&1
+TPENG="$TP/AIDOCS/tools/engine.mjs"
+node "$TPENG" doctor >/dev/null 2>&1 && pass "fresh project doctor clean (baseline)" || fail "fresh project doctor not clean at baseline"
+mkdir -p "$TP/WDDOCS/DESIGN"
+printf '# Design notes\n\nA user design line with a semicolon; in it.\n' > "$TP/WDDOCS/DESIGN/notes.md"
+WOUT="$(node "$TPENG" doctor 2>&1)"; WCODE=$?
+echo "$WOUT" | grep -q "WDDOCS prose" && pass "WDDOCS semicolon reported under WDDOCS prose" || fail "WDDOCS prose not reported"
+[ "$WCODE" = "0" ] && pass "WDDOCS prose is warning-tier (doctor exits 0)" || fail "WDDOCS prose wrongly failed doctor (exit $WCODE)"
+printf '\nA capture line with a semicolon; here.\n' >> "$TP/AIDOCS/ProseTier_MEMORY.md"
+CCODE=0; node "$TPENG" doctor >/dev/null 2>&1 || CCODE=$?
+[ "$CCODE" != "0" ] && pass "core authored semicolon is error-tier (doctor exits $CCODE)" || fail "core authored semicolon did not fail doctor"
+node "$TPENG" doctor 2>&1 | grep -A3 "\[Banned prose\]" | grep -q "ProseTier_MEMORY" && pass "core semicolon listed under Banned prose (error)" || fail "core semicolon not under Banned prose"
+
+echo "=== T20: --name validation rejects path-bearing names (migrate-archive / restore / verdict) ==="
+NV="$BASE/namevalid"
+node "$RENG" init "$NV" --name NameValid >/dev/null 2>&1
+NVENG="$NV/AIDOCS/tools/engine.mjs"
+node "$NVENG" migrate-archive --name "../evil" >/dev/null 2>&1; RC=$?; [ "$RC" = "5" ] && pass "migrate-archive rejects ../evil (exit 5)" || fail "migrate-archive accepted a path-bearing name (exit $RC)"
+node "$NVENG" migrate-restore --name "a/b" >/dev/null 2>&1; RC=$?; [ "$RC" != "0" ] && pass "migrate-restore rejects a/b (exit $RC)" || fail "migrate-restore accepted a/b"
+printf '[]' > "$NV/TEMP/v.json"; node "$NVENG" verdict --apply "$NV/TEMP/v.json" --name "x;y" >/dev/null 2>&1; RC=$?; [ "$RC" != "0" ] && pass "verdict --apply rejects x;y (exit $RC)" || fail "verdict --apply accepted x;y"
+
+echo "=== T21: fetch-engine recreates INSTALL/ after a graduation-style removal ==="
+FE="$BASE/fetchgrad"
+node "$RENG" init "$FE" --name FetchGrad >/dev/null 2>&1
+rm -rf "$FE/INSTALL"
+mkdir -p "$BASE/fesrc"; printf 'x' > "$BASE/fesrc/marker.txt"
+node "$FE/AIDOCS/tools/engine.mjs" fetch-engine --from "$BASE/fesrc" >/dev/null 2>&1
+[ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -Sync)" || fail "fetch-engine did not recreate INSTALL/"
+
+echo "=== T22: auto-prune creates <doc>_ARCHIVE.md on demand (no pre-seeded folder needed) ==="
+PR="$BASE/prunetest"
+node "$RENG" init "$PR" --name PruneTest >/dev/null 2>&1
+PRENG="$PR/AIDOCS/tools/engine.mjs"
+# Over-cap MEMORY.md (memoryupdate.memory cap is 150): a ## LIFO of 160 plain bullets.
+{ printf '# PruneTest - MEMORY\n\n**Purpose:** prune test.\n\n## LIFO\n\n'; for n in $(seq 1 160); do printf -- '- legacy bullet %s\n' "$n"; done; } > "$PR/AIDOCS/PruneTest_MEMORY.md"
+# One fresh bullet, then commit (commit applies it, then auto-prune fires - reconcile is not pending on a fresh init).
+printf '{"actions":[{"op":"lifo_insert","file":"memoryupdate.memory","section":"LIFO","bullet":"a fresh protected bullet"}]}\n' > "$PR/AIDOCS/tools/staging/memoryupdate.json"
+rm -f "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md"
+PCOUT="$(node "$PRENG" commit --skill memoryupdate 2>&1)"; PCC=$?
+[ "$PCC" = "0" ] && pass "commit+auto-prune exits 0 with no pre-seeded archive" || fail "commit/prune failed (exit $PCC): $PCOUT"
+[ -f "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md" ] && pass "auto-prune created PruneTest_MEMORY_ARCHIVE.md on demand" || fail "prune did NOT create the archive file"
+grep -q 'legacy bullet' "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md" 2>/dev/null && pass "pruned bullets archived (recovery net intact)" || fail "no pruned content in archive"
+grep -q 'a fresh protected bullet' "$PR/AIDOCS/PruneTest_MEMORY.md" && pass "fresh bullet protected from prune" || fail "fresh bullet was wrongly pruned"
+
+echo ""
+if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
+exit $FAILED
