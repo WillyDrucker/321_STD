@@ -2,6 +2,14 @@
 
 **Purpose:** The read-and-execute runbook for onboarding a project. The install process runs it to finish onboarding (the assistant executes it directly once the engine is laid), and the `-Setup` skill re-runs it for a manual re-onboard. The depth lives here, not in the skill body. This file is ephemeral - it sits under `INSTALL/`, which `graduate` removes once the project is steady.
 
+## Operating rule (run it through, do not stop to ask)
+
+This is part of the install, not a menu. Execute it end to end on your own. Do not stop to ask the user how to proceed, which mode to run, or how to finish, and never offer a destructive "fresh overwrite" of an existing project - that is the data-loss path this runbook exists to avoid (`init --force` is refused on an existing project for the same reason).
+
+The reason it is safe to run unattended: migration is **non-destructive**. Every archiving step moves content into `AIDOCS/<PROJECT>_SETUP_ARCHIVE` (move, never delete), so the archive is the recovery net and a missing git repo is **not** a blocker - nothing is lost even with no version control to fall back on. Mode auto-detects (see below), so you do not ask which one to run.
+
+The only sanctioned stop is the end: the **reconcile gate** for a migration (hand off to `/321 -Update`), or the optional first-commit offer for a fresh fill. Run straight through to there.
+
 ## Roles (script first, AI for judgment)
 
 Every step is one of three kinds, and each AI step has a script backstop so a no-AI run still completes:

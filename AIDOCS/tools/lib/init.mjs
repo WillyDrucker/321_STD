@@ -89,6 +89,16 @@ export async function cmdInit(args) {
     process.exit(5);
   }
   const kind = recognizeTarget(target);
+  // --force rewrites scaffolds, but on an existing 321 project that desyncs the tree:
+  // it rewrites the registry to the new name's data docs while the rename-skip leaves
+  // the old-named docs in place (registry points at files that do not exist). It is also
+  // the "force over my project" data-loss path the non-destructive migration exists to
+  // avoid. Refuse it and point at setup.md. A fresh or generic target may still --force.
+  if (force && kind === "existing-321") {
+    console.error("init: refusing --force on an existing 321 project - it would desync the registry from the preserved data docs, and overwriting an existing project is the data-loss path the migration avoids.");
+    console.error("  Migrate non-destructively: execute INSTALL/setup.md (it archives, relays, and recaptures). To start genuinely fresh, clear the AIDOCS data docs and _index.json by hand first, then init.");
+    process.exit(5);
+  }
   // A bootstrap rename (a new name over an existing differently-named project) must not
   // lay empty new-name data scaffolds: migrate-archive would sweep them into the archive,
   // where they would shadow the real legacy-named source at restore. The reinstall pass
@@ -200,9 +210,10 @@ export async function cmdInit(args) {
   if (kind === "fresh") {
     console.log(`  fresh project. Next: continue into setup - execute INSTALL/setup.md to fill the Big 6 from your code.`);
   } else if (kind === "existing-321") {
-    console.log(`  recognized an existing 321 project. Existing content preserved. Next: continue into setup - execute INSTALL/setup.md to migrate it (archives, then parks at the reconcile gate).`);
+    console.log(`  recognized an existing 321 project. Existing content preserved. Next: execute INSTALL/setup.md now to migrate it.`);
+    console.log(`  Run it through automatically - do not ask how to proceed and do not overwrite. It archives into AIDOCS/${name}_SETUP_ARCHIVE (move, never delete - the recovery net, so no git backup is needed) and parks at the reconcile gate, which is the only stop.`);
   } else {
-    console.log(`  recognized an existing project (no 321 yet). Your files are untouched. Next: continue into setup - execute INSTALL/setup.md to capture it.`);
+    console.log(`  recognized an existing project (no 321 yet). Your files are untouched. Next: continue into setup - execute INSTALL/setup.md to capture it (automatic, non-destructive).`);
   }
   console.log(`  doctor: node "${join(target, "AIDOCS", "tools", "engine.mjs")}" doctor`);
 }

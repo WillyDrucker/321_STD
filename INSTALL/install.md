@@ -25,7 +25,7 @@ The bootstrap script runs the mechanical steps 1-6, then the install continues i
 4. **Scaffold.** `init <target> --name <NAME> [--privacy <mode>]` lays the skeleton - engine, skills, auto-memory, data files with the name substituted, and `INSTALL/` with these runbooks. The `.gitignore` is generated for the privacy mode (not copied), so a public install gates the project's own knowledge from the start. A reinstall (the migration relay) recalls the mode from the registry, then the archive, so it is not lost.
 5. **Register and health-check.** `sync` builds the skill dispatch, `doctor` validates the shape. On a fresh scaffold doctor must pass. On an existing project the install does not fail on doctor - a preserved legacy `AGENTS.md` or unscrubbed `CHANGELOG` makes pre-migration findings expected, and the migration reconciles them - so they report and the install continues.
 6. **Init git (fresh only).** `git init` if a fresh target is not already a repo. An existing project is left as the user has it - its version control is the user's call, not the installer's.
-7. **Run setup.** The assistant driving the install then executes `INSTALL/setup.md` to finish onboarding (fresh fill or migration, auto-detected). Setup is part of the install, not a separate step the user has to invoke - it never depends on the `/321 -Setup` skill being loaded, since the runbook is executed directly.
+7. **Run setup.** The assistant driving the install then executes `INSTALL/setup.md` to finish onboarding (fresh fill or migration, auto-detected). Setup is part of the install, not a separate step the user has to invoke - it never depends on the `/321 -Setup` skill being loaded, since the runbook is executed directly. Run it through automatically: do not stop to ask how to proceed or which mode to use, and never offer to overwrite an existing project. Migration is non-destructive (it archives, never deletes), so it is safe to run with no git backup, and the only stop is the reconcile gate at the end.
 
 A migration runs the full capture and stops at the reconcile gate, where `/321 -Update` takes over. The project is usable throughout.
 
@@ -33,7 +33,7 @@ A migration runs the full capture and stops at the reconcile gate, where `/321 -
 
 The same command serves a fresh or an existing project, and it is non-destructive. `init` recognizes what is already there before it writes, and reports it:
 
-- **Existing 321 project** (a `.claude/skills/321/`, an `_index.json`, or `*_MEMORY` / `*_SESSION` data docs, even malformed) - existing content is preserved in place. Migration runs next as part of the install (the assistant executes `setup.md`: archive the known shape, sweep the rest, reinstall fresh, restore, then capture).
+- **Existing 321 project** (a `.claude/skills/321/`, an `_index.json`, or `*_MEMORY` / `*_SESSION` data docs, even malformed) - existing content is preserved in place. Migration runs next as part of the install (the assistant executes `setup.md`: archive the known shape, sweep the rest, reinstall fresh, restore, then capture). This is automatic and non-destructive - the assistant does not ask whether to migrate or offer a fresh overwrite, and `init --force` is refused here, because overwriting an existing project is the data-loss path migration is built to avoid.
 - **Existing project, no 321 yet** - your files are untouched, the canonical structure is laid around them, and setup captures the project into the Big 6.
 - **Fresh** - the full skeleton is written and setup fills the Big 6 from your code.
 
