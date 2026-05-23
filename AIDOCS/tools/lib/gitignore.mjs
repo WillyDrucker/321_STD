@@ -13,9 +13,9 @@
 //     engine, build output, and the always-local WDDOCS lanes (RELEASES deploy
 //     runbooks, SESSION_HANDOFF status). Ignored in every mode.
 //
-// 321_STD's own .gitignore is hand-maintained ("full" mode) and not generated here:
-// it ships its memory + auto-memory as the product template, so it tracks Tier B on
-// purpose while still hiding WDDOCS. privacy refuses to regenerate a "full" project.
+// The 321 template repo's own .gitignore is hand-maintained ("full" mode), not
+// generated here: it ships its memory + auto-memory as the product template, so it
+// tracks Tier B on purpose while hiding WDDOCS. privacy refuses a "full" project.
 
 export const PRIVACY_MODES = ["public", "private", "full"];
 

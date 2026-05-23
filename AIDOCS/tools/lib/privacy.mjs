@@ -26,7 +26,7 @@ export function cmdPrivacy(index, args) {
   }
 
   if (!["public", "private"].includes(set)) {
-    console.error('privacy --set <public | private>. ("full" is the 321_STD template repo - set it by hand.)');
+    console.error('privacy --set <public | private>. ("full" is the 321 template repo - set it by hand.)');
     process.exit(5);
   }
   // "full" ships its memory + auto-memory as the product template, so its .gitignore is

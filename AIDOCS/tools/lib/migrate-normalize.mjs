@@ -5,7 +5,7 @@
 
 function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
-// Legacy 321_STD token normalization: an old 321 install is a valid migration
+// Legacy 321 token normalization: an old 321 install is a valid migration
 // source, so its renamed skill flag, doc name, and SKILLS dir map to the canonical
 // ones as the content lands.
 export function normalizeLegacy(content) {
