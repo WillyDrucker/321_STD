@@ -13,12 +13,16 @@ description: The daily driver. Chains -SessionUpdate then -MemoryUpdate in one p
 - **reconciliation** - gate-triggered, not a flag. When the post-migration `reconcile_pending` gate is set, the default invocation runs the reconciliation pass instead of the chain.
 - **-Sync** - update the engine itself from upstream, project data untouched.
 
+## Routing (decide first, run silently)
+
+Choose the pass before anything else and do not narrate the choice. A routine run produces no "gate is clear, this is the normal chain" preamble - the routing is plumbing, not output.
+
+1. **`graduated: true` in `_index.json`** - onboarding is over and reconciliation can never apply again. Go straight to [The chain (default)](#the-chain-default), silently. No gate read. The router already loaded `_index.json`, so this check costs nothing, and it is the steady state for nearly every run over a project's life.
+2. **Otherwise, read the gate once** - `node AIDOCS/tools/engine.mjs state`. `reconcile_pending: true` routes to the one post-migration reconciliation pass below. `false` or absent routes to the default chain, run silently.
+
 ## Reconciliation pass (post-migration gate)
 
-Read the gate before anything else: `node AIDOCS/tools/engine.mjs state`. The `reconcile_pending` field is the Setup-to-Update handoff. A migration (`/321 -Setup`) captures the prior project additively and stops, setting this gate. Reconciliation is the distillation Setup deferred, and this pass is where it happens.
-
-- **`reconcile_pending: true`** - this run is the reconciliation pass. Announce it ("Post-migration reconciliation - distilling the raw capture."), then follow this section instead of the default chain.
-- **`reconcile_pending: false` (or absent)** - the normal chain. Do not mention the gate. Proceed to The chain (default) silently. The gate is plumbing, not something to narrate on a routine update.
+Routing sent you here: a pre-graduation project with `reconcile_pending: true`, the Setup-to-Update handoff. A migration (`/321 -Setup`) captures the prior project additively and stops, setting the gate. Reconciliation is the distillation Setup deferred, and this pass is where it happens. Announce it once ("Post-migration reconciliation - distilling the raw capture."), then follow this section instead of the default chain.
 
 **Roles (AI leads, the scripts back it, the AI verifies).** Reconcile is the high-judgment phase, the inverse of install and setup. The AI owns the calls a script cannot make - which captured bullets still matter, how each lane is finally shaped, what folds where. The scripts own the mechanical backend: `migrate-import --audit` diffs the archive against the distilled result, `doctor` gates structure and house-voice, `commit` applies any staged odds-and-ends, `graduate` tears the tier down. The close is an explicit AI verification (the acceptance checks plus the archive-alignment walk below), so nothing the capture held is dropped without a decision. The backstop: with no AI, none of this runs and the capture stays parked at the gate, losslessly, until an AI session distills it.
 
@@ -146,7 +150,7 @@ Keep the project's engine current with its upstream. This refreshes engine code,
 
 ## Rules
 
-- **Reconciliation gate first, silent when off.** Read `reconcile_pending` before the chain. Set means this run is the post-migration reconciliation pass (direct-edit distillation, clear the gate, then graduate). Off means the normal chain, never mention the gate.
+- **Route silently, graduated skips the gate.** A `graduated: true` project (the steady state) goes straight to the default chain - no gate read, no mention of reconciliation. Only a pre-graduation project reads `reconcile_pending`: set is the reconciliation pass (direct-edit distillation, clear the gate, then graduate), off is the normal chain. The routing is never narrated either way.
 - **Thin orchestrator (default).** No staging, no ops here - the lanes own their writes.
 - **Order is fixed.** SESSION first (events), then MEMORY (the state events imply), so the memory lane distills against a fresh backbone.
 - **Stop on a failed lane.** A failed SESSION commit halts the chain before MEMORY runs.
