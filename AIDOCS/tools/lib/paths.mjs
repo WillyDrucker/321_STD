@@ -90,7 +90,7 @@ export function claudeMemoryDir(root) {
 
 // Store the external path home-relative ("~/.claude/...") so a tracked _index.json never
 // bakes in an absolute home path (the username and machine layout). fromHomeRef expands
-// it back to absolute for filesystem ops; a non-home path is passed through unchanged.
+// it back to absolute for filesystem ops. A non-home path is passed through unchanged.
 export function toHomeRef(abs) {
   const home = memoryHome();
   return abs.startsWith(home) ? `~${abs.slice(home.length)}`.replace(/\\/g, "/") : abs.replace(/\\/g, "/");

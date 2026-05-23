@@ -74,7 +74,7 @@ Write `AIDOCS/tools/staging/memoryupdate.json`. Never edit MEMORY / BACKLOG dire
 }
 ```
 
-**Extended detail (the `[+]` pair).** When a durable observation needs more than a line or two of rationale, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `memoryupdate.memory_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Keep `body_md` prose, no code fences (the validator rejects them, the code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them. Use `drop` / `replace` (by anchor) to edit an existing sub-section.
+**Extended detail (the `[+]` pair).** When a durable observation needs more than a line or two of rationale, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `memoryupdate.memory_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
 ## Step 6: Validate + commit
 

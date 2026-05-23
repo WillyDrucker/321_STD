@@ -4,12 +4,16 @@
 // recovery net. Operates on the active root (--root). Known-shape paths only - the
 // AI discovery sweep (verdict.mjs) covers the rest, routing into the same archive.
 // Idempotent, so the sweep can lean on it as needed: it skips what is already
-// moved, making re-runs safe.
+// moved, making re-runs safe. The one exception to move-only: it re-lays a canonical
+// .gitignore at root right after archiving the old one, so the project is never without
+// ignore rules during the reinstall (the old copy is preserved in the archive for the
+// migrate-restore union-merge).
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { flag, validName } from "./args.mjs";
+import { buildGitignore } from "./gitignore.mjs";
 import { installLog } from "./installLog.mjs";
 import { fromHomeRef, repoRoot } from "./paths.mjs";
 
@@ -27,14 +31,18 @@ export function cmdMigrateArchive(args) {
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   let moved = 0;
 
-  // Read the external memory path (auto_memory.path, the runtime source of truth) before
-  // the move loop carries _index.json into the archive, so the project's live rules can be
-  // snapshotted below. Empty / unset (a pre-rebuild or path-less project) means nothing to grab.
-  let externalDir = null;
+  // Read the registry before the move loop carries _index.json into the archive: the
+  // external memory path (auto_memory.path, the runtime source of truth) so the project's
+  // live rules can be snapshotted below, and the privacy mode so the .gitignore re-lay
+  // below matches it. Empty / unset (a pre-rebuild or path-less project) means nothing to
+  // grab, and privacy defaults to the safe "private".
+  let externalDir = null, privacy = "private";
   try {
-    const ref = JSON.parse(readFileSync(join(root, "AIDOCS", "_index.json"), "utf8")).auto_memory?.path;
+    const idx = JSON.parse(readFileSync(join(root, "AIDOCS", "_index.json"), "utf8"));
+    if (idx.privacy) privacy = idx.privacy;
+    const ref = idx.auto_memory?.path;
     if (ref) { const ext = fromHomeRef(ref); if (existsSync(ext)) externalDir = ext; }
-  } catch { /* no registry or no external path - nothing to snapshot */ }
+  } catch { /* no registry - default privacy, nothing to snapshot */ }
 
   for (const rel of KNOWN) {
     const src = join(root, rel);
@@ -45,6 +53,16 @@ export function cmdMigrateArchive(args) {
     renameSync(src, dst);
     moved++;
   }
+
+  // Re-lay a canonical .gitignore the instant the old one is archived, so the project is
+  // never left bare between here and the reinstall's init - a window that spans the
+  // discovery sweep and a network engine fetch, where a concurrent `git add` would stage
+  // ignored content (node_modules, TEMP, secrets). The reinstall's init is write-if-missing
+  // so it preserves this file, and migrate-restore union-merges the archived custom lines
+  // back. Every privacy mode's Tier C ignores are identical, so the gate holds either way.
+  const giRoot = join(root, ".gitignore");
+  let gitignoreRelaid = false;
+  if (!existsSync(giRoot)) { writeFileSync(giRoot, buildGitignore(privacy), "utf8"); gitignoreRelaid = true; }
 
   // The project's data docs (AIDOCS/*_*.md - memory / session / backlog / audit and
   // their extendeds, whatever the prefix) and the legacy auto-prune archive dirs the old
@@ -88,5 +106,6 @@ export function cmdMigrateArchive(args) {
 
   const tail = `${skillSnapshot ? " + snapshotted AIDOCS/SKILL" : ""}${externalSnapshot ? " + captured external memory" : ""}`;
   console.log(`migrate-archive: moved ${moved} path(s)${tail} into ${archive} (move, not delete - the recovery net).`);
-  installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE.`);
+  if (gitignoreRelaid) console.log("migrate-archive: re-laid a canonical .gitignore at the project root (closes the no-ignore window before reinstall).");
+  installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE${gitignoreRelaid ? ", re-laid root .gitignore" : ""}.`);
 }

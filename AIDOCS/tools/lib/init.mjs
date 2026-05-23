@@ -54,7 +54,7 @@ function recognizeTarget(target) {
 // Recall a project's recorded privacy across a reinstall so a migration keeps its mode:
 // the live registry first, then the post-archive copy in SETUP_ARCHIVE (migrate-archive
 // moves _index.json there). Default private - the safe default tracks everything, so a
-// missed call cannot silently hide a private project; a public repo passes --privacy.
+// missed call cannot silently hide a private project. A public repo passes --privacy.
 async function recallPrivacy(target, name) {
   for (const p of [
     join(target, "AIDOCS", "_index.json"),
@@ -68,7 +68,7 @@ async function recallPrivacy(target, name) {
 
 // Recall a recorded external-memory path across a reinstall (the live registry, then the
 // post-archive copy in SETUP_ARCHIVE), so a re-migration keeps the folder it already uses.
-// A legacy project recorded it absolute; a rebuilt one home-relative - either is returned
+// A legacy project recorded it absolute, a rebuilt one home-relative - either is returned
 // as stored and normalized to absolute by the caller.
 async function recallMemoryPath(target, name) {
   for (const p of [
@@ -124,7 +124,7 @@ export async function cmdInit(args) {
   const target = resolve(process.cwd(), targetArg);
   if (canonicalPath(SOURCE_ROOT) === canonicalPath(target)) { console.error("init: refusing to scaffold over the source project."); process.exit(5); }
   // Privacy mode gates what the project tracks (Tier B: memory, auto-memory, WDDOCS docs).
-  // Explicit --privacy wins; else recall a reinstall's mode, else default private.
+  // Explicit --privacy wins, else recall a reinstall's mode, else default private.
   let privacy = flag(args, "--privacy");
   if (!privacy) privacy = await recallPrivacy(target, name);
   if (!PRIVACY_MODES.includes(privacy)) {
@@ -199,7 +199,7 @@ export async function cmdInit(args) {
   // scaffold too. An existing data file is left for the -Setup migration to archive.
   // Resolve and record Claude Code's external memory path (auto_memory.path) - the runtime
   // source of truth. Stored home-relative so a tracked _index.json carries no absolute home
-  // path; the seed below copies the canonical rules into it.
+  // path. The seed below copies the canonical rules into it.
   const memAbs = await resolveMemoryPath(args, target, name);
   const memRef = toHomeRef(memAbs);
   const scaffolds = [];

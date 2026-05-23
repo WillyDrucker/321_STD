@@ -2,8 +2,9 @@
 // never fixes. Errors (registry resolves, memory and session shapes intact, every
 // [+] bullet paired with its EXTENDED sub-section, auto-memory pointers match, no
 // banned prose) exit non-zero so install and the reconcile gate can gate on them.
-// Warnings (LIFO over cap, unresolved import markers) are expected mid-migration
-// and clear as the reconcile pass distills (DEV-AUDIT anchor: fail at gates).
+// Warnings split two ways: reconcile warnings (LIFO over cap, unresolved import
+// markers) clear as the reconcile pass distills, advisory warnings (privacy drift,
+// WDDOCS prose) are steady-state and gate nothing (DEV-AUDIT anchor: fail at gates).
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -37,7 +38,12 @@ export function cmdDoctor(index) {
     "Privacy drift":  checkPrivacyDrift(index),
     "WDDOCS prose":   checkWddocsProse(index),
   };
-  let errors = 0, warns = 0;
+  // Caps and import residue are reconcile targets - a migration capture distills them
+  // to zero. Privacy drift and WDDOCS prose are steady-state advisories no distillation
+  // clears, so the summary counts the two classes apart instead of calling every warning
+  // a reconcile leftover (which misreads on a graduated project).
+  const RECONCILE_WARN = new Set(["Size caps", "Import residue"]);
+  let errors = 0, reconcileWarns = 0, otherWarns = 0;
   for (const [name, issues] of Object.entries(errorChecks)) {
     console.log(`[${name}]`);
     if (issues.length === 0) { console.log("  ok"); continue; }
@@ -47,12 +53,18 @@ export function cmdDoctor(index) {
   for (const [name, issues] of Object.entries(warnChecks)) {
     console.log(`[${name}]`);
     if (issues.length === 0) { console.log("  ok"); continue; }
-    warns += issues.length;
+    if (RECONCILE_WARN.has(name)) reconcileWarns += issues.length; else otherWarns += issues.length;
     for (const i of issues) console.log(`  - ${i} (warning)`);
   }
-  if (errors === 0 && warns === 0) { console.log("\ndoctor: all checks passed."); return; }
-  if (errors === 0) { console.log(`\ndoctor: structure clean, ${warns} reconcile warning(s) - expected mid-migration, cleared by distillation.`); return; }
-  console.log(`\ndoctor: ${errors} issue(s)${warns ? `, ${warns} warning(s)` : ""} found.`);
+  if (errors === 0 && reconcileWarns === 0 && otherWarns === 0) { console.log("\ndoctor: all checks passed."); return; }
+  if (errors === 0) {
+    const msgs = [];
+    if (reconcileWarns) msgs.push(`${reconcileWarns} reconcile warning(s) - expected mid-migration, cleared by distillation`);
+    if (otherWarns) msgs.push(`${otherWarns} advisory warning(s) - steady-state (privacy / WDDOCS prose), not a reconcile target`);
+    console.log(`\ndoctor: structure clean. ${msgs.join(". ")}.`);
+    return;
+  }
+  console.log(`\ndoctor: ${errors} issue(s)${reconcileWarns + otherWarns ? `, ${reconcileWarns + otherWarns} warning(s)` : ""} found.`);
   process.exit(20);
 }
 

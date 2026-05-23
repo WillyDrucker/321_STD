@@ -147,6 +147,12 @@ ARCH="AIDOCS/NEW321_SETUP_ARCHIVE/AIDOCS"
 [ -f "$ARCH/OLD321_DEV-AUDIT.md" ] && pass "OLD321_DEV-AUDIT.md swept to archive" || fail "OLD321_DEV-AUDIT.md not in archive"
 [ -d "AIDOCS/NEW321_SETUP_ARCHIVE" ] && [ ! -d "$ARCH/NEW321_SETUP_ARCHIVE" ] && pass "SETUP_ARCHIVE itself not swept into itself" || fail "SETUP_ARCHIVE recursed into itself"
 [ -f AIDOCS/ENV/keys.md ] && pass "ENV/keys.md left in place (not archived)" || fail "ENV/keys.md was moved"
+# Hardening: the old .gitignore is archived, but a canonical one is re-laid at root the
+# same step, so there is no bare-root window before the reinstall's init where a concurrent
+# `git add` could stage ignored content (node_modules, secrets).
+[ -f .gitignore ] && pass "migrate-archive re-laid .gitignore (no bare-root window)" || fail "root left without a .gitignore after migrate-archive"
+grep -qE '^node_modules/$' .gitignore && pass "re-laid .gitignore carries Tier C (node_modules ignored in the window)" || fail "re-laid .gitignore missing node_modules"
+[ -f "AIDOCS/NEW321_SETUP_ARCHIVE/.gitignore" ] && grep -q 'OLD_CUSTOM_IGNORE' "AIDOCS/NEW321_SETUP_ARCHIVE/.gitignore" && pass "original .gitignore preserved in the archive for the union-merge" || fail "original .gitignore not archived"
 
 echo "=== T3 (defense-in-depth): plant an empty NEW321_DEV-AUDIT.md beside the real OLD321 one in the archive ==="
 cat > "$ARCH/NEW321_DEV-AUDIT.md" <<'EOF'

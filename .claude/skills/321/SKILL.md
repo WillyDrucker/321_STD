@@ -34,4 +34,4 @@ Unknown flag -> list the available flags from `skills.dispatch` and exit. Do not
 
 - **Resolve and load.** The router does not duplicate sub-skill logic.
 - **Body paths come from `_index.json`.** Do not hardcode them here.
-- **Registration is mechanical.** A skill body in `AIDOCS/SKILL/` plus `sync` registers it - no router edit needed.
+- **Registration is mechanical.** A skill body in `AIDOCS/SKILL/` plus `sync` registers it for dispatch - adding one needs no router edit. The quick-ref above is a human usage hint, reconciled by hand at graduation when `-Setup` is deregistered (`-Update` Phase 2).

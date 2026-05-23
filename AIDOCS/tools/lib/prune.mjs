@@ -59,11 +59,15 @@ export function autoPrune(index, editedKeys, fresh) {
     const ext = extPath && existsSync(extPath) ? readFileSync(extPath, "utf8") : null;
     const r = trim(readFileSync(mainPath, "utf8"), ext, size.cap, size.prune_to, isProtected);
     if (!r) continue;
-    writeFileSync(mainPath, r.main, "utf8");
-    if (extPath && r.extended != null) writeFileSync(extPath, r.extended, "utf8");
+    // Archive before removing from the live files, so a failed append leaves the over-cap
+    // content in place (a warning, never a loss) - the "move, not delete" recovery-net
+    // contract. A write failure after a good append at worst duplicates into the archive,
+    // which is recoverable, where the reverse order would lose the dropped entries.
     const archivePath = mainPath.replace(/\.md$/, "_ARCHIVE.md");
     const header = existsSync(archivePath) ? "" : "# Archive\n\n**Purpose:** Pruned LIFO overflow, kept as the recovery net. Appended as files pass their cap.\n";
     appendFileSync(archivePath, `${header}\n${r.archived.join("\n\n")}\n`, "utf8");
+    writeFileSync(mainPath, r.main, "utf8");
+    if (extPath && r.extended != null) writeFileSync(extPath, r.extended, "utf8");
     console.log(`commit: pruned ${r.archived.length} entr${r.archived.length === 1 ? "y" : "ies"} from ${key} into ${archivePath.split(/[\\/]/).pop()} (move, not delete).`);
   }
 }
