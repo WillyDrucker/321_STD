@@ -4,9 +4,9 @@
 // path, excluding INSTALL / .git / TEMP / node_modules so it never recurses).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
 import { flag } from "./args.mjs";
 import { installEngineDir } from "./paths.mjs";
@@ -18,6 +18,9 @@ export async function cmdFetchEngine(args) {
   const repo = flag(args, "--repo");
   const ref = flag(args, "--ref") || "main";
   const dest = installEngineDir();
+  // graduate removes INSTALL/ entirely, so a post-graduation -Update -Sync has no
+  // parent for INSTALL/engine. Recreate it (no-op when INSTALL/ already exists).
+  mkdirSync(dirname(dest), { recursive: true });
   if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
 
   if (from) {

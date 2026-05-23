@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { flag } from "./args.mjs";
+import { flag, validName } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
@@ -22,7 +22,7 @@ const KNOWN = ["AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore", "AIDOCS/_
 
 export function cmdMigrateArchive(args) {
   const name = flag(args, "--name");
-  if (!name || name.startsWith("--")) { console.error("migrate-archive needs --name <PROJECT>"); process.exit(5); }
+  if (!validName(name)) { console.error("migrate-archive needs --name <PROJECT> (letter, then letters / digits / _ / - only)"); process.exit(5); }
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   let moved = 0;

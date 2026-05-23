@@ -12,7 +12,7 @@ Install from 321done.ai/std as MY_PROJECT
 
 Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321done.ai/std` and runs the install. The project is usable immediately, and setup runs as part of the install - it fills the Big 6 on a fresh project, or migrates an existing one.
 
-**Existing project?** Same prompt. Your files are preserved, and setup migrates what is already there, including a legacy 321 install. It captures everything first, then `/321 -Update` reconciles it into final shape.
+**Existing project?** Same prompt, and your assistant runs it straight through without asking. Your files are preserved, and setup migrates what is already there, including a legacy or stale 321 install, by archiving first and never deleting. Then `/321 -Update` reconciles it into final shape.
 
 ### What the install writes
 
@@ -44,6 +44,6 @@ Runs in the current directory and names the project after the folder. Override t
 ## Documentation
 
 - **`AGENTS.md`** - the orchestrator: cold-start load order, hard rules, project specifics.
-- **`WDDOCS/DESIGN/SYSTEM.md`** - the system model plus the install / setup / reconcile lifecycle.
+- **`INSTALL/install.md` + `INSTALL/setup.md`** - the install and setup runbooks: the fresh-fill and migration lifecycle, step by step.
 - **`AIDOCS/_index.json`** - the registry: paths, file keys, buckets, size caps, and the canonical skill dispatch.
 - **`node AIDOCS/tools/engine.mjs help`** - the engine command surface in one read.

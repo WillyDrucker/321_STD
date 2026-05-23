@@ -11,7 +11,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 
-import { flag } from "./args.mjs";
+import { flag, validName } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { repoRoot } from "./paths.mjs";
 
@@ -165,7 +165,7 @@ export function cmdVerdict(args) {
   if (!apply) { console.log(`verdict: well-formed (${entries.length} entr${entries.length === 1 ? "y" : "ies"}).`); return; }
 
   const name = flag(args, "--name");
-  if (!name || name.startsWith("--")) { console.error("verdict --apply needs --name <PROJECT>"); process.exit(5); }
+  if (!validName(name)) { console.error("verdict --apply needs --name <PROJECT> (letter, then letters / digits / _ / - only)"); process.exit(5); }
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   const counts = { move: 0, copy: 0, leave: 0, kept: 0, missing: 0 };
   for (const e of entries) {

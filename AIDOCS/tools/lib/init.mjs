@@ -9,7 +9,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { flag } from "./args.mjs";
+import { flag, validName } from "./args.mjs";
 import { buildGitignore, PRIVACY_MODES } from "./gitignore.mjs";
 import { installLog } from "./installLog.mjs";
 import { SOURCE_ROOT } from "./paths.mjs";
@@ -73,7 +73,7 @@ export async function cmdInit(args) {
     process.exit(5);
   }
   const name = flag(args, "--name");
-  if (!name || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(name)) {
+  if (!validName(name)) {
     console.error("init requires --name <PROJECT> (start with a letter, then letters / digits / _ / - only).");
     process.exit(5);
   }

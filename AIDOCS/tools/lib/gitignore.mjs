@@ -119,8 +119,9 @@ export function hasPrivacyBlock(text) {
 }
 
 // Remove the public privacy block (between the markers) wherever it sits, leaving
-// every other line - custom ignores, the migrate-restore tail - untouched.
-export function stripPrivacyBlock(text) {
+// every other line - custom ignores, the migrate-restore tail - untouched. Internal:
+// applyPrivacy is the only caller.
+function stripPrivacyBlock(text) {
   const lines = text.split("\n");
   const out = [];
   let inside = false;

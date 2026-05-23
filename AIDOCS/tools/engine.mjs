@@ -112,7 +112,7 @@ Commands:
   verdict   Validate or apply a migration verdict (the AI's scan result), a JSON
             array of {path, type, confidence, action}: --validate <file>, or
             --apply <file> --name <PROJECT> (move / copy to the archive, or leave).
-            --suggest drafts a candidate verdict from a heuristic scan, for AI review.
+            --suggest [--out <file>] drafts a candidate verdict from a heuristic scan, for AI review.
   bigsix    --suggest    Draft the two script-readable Big-6 sections (Stack +
             Pipeline) from package.json, for the MemoryUpdate fill to refine.
   graduate  Tear down onboarding: deregister -Setup, remove INSTALL/, mark graduated.
@@ -120,7 +120,8 @@ Commands:
   init      Lay the project skeleton into a target, substituting the name. --privacy
             sets the tracking mode (private default, public gates the project's own
             knowledge local). A reinstall recalls the mode from the registry / archive.
-            <target-dir> --name <PROJECT> [--privacy <public | private>]
+            <target-dir> --name <PROJECT> [--privacy <public | private>] [--force]
+            (--force rewrites the scaffold; refused on an existing 321 project)
   help      Print this message.
 `);
 }
