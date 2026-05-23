@@ -26,6 +26,7 @@ export function cmdDoctor(index) {
     "Orphan pairs":         checkOrphans(index),
     "Auto-memory pointers": checkAutoMemory(index),
     "Banned prose":         checkProse(index),
+    "Privacy gate":         checkPrivacyLeak(index),
   };
   // Warnings do not fail the run. A capture lands additively over cap with import
   // markers still in place, so these are expected mid-migration - the reconcile pass
@@ -33,7 +34,7 @@ export function cmdDoctor(index) {
   const warnChecks = {
     "Size caps":      checkCaps(index),
     "Import residue": checkResidue(index),
-    "Privacy gate":   checkPrivacy(index),
+    "Privacy drift":  checkPrivacyDrift(index),
     "WDDOCS prose":   checkWddocsProse(index),
   };
   let errors = 0, warns = 0;
@@ -212,21 +213,32 @@ function checkResidue(index) {
   return issues;
 }
 
-// The .gitignore matches the recorded privacy mode. A public project must carry the
-// gate block (else its memory / auto-memory / WDDOCS could be tracked); a private one
-// must not. "full" (the template repo) is hand-maintained and an unset mode is a legacy
-// project - both skip. A warning, not an error: drift surfaces at the gate without
-// blocking the install or reconcile, and `privacy --set` fixes it.
-function checkPrivacy(index) {
-  const issues = [];
+// A public project not gating its own knowledge is a leak: Tier B (memory, auto-memory,
+// WDDOCS, the pruned *_ARCHIVE.md overflow) would be committed to an open repo. A missing
+// .gitignore leaks in any mode, since Tier C secrets would track too. Error-tier
+// (DEV-AUDIT anchor: fail at the gate where the damage is real). "full" (the template
+// repo) is hand-maintained and an unset mode is a legacy project - both skip.
+function checkPrivacyLeak(index) {
   const mode = index.privacy;
-  if (!mode || mode === "full") return issues;
+  if (!mode || mode === "full") return [];
   const giAbs = fromRoot("./.gitignore");
-  if (!existsSync(giAbs)) { issues.push("privacy is set but .gitignore is missing"); return issues; }
-  const has = hasPrivacyBlock(readFileSync(giAbs, "utf8"));
-  if (mode === "public" && !has) issues.push('privacy is "public" but .gitignore has no public gate - memory / auto-memory / WDDOCS may be tracked (run privacy --set public)');
-  if (mode === "private" && has) issues.push('privacy is "private" but .gitignore still carries the public gate (run privacy --set private)');
-  return issues;
+  if (!existsSync(giAbs)) return ["privacy is set but .gitignore is missing - secrets and project knowledge would be tracked"];
+  if (mode === "public" && !hasPrivacyBlock(readFileSync(giAbs, "utf8"))) {
+    return ['privacy is "public" but .gitignore has no public gate - memory / auto-memory / WDDOCS / pruned archives would be tracked (run privacy --set public)'];
+  }
+  return [];
+}
+
+// A private project still carrying the public gate is drift, not a leak: it over-ignores
+// its own knowledge (keeps Tier B local when private would track it), nothing is exposed.
+// Warning-tier, fixed by `privacy --set private`.
+function checkPrivacyDrift(index) {
+  if (index.privacy !== "private") return [];
+  const giAbs = fromRoot("./.gitignore");
+  if (existsSync(giAbs) && hasPrivacyBlock(readFileSync(giAbs, "utf8"))) {
+    return ['privacy is "private" but .gitignore still carries the public gate (run privacy --set private)'];
+  }
+  return [];
 }
 
 // Em dashes and semicolons in our authored prose (prose.mjs owns the target set and

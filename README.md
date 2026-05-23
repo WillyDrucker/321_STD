@@ -30,7 +30,7 @@ iwr -useb https://raw.githubusercontent.com/WillyDrucker/321_STD/main/install.ps
 curl -fsSL https://raw.githubusercontent.com/WillyDrucker/321_STD/main/install.sh | bash
 ```
 
-Runs in the current directory and names the project after the folder. Override the name with `STD321_NAME` (or `-Name` / `--name`) and the location with `STD321_TARGET` (or `-Target` / `--target`). The script runs `init` + `sync` + `doctor`, runs `git init` on a fresh project, then points you to setup - an assistant runs `INSTALL/setup.md` to finish onboarding (fresh fill or migration).
+Runs in the current directory and names the project after the folder. Override the name with `STD321_NAME` (or `-Name` / `--name`), the location with `STD321_TARGET` (or `-Target` / `--target`), and the tracking mode with `STD321_PRIVACY` (or `-Privacy` / `--privacy`) - `private` (default) tracks the project's own knowledge, `public` gates it local so only the framework ships. The script runs `init` + `sync` + `doctor`, runs `git init` on a fresh project, then points you to setup - an assistant runs `INSTALL/setup.md` to finish onboarding (fresh fill or migration).
 
 ## The /321 skills
 

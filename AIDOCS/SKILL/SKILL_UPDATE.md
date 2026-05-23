@@ -68,7 +68,7 @@ These lanes are direct curated edits gated by doctor, the same mechanism as the 
 7. **Auto-memory is canonical plus the kept profile** - no re-added standalone rules, every pointer matched. Doctor's auto-memory check confirms the pointers both ways.
 8. **Config docs are reconciled.** DEV-AUDIT Project specifics deduped against the baseline, AUTO-PUSH release steps are the project's real cycle (or on placeholder when there is no signal), CHANGELOG in house voice.
 9. **AGENTS stays lean.** Archived orchestrator content folded into MEMORY / DEV-AUDIT, no routed block bloating the index, the Hard-rules pointers resolve (doctor confirms).
-10. **Every filled Big-6 section carries its `### <Section> Decisions` sub-section.** The capture fills these, so this is a confirm pass - a filled Overview / Stack / Architecture / Environment / Pipeline / Conventions whose Decisions block is missing gets one (even "(none yet)"), so the why travels with the what. Doctor does not gate this, so check it by eye.
+10. **Every filled Big-6 section carries its rationale inline.** MEMORY holds the Big 6 with the why woven into each section, not as a separate sub-section (EXTENDED is LIFO depth only, no Big-6 mirror). This is a confirm pass - a filled Overview / Stack / Architecture / Environment / Pipeline / Conventions that gives the what without the why gets the rationale folded in, so the two travel together. Doctor does not gate this, so check it by eye.
 
 **Close the pass.** First audit each distilled lane against its archive - the verify of what took and what did not. Point `--audit` at the same archived EXTENDED Setup imported from:
 

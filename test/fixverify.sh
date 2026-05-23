@@ -8,7 +8,7 @@
 # through the REAL engine with an explicit scratch target. Scratch output lands in
 # TEMP/ (disposable). Run from the repo root: bash test/fixverify.sh
 set -u
-REAL="/c/Dev/321_STD"
+REAL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RENG="$REAL/AIDOCS/tools/engine.mjs"
 BASE="$REAL/TEMP/fixverify"
 PROJ="$BASE/proj"
@@ -102,7 +102,7 @@ cat > AIDOCS/OLD321_AUTO-PUSH.md <<'EOF'
 MARKER_AUTOPUSH_REAL: bump version, update CHANGELOG, npm run build, wrangler deploy.
 EOF
 
-printf 'SECRET_KEY=do-not-touch-me\n' > AIDOCS/ENV/keys.md
+printf 'local-only env note (fixture) - never archived or committed\n' > AIDOCS/ENV/keys.md
 # A project-customized auto-memory: an edited canonical rule (marker) plus a custom-only rule.
 mkdir -p AIDOCS/automemory
 printf 'CUSTOM_RULE_MARKER: this project edited this canonical rule in place.\n' > AIDOCS/automemory/feedback_code_comments.md
@@ -276,13 +276,20 @@ node "$PRIV/AIDOCS/tools/engine.mjs" privacy --set private >/dev/null 2>&1
 grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && fail "set private left the gate behind" || pass "privacy --set private removes the gate"
 grep -q 'CUSTOM_USER_IGNORE' "$PRIV/.gitignore" && pass "custom ignore survived the flip" || fail "custom ignore lost on flip"
 
-echo "=== T16: doctor warns (not fails) on privacy drift - registry public, .gitignore has no gate ==="
+echo "=== T16: public-without-gate is a leak ERROR; private-with-gate is a drift warning ==="
 DRIFT="$BASE/drift"
 node "$RENG" init "$DRIFT" --name DriftProj --privacy private >/dev/null 2>&1
+# leak: registry says public but the .gitignore has no gate, so Tier B would track
 node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f));j.privacy="public";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$DRIFT/AIDOCS/_index.json"
-DR="$(node "$DRIFT/AIDOCS/tools/engine.mjs" doctor 2>&1)"
-echo "$DR" | grep -qi "no public gate" && pass "doctor warns on public-mode drift" || fail "doctor missed the public drift"
-echo "$DR" | grep -q "structure clean" && pass "drift is a warning, doctor still passes" || fail "drift wrongly failed doctor"
+DR="$(node "$DRIFT/AIDOCS/tools/engine.mjs" doctor 2>&1)"; DRC=$?
+echo "$DR" | grep -qi "no public gate" && pass "doctor flags public-without-gate" || fail "doctor missed the public leak"
+[ "$DRC" = "20" ] && pass "public-without-gate is an ERROR (leak fails doctor)" || fail "public leak did not fail doctor (exit $DRC)"
+# drift: registry says private but a public gate lingers, so it over-gates (no leak)
+node "$RENG" init "$BASE/drift2" --name Drift2 --privacy public >/dev/null 2>&1
+node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f));j.privacy="private";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$BASE/drift2/AIDOCS/_index.json"
+D2="$(node "$BASE/drift2/AIDOCS/tools/engine.mjs" doctor 2>&1)"; D2C=$?
+echo "$D2" | grep -qi "still carries the public gate" && pass "doctor warns on private-with-gate drift" || fail "doctor missed the private drift"
+[ "$D2C" = "0" ] && pass "private-with-gate drift is a warning, doctor still passes" || fail "private drift wrongly failed doctor (exit $D2C)"
 
 echo "=== T17: a 'full' project (the template repo) is exempt from the drift check and refuses --set ==="
 FULLP="$BASE/fullp"
