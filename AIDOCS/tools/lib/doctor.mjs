@@ -56,7 +56,7 @@ export function cmdDoctor(index) {
   process.exit(20);
 }
 
-// Every registered path and file resolves on disk, the auto-memory source exists,
+// Every registered path and file resolves on disk, the auto-memory seed exists,
 // and every bucket / size key points at a real file key (no drift).
 function checkRegistry(index) {
   const issues = [];
@@ -68,8 +68,8 @@ function checkRegistry(index) {
     if (!existsSync(abs)) issues.push(`file "${k}" -> ${p} does not exist`);
     else if (!isFile(abs)) issues.push(`file "${k}" -> ${p} is not a regular file`);
   }
-  const src = index.auto_memory?.source;
-  if (src && !existsSync(fromRoot(src))) issues.push(`auto_memory.source -> ${src} does not exist`);
+  const seed = index.auto_memory?.seed ?? index.auto_memory?.source;   // legacy key honored
+  if (seed && !existsSync(fromRoot(seed))) issues.push(`auto_memory seed -> ${seed} does not exist`);
   const fileKeys = new Set(Object.keys(index.files || {}));
   for (const k of Object.keys(index.buckets || {})) if (!fileKeys.has(k)) issues.push(`bucket key "${k}" has no matching file`);
   for (const k of Object.keys(index.sizes || {})) if (!fileKeys.has(k)) issues.push(`size key "${k}" has no matching file`);
@@ -157,7 +157,11 @@ function checkSkillBodies(index) {
 function checkAutoMemory(index) {
   const issues = [];
   const agentsRel = index.paths?.agents_md;
-  const srcRel = index.auto_memory?.source;
+  // The AGENTS Hard-rules mirror is checked against the in-repo seed (auto_memory.seed),
+  // the shippable canonical set. The runtime source of truth is the external Claude memory
+  // (auto_memory.path), which may carry extra project-custom rules - not a mirror concern.
+  // Legacy auto_memory.source (pre-seed/path schema) is honored so the rename is non-breaking.
+  const srcRel = index.auto_memory?.seed ?? index.auto_memory?.source;
   if (!agentsRel || !srcRel) return issues;
   const agentsAbs = fromRoot(agentsRel);
   const dirAbs = fromRoot(srcRel);

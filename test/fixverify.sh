@@ -14,6 +14,10 @@ BASE="$REAL/TEMP/fixverify"
 PROJ="$BASE/proj"
 FRESH="$BASE/fresh"
 ENG="$PROJ/AIDOCS/tools/engine.mjs"
+# Redirect Claude Code's external-memory home under the scratch tree, so init's auto-memory
+# seeding lands here (each scratch project gets its own key-derived folder) and never touches
+# the real ~/.claude. Cleared with $BASE at the top of every run.
+export STD321_MEMORY_HOME="$BASE/home"
 FAILED=0
 pass(){ echo "  PASS: $1"; }
 fail(){ echo "  FAIL: $1"; FAILED=1; }
@@ -383,6 +387,34 @@ SARCH="$SS/AIDOCS/SkillSnap_SETUP_ARCHIVE/AIDOCS/SKILL"
 [ -f "$SARCH/SKILL_AUTO-PUSH.md" ] && pass "SKILL snapshotted into the archive" || fail "SKILL not snapshotted into archive"
 grep -q 'CUSTOM_SKILL_MARKER' "$SARCH/SKILL_AUTO-PUSH.md" 2>/dev/null && pass "in-place customization preserved in the snapshot" || fail "customization not in the snapshot"
 [ -f "$SS/AIDOCS/SKILL/SKILL_AUTO-PUSH.md" ] && grep -q 'CUSTOM_SKILL_MARKER' "$SS/AIDOCS/SKILL/SKILL_AUTO-PUSH.md" && pass "live SKILL kept (copy, not move)" || fail "live SKILL was moved, not copied"
+
+echo "=== T26: init seeds Claude's external memory from the seed and records auto_memory.path ==="
+SE="$BASE/seedext"
+node "$RENG" init "$SE" --name SeedExt >/dev/null 2>&1
+grep -q '"seed": "./AIDOCS/automemory"' "$SE/AIDOCS/_index.json" && pass "auto_memory.seed recorded (the shippable seed)" || fail "auto_memory.seed missing"
+grep -qE '"path": ".+"' "$SE/AIDOCS/_index.json" && pass "auto_memory.path recorded (the external home)" || fail "auto_memory.path empty or missing"
+[ -f "$SE/AIDOCS/automemory/feedback_code_comments.md" ] && pass "in-project seed kept (rides in the repo)" || fail "in-project seed missing"
+SEDIR="$(ls -d "$BASE"/home/.claude/projects/*seedext*/memory 2>/dev/null | head -1)"
+[ -n "$SEDIR" ] && [ -f "$SEDIR/feedback_code_comments.md" ] && pass "canonical rules seeded into Claude's external memory" || fail "external memory not seeded"
+[ -f "$SEDIR/MEMORY.md" ] && pass "external memory index (MEMORY.md) seeded" || fail "external MEMORY.md not seeded"
+
+echo "=== T27: migrate-archive snapshots the external memory (source of truth) into SETUP_ARCHIVE ==="
+ME="$BASE/memext"
+node "$RENG" init "$ME" --name MemExt >/dev/null 2>&1
+MEDIR="$(ls -d "$BASE"/home/.claude/projects/*memext*/memory 2>/dev/null | head -1)"
+printf 'a project-only external rule\n' > "$MEDIR/feedback_project_custom.md"
+node "$ME/AIDOCS/tools/engine.mjs" migrate-archive --name MemExt >/dev/null 2>&1
+SNAP="$ME/AIDOCS/MemExt_SETUP_ARCHIVE/external-automemory"
+[ -f "$SNAP/feedback_project_custom.md" ] && pass "external custom rule snapshotted into the archive" || fail "external memory not snapshotted"
+[ -f "$MEDIR/feedback_project_custom.md" ] && pass "external memory left in place (copy, not move - live global state)" || fail "external memory was moved/deleted"
+
+echo "=== T28: legacy auto_memory.source still passes doctor (the seed rename is non-breaking) ==="
+LG="$BASE/legacyam"
+node "$RENG" init "$LG" --name LegacyAm >/dev/null 2>&1
+# rewrite the registry to the pre-rebuild schema: auto_memory.source, no seed/path
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={source:"./AIDOCS/automemory"};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$LG/AIDOCS/_index.json"
+node "$LG/AIDOCS/tools/engine.mjs" doctor >/dev/null 2>&1 && pass "doctor passes on legacy auto_memory.source" || fail "doctor failed on legacy source schema"
+node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -A1 "Auto-memory pointers" | grep -q "ok" && pass "auto-memory mirror check stays active on legacy source (fallback honored)" || fail "auto-memory check went inert on legacy source"
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi

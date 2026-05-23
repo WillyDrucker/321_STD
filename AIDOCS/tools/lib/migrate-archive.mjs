@@ -6,12 +6,12 @@
 // Idempotent, so the sweep can lean on it as needed: it skips what is already
 // moved, making re-runs safe.
 
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { flag, validName } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
-import { repoRoot } from "./paths.mjs";
+import { fromHomeRef, repoRoot } from "./paths.mjs";
 
 // Known 321-shape paths moved aside (relative to the root). The engine scripts
 // (tools), the router, and ENV stay in place. Auto-memory is archived too - its
@@ -26,6 +26,15 @@ export function cmdMigrateArchive(args) {
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   let moved = 0;
+
+  // Read the external memory path (auto_memory.path, the runtime source of truth) before
+  // the move loop carries _index.json into the archive, so the project's live rules can be
+  // snapshotted below. Empty / unset (a pre-rebuild or path-less project) means nothing to grab.
+  let externalDir = null;
+  try {
+    const ref = JSON.parse(readFileSync(join(root, "AIDOCS", "_index.json"), "utf8")).auto_memory?.path;
+    if (ref) { const ext = fromHomeRef(ref); if (existsSync(ext)) externalDir = ext; }
+  } catch { /* no registry or no external path - nothing to snapshot */ }
 
   for (const rel of KNOWN) {
     const src = join(root, rel);
@@ -68,7 +77,16 @@ export function cmdMigrateArchive(args) {
   const skillDst = join(archive, "AIDOCS", "SKILL");
   if (existsSync(skillSrc) && !existsSync(skillDst)) { cpSync(skillSrc, skillDst, { recursive: true }); skillSnapshot = true; }
 
-  const tail = skillSnapshot ? " + snapshotted AIDOCS/SKILL" : "";
+  // Snapshot the external Claude memory (the runtime source of truth) into the archive so
+  // the reconcile merge can weigh the project's real rules + profile. Copy, not move - it
+  // is Claude Code's live global state: read it, never delete it.
+  let externalSnapshot = false;
+  if (externalDir) {
+    const dst = join(archive, "external-automemory");
+    if (!existsSync(dst)) { cpSync(externalDir, dst, { recursive: true }); externalSnapshot = true; }
+  }
+
+  const tail = `${skillSnapshot ? " + snapshotted AIDOCS/SKILL" : ""}${externalSnapshot ? " + captured external memory" : ""}`;
   console.log(`migrate-archive: moved ${moved} path(s)${tail} into ${archive} (move, not delete - the recovery net).`);
   installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

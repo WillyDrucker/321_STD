@@ -6,6 +6,7 @@
 // operate on a separate target without being copied into it.
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -66,4 +67,34 @@ export function canonicalPath(p) {
 export function isContained(root, candidate) {
   const rel = relative(canonicalPath(root), canonicalPath(candidate));
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+// The home base for Claude Code's per-project memory. STD321_MEMORY_HOME overrides it so
+// the test suite can redirect seeding into a scratch tree instead of the real ~/.claude.
+function memoryHome() { return process.env.STD321_MEMORY_HOME || homedir(); }
+
+// Claude Code's native per-project memory directory for a project root - the runtime
+// source of truth, loaded by the harness each session (the in-project AIDOCS/automemory
+// is only the shippable seed). The harness keys the folder off the project cwd with the
+// drive letter lowercased and the colon, separators, and underscores collapsed to "-"
+// (observed in Claude Code 2.1.x: c:\Dev\321_STD -> c--Dev-321-STD). Derived once at
+// install and recorded in _index.json (auto_memory.path), so later passes read the
+// recorded value rather than re-deriving against an encoding that can shift between
+// Claude Code versions. Returns an absolute path (the dir need not exist yet).
+export function claudeMemoryKey(root) {
+  return resolve(root).replace(/^([A-Za-z]):/, (_, d) => `${d.toLowerCase()}:`).replace(/[:\\/_]/g, "-");
+}
+export function claudeMemoryDir(root) {
+  return join(memoryHome(), ".claude", "projects", claudeMemoryKey(root), "memory");
+}
+
+// Store the external path home-relative ("~/.claude/...") so a tracked _index.json never
+// bakes in an absolute home path (the username and machine layout). fromHomeRef expands
+// it back to absolute for filesystem ops; a non-home path is passed through unchanged.
+export function toHomeRef(abs) {
+  const home = memoryHome();
+  return abs.startsWith(home) ? `~${abs.slice(home.length)}`.replace(/\\/g, "/") : abs.replace(/\\/g, "/");
+}
+export function fromHomeRef(ref) {
+  return ref?.startsWith("~") ? join(memoryHome(), ref.slice(1)) : ref;
 }

@@ -32,7 +32,7 @@ Setup, commands, secrets, and platform notes live in `AIDOCS/ENV/`. Read on dema
 
 ## Hard rules
 
-Perfect copy of the auto-memory inventory in `AIDOCS/automemory`. This surface keeps the rules visible in the orchestrator at session start. Source of truth for each rule lives in the linked `feedback_*.md` file. Link targets are auto-memory filenames - resolve them through `AIDOCS/automemory`.
+Mirror of the auto-memory inventory, so the rules stay visible in the orchestrator at session start and to agents without native memory loading. The runtime source of truth is Claude's native memory (the registry's `auto_memory.path`), seeded at install from `AIDOCS/automemory` (`auto_memory.seed`). Link targets are seed filenames - resolve them through `AIDOCS/automemory`.
 
 - [Code comments](feedback_code_comments.md) - comments that earn their space. Worth writing: module headers, constraints, failure modes, contracts. Surplus context goes to a doc.
 - [Doc purpose header](feedback_doc_purpose_header.md) - every project MD file gets a **Purpose:** callout after the H1.

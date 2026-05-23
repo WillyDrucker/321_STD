@@ -57,7 +57,8 @@
     }
   },
   "auto_memory": {
-    "source": "./AIDOCS/automemory"
+    "seed": "./AIDOCS/automemory",
+    "path": ""
   },
   "engine": {
     "version": "0.1.0",
