@@ -32,7 +32,7 @@ Default is no change - most sessions produce project work, not memory-track work
 
 Always run `/321 -SessionUpdate` first, so SESSION is current before this skill reads it. If it fails, stop and report.
 
-**Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), skip Step 1 - Setup's SESSION capture already ran this pass. `migrate-import` has already scavenged the archived MEMORY_EXTENDED depth 1:1, so do not re-derive those entries - fill the Big 6 from the code scan plus the archive (the initial project check), add durable observations the import did not carry, and sweep BACKLOG. Capture additively, the reconciliation pass distills later.
+**Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), skip Step 1 - Setup's SESSION capture already ran this pass. `migrate-import` has already scavenged the archived MEMORY_EXTENDED depth 1:1, so do not re-derive those entries - fill the Big 6 from the code scan plus the archive (the initial project check), and add durable observations the import did not carry. Leave BACKLOG alone here: `migrate-restore` already carried it in and the reconciliation pass sweeps it. Capture additively, the reconciliation pass distills later.
 
 ## Step 2: Gather context
 

@@ -31,7 +31,7 @@ Read the gate before anything else: `node AIDOCS/tools/engine.mjs state`. The `r
 - **Drop** exact duplicates and entries whose code no longer exists.
 - **Rewrite** any raw or over-long `[+]` headline into a descriptive bullet whose text matches its `### heading`. The engine slugifies the bullet text to resolve the anchor, so the two must read the same.
 - **Bring both lanes under cap by judgment**, not by leaning on auto-prune, which drops the bottom-most rather than the least valuable. Re-merging loses nothing, it reshapes the additive raw into a curated steady state.
-- **Sweep BACKLOG** against the restored `WDDOCS` (`RELEASES/`, `DESIGN/`, and the rest).
+- **Sweep BACKLOG.** `migrate-restore` carried the archived Features + Ideas in verbatim - dedupe and prune that real content against the restored `WDDOCS` (`RELEASES/`, `DESIGN/`, and the rest). A non-321 source carries no BACKLOG, so there it is derived from `WDDOCS` instead.
 - **Sort migration content to the bottom** of each LIFO. Captured history is older than the project's live history, so it sits below it. Routine updates after the migration land on top as usual.
 - **Refresh SESSION Current State.** The capture wrote it before this pass, so it still describes the project as awaiting reconcile (the gate, the "run `/321 -Update`" note). Rewrite it to the reconciled, steady reality - the project is migrated and about to graduate, not parked at the gate.
 

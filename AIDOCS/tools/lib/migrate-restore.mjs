@@ -2,11 +2,11 @@
 // migrate-archive. After init relays a clean structure, this layers the project's
 // own content back from AIDOCS/<NAME>_SETUP_ARCHIVE/: user docs (WDDOCS) verbatim, a
 // union-merge of the archived .gitignore so custom ignores are never dropped, the
-// project sections of the config docs (DEV-AUDIT specifics, AUTO-PUSH release steps)
-// copied verbatim with legacy + rename normalization, and CHANGELOG verbatim. The
-// knowledge files (MEMORY / SESSION / Big-6) are not restored here - they are
-// captured and distilled through -Update instead, and so is the dedup / reformat of
-// the sections this lane copies. ENV is left in place by migrate-archive.
+// section-shaped docs (DEV-AUDIT specifics, AUTO-PUSH release steps, the BACKLOG
+// Features + Ideas lists) copied verbatim with legacy + rename normalization, and
+// CHANGELOG verbatim. The knowledge files (MEMORY / SESSION / Big-6) are not restored
+// here - they are captured and distilled through -Update instead, and so is the dedup
+// / reformat of the sections this lane copies. ENV is left in place by migrate-archive.
 
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -18,14 +18,18 @@ import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
 import { overwriteSection } from "./mutators.mjs";
 import { repoRoot } from "./paths.mjs";
 
-// The config docs whose project section is copied back verbatim. Each names the
-// archive filename suffixes to look for (DEV-STANDARDS is the legacy DEV-AUDIT), the
-// live doc to write, and the section heading to replace.
-const CONFIG_SECTIONS = [
+// The docs whose named section is copied back verbatim. Each names the archive
+// filename suffixes to look for (DEV-STANDARDS is the legacy DEV-AUDIT), the live doc
+// to write, and the section heading to replace. BACKLOG is two specs: Features and
+// Ideas are both user-owned lists, carried whole so the reconcile sweep dedupes real
+// content instead of re-deriving it from nothing.
+const RESTORED_SECTIONS = [
   { archiveSuffixes: ["_DEV-AUDIT.md", "_DEV-STANDARDS.md"], live: "DEV-AUDIT", section: "Project specifics" },
   { archiveSuffixes: ["_AUTO-PUSH.md"], live: "AUTO-PUSH", section: "Project release steps" },
+  { archiveSuffixes: ["_BACKLOG.md"], live: "BACKLOG", section: "Features" },
+  { archiveSuffixes: ["_BACKLOG.md"], live: "BACKLOG", section: "Ideas" },
 ];
-const OLD_NAME = /_(DEV-AUDIT|DEV-STANDARDS|AUTO-PUSH)\.md$/;
+const OLD_NAME = /_(DEV-AUDIT|DEV-STANDARDS|AUTO-PUSH|BACKLOG)\.md$/;
 
 // Keep every canonical line, append the archived lines the canonical set does not
 // already have (under a header). Returns null when there is nothing new to add.
@@ -64,12 +68,12 @@ function extractSection(content, section) {
   return body && !isPlaceholderBody(body) ? body : null;
 }
 
-// Copy one config doc's project section from the archive into the freshly-laid live
-// doc, verbatim but for legacy + rename normalization. Walks the archive candidates
-// and takes the first whose section has real content, so an empty same-name scaffold
-// never shadows the real legacy-named source. Returns a report string, or null when
-// no candidate had a section to copy (the reconcile pass derives it instead).
-function restoreConfigSection(archiveAidocs, root, name, spec) {
+// Copy one archived doc's named section into the freshly-laid live doc, verbatim but
+// for legacy + rename normalization. Walks the archive candidates and takes the first
+// whose section has real content, so an empty same-name scaffold never shadows the
+// real legacy-named source. Returns a report string, or null when no candidate had a
+// section to copy (the reconcile pass derives it instead).
+function restoreSection(archiveAidocs, root, name, spec) {
   const liveAbs = join(root, "AIDOCS", `${name}_${spec.live}.md`);
   if (!existsSync(liveAbs)) return null;
   for (const src of findArchivedCandidates(archiveAidocs, spec.archiveSuffixes, name)) {
@@ -113,10 +117,10 @@ export function cmdMigrateRestore(args) {
     else done.push(".gitignore (no new lines)");
   }
 
-  // Config-doc project sections (DEV-AUDIT specifics, AUTO-PUSH release steps),
-  // copied verbatim. The -Update reconcile pass dedups / finalizes them.
-  for (const spec of CONFIG_SECTIONS) {
-    const note = restoreConfigSection(archiveAidocs, root, name, spec);
+  // Section-shaped docs (DEV-AUDIT specifics, AUTO-PUSH release steps, BACKLOG
+  // Features + Ideas), copied verbatim. The -Update reconcile pass dedups / sweeps them.
+  for (const spec of RESTORED_SECTIONS) {
+    const note = restoreSection(archiveAidocs, root, name, spec);
     if (note) done.push(note);
   }
 

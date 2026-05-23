@@ -127,7 +127,7 @@ The target holds content worth preserving. Land the canonical structure, then la
      node AIDOCS/tools/engine.mjs validate --skill memoryupdate
      node AIDOCS/tools/engine.mjs commit   --skill memoryupdate
      ```
-   - **Part B - the initial project check.** Run `-MemoryUpdate` (read `AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md` and execute in migration mode - skip its SessionUpdate auto-invoke, step 8 already captured SESSION). It fills the Big 6 from the code scan plus the archive (a hand-rolled `CLAUDE.md` / `AGENTS.md` is prime Big-6 source), adds durable observations the import did not carry, and sweeps BACKLOG. Validate and commit.
+   - **Part B - the initial project check.** Run `-MemoryUpdate` (read `AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md` and execute in migration mode - skip its SessionUpdate auto-invoke, step 8 already captured SESSION). It fills the Big 6 from the code scan plus the archive (a hand-rolled `CLAUDE.md` / `AGENTS.md` is prime Big-6 source) and adds durable observations the import did not carry. BACKLOG is already carried in by `migrate-restore` (step 5) and swept at reconcile, so leave it. Validate and commit.
    - **Standard project.** Skip Part A. MemoryUpdate fills the Big 6 from code plus the discovered artifacts.
 10. **Scrub and verify the capture (A).**
     ```bash
@@ -169,7 +169,7 @@ Step 2 of the migration path is where Setup's judgement lives, on top of the det
 
 ## Deferred (land when their engine does)
 
-`import-skills` (bringing a project's own `/321` skills across) is not yet built. This runbook archives the known shape, runs the graded discovery sweep, restores the config-doc project sections (DEV-AUDIT, AUTO-PUSH, CHANGELOG) with `migrate-restore`, scavenges the archived EXTENDED depth 1:1 with `migrate-import`, and captures through the normal skills. The skills-import machinery is added when its engine support lands.
+`import-skills` (bringing a project's own `/321` skills across) is not yet built. This runbook archives the known shape, runs the graded discovery sweep, restores the project's own docs (DEV-AUDIT, AUTO-PUSH, BACKLOG, CHANGELOG) with `migrate-restore`, scavenges the archived EXTENDED depth 1:1 with `migrate-import`, and captures through the normal skills. The skills-import machinery is added when its engine support lands.
 
 One design lane also runs on its backstop for now:
 

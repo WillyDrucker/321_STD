@@ -103,8 +103,8 @@ Commands:
   migrate-archive  Move a project's known 321-shape content into
             AIDOCS/<NAME>_SETUP_ARCHIVE/ (move, not delete). --name <PROJECT>
   migrate-restore  Layer archived content back after reinstall: WDDOCS verbatim, a
-            .gitignore union-merge, the DEV-AUDIT / AUTO-PUSH project sections (with
-            legacy + rename normalization), and CHANGELOG (nothing dropped). --name <PROJECT>
+            .gitignore union-merge, the DEV-AUDIT / AUTO-PUSH sections and BACKLOG
+            lists (with legacy + rename normalization), and CHANGELOG (nothing dropped). --name <PROJECT>
   migrate-import  Lossless-import an archived EXTENDED file into a staging file the
             commit pipeline applies (paired [+] bullets + ### sub-sections), or --audit
             it against the distilled EXTENDED at reconcile.
