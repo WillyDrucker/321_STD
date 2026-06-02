@@ -12,7 +12,7 @@
 #
 # Options / env (all optional):
 #   --target DIR  / STD321_TARGET   where to install. Default: current directory.
-#   --name NAME   / STD321_NAME     project name (letter, then letters / digits / _ / -).
+#   --name NAME   / STD321_NAME     project name (letter or digit, then letters / digits / _ / -).
 #                                   Default: target directory basename.
 #   --repo URL    / STD321_REPO     engine repo to clone when no local engine is found.
 #   --privacy M   / STD321_PRIVACY  tracking mode: private (default - tracks the project's
@@ -43,8 +43,8 @@ command -v git  >/dev/null 2>&1 || { echo "git required. Install from https://gi
 mkdir -p "$TARGET"
 TARGET="$(cd "$TARGET" && pwd)"
 [ -z "$NAME" ] && NAME="$(basename "$TARGET")"
-if ! [[ "$NAME" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
-  echo "Invalid project name: '$NAME'. Start with a letter, then letters / digits / _ / - only." >&2
+if ! [[ "$NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  echo "Invalid project name: '$NAME'. Start with a letter or digit, then letters / digits / _ / - only." >&2
   echo "Pass --name <NAME> or rename the target directory." >&2
   exit 1
 fi

@@ -97,7 +97,7 @@ function restoreSection(archiveAidocs, root, name, spec) {
 
 export function cmdMigrateRestore(args) {
   const name = flag(args, "--name");
-  if (!validName(name)) { console.error("migrate-restore needs --name <PROJECT> (letter, then letters / digits / _ / - only)"); process.exit(5); }
+  if (!validName(name)) { console.error("migrate-restore needs --name <PROJECT> (letter or digit, then letters / digits / _ / - only)"); process.exit(5); }
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   if (!existsSync(archive)) { console.error(`migrate-restore: no archive at ${archive}`); process.exit(5); }

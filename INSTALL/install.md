@@ -11,7 +11,7 @@ From a clone of the 321 repo (the engine ships in the repo):
 .\install.ps1 -Target ..\my-project -Name MyProject      (Windows)
 ```
 
-`--name` defaults to the target directory basename. A name must start with a letter and use only letters, digits, `_`, or `-`. With no local engine, the script shallow-clones the repo into a temp dir and removes it afterward.
+`--name` defaults to the target directory basename. A name must start with a letter or digit and use only letters, digits, `_`, or `-`. With no local engine, the script shallow-clones the repo into a temp dir and removes it afterward.
 
 `--privacy <public | private>` sets the tracking mode (default `private`). `private` tracks the project's own knowledge - the MEMORY / SESSION / BACKLOG data docs, the auto-memory, and the WDDOCS design docs. `public` keeps that knowledge local and tracks only the framework (engine, skills, registry, runbooks) plus the folder skeletons, so a public repo ships the code without leaking the project's memory. The default is private because it tracks everything - a missed call cannot silently hide content, and a public project passes `--privacy public`. Flip it later with `node AIDOCS/tools/engine.mjs privacy --set <mode>`.
 

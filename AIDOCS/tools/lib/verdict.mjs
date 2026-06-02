@@ -162,7 +162,7 @@ export function cmdVerdict(args) {
   if (!apply) { console.log(`verdict: well-formed (${entries.length} entr${entries.length === 1 ? "y" : "ies"}).`); return; }
 
   const name = flag(args, "--name");
-  if (!validName(name)) { console.error("verdict --apply needs --name <PROJECT> (letter, then letters / digits / _ / - only)"); process.exit(5); }
+  if (!validName(name)) { console.error("verdict --apply needs --name <PROJECT> (letter or digit, then letters / digits / _ / - only)"); process.exit(5); }
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
   const counts = { move: 0, copy: 0, leave: 0, kept: 0, missing: 0 };
   for (const e of entries) {

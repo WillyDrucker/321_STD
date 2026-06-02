@@ -37,17 +37,49 @@ function stripTrailingPeriod(s) { return s.endsWith(".") ? s.slice(0, -1) : s; }
 // migrate-import --from <archived doc> --skill <updatesession | updatememory>
 //   [--old <NAME> --new <NAME>] [--append] [--dry-run]
 //   --audit re-reads the archive and diffs it against the distilled EXTENDED.
+//   --from-archive <archive root> reads MANIFEST.json to resolve --from / --old / --new
+//     from the recorded role mapping, so the AI does not re-derive them from filenames.
 export async function cmdMigrateImport(index, args) {
-  const from = flag(args, "--from");
+  let from = flag(args, "--from");
   const skill = flag(args, "--skill");
-  const oldName = flag(args, "--old");
-  const newName = flag(args, "--new");
+  let oldName = flag(args, "--old");
+  let newName = flag(args, "--new");
   const append = args.includes("--append");
   const dryRun = args.includes("--dry-run");
   const audit = args.includes("--audit");
+  const fromArchive = flag(args, "--from-archive");
 
-  if (!from) { console.error("migrate-import needs --from <archived doc>"); process.exit(5); }
   if (!skill) { console.error("migrate-import needs --skill <updatesession | updatememory>"); process.exit(5); }
+
+  // --from-archive resolves --from / --old / --new from the archive's MANIFEST.json,
+  // mapping the skill to its recorded role (updatesession -> session_extended,
+  // updatememory -> memory_extended). Removes the AI guesswork for legacy naming
+  // variants (a SESSION_HANDOFF infix, a WD_ prefix). An explicit --from still wins.
+  if (fromArchive && !from) {
+    const role = skill === "updatesession" ? "session_extended" : skill === "updatememory" ? "memory_extended" : null;
+    if (!role) { console.error(`migrate-import --from-archive: skill "${skill}" has no manifest role mapping (expected updatesession or updatememory).`); process.exit(5); }
+    const archiveRoot = resolve(repoRoot(), fromArchive);
+    if (!isContained(repoRoot(), archiveRoot)) { console.error(`migrate-import --from-archive "${fromArchive}" escapes the project root.`); process.exit(5); }
+    const mfPath = join(archiveRoot, "MANIFEST.json");
+    if (!existsSync(mfPath)) { console.error(`migrate-import --from-archive: no MANIFEST.json at ${mfPath} (was the archive made by an older migrate-archive?)`); process.exit(16); }
+    let mf;
+    try { mf = JSON.parse(readFileSync(mfPath, "utf8")); } catch (e) { console.error(`migrate-import --from-archive: MANIFEST.json malformed (${e.message})`); process.exit(16); }
+    // Prefer the entry whose old_prefix matches source_project_name (the legacy content
+    // the migration exists to preserve). On a renamed-migration the archive also carries
+    // the fresh target-name scaffolds the install laid before migrate-archive ran, and
+    // we do NOT want to import from those.
+    const candidates = (mf.moved || []).filter((m) => m.role === role);
+    let entry = null;
+    if (mf.source_project_name) entry = candidates.find((m) => m.old_prefix === mf.source_project_name);
+    if (!entry) entry = candidates[0];
+    if (!entry) { console.error(`migrate-import --from-archive: MANIFEST.json has no entry with role "${role}" (the archive may not carry that lane).`); process.exit(17); }
+    from = join(fromArchive, entry.path);
+    if (!oldName && mf.source_project_name) oldName = mf.source_project_name;
+    if (!newName && mf.target_project_name) newName = mf.target_project_name;
+    console.log(`migrate-import: resolved from manifest -> --from ${from} --old ${oldName || "(none)"} --new ${newName || "(none)"}`);
+  }
+
+  if (!from) { console.error("migrate-import needs --from <archived doc> or --from-archive <archive root>"); process.exit(5); }
 
   // Resolve the lane's main + EXTENDED file keys from the registry (the spine), so the
   // staging carries real keys the validator and commit accept.

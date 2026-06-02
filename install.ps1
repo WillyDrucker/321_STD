@@ -11,7 +11,7 @@
 #
 # Options / env (all optional):
 #   -Target DIR  / STD321_TARGET   where to install. Default: current directory.
-#   -Name NAME   / STD321_NAME     project name (letter, then letters / digits / _ / -).
+#   -Name NAME   / STD321_NAME     project name (letter or digit, then letters / digits / _ / -).
 #                                  Default: target directory basename.
 #   -Repo URL    / STD321_REPO     engine repo to clone when no local engine is found.
 #   -Privacy M   / STD321_PRIVACY  tracking mode: private (default - tracks the project's
@@ -48,8 +48,8 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Path $Target -Force | Out-Null }
 $Target = (Resolve-Path $Target).Path
 if (-not $Name) { $Name = Split-Path -Leaf $Target }
-if (-not ($Name -match '^[A-Za-z][A-Za-z0-9_-]*$')) {
-  Write-Host "Invalid project name: '$Name'. Start with a letter, then letters / digits / _ / - only." -ForegroundColor Red
+if (-not ($Name -match '^[A-Za-z0-9][A-Za-z0-9_-]*$')) {
+  Write-Host "Invalid project name: '$Name'. Start with a letter or digit, then letters / digits / _ / - only." -ForegroundColor Red
   Write-Host "Pass -Name <NAME> or rename the target directory." -ForegroundColor Yellow
   exit 1
 }

@@ -945,6 +945,74 @@ node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1
 # Idempotent re-run: second invocation must not error even though there is nothing left to move.
 node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1 && pass "migrate-archive re-run is idempotent (legacy SKILLS already moved)" || fail "migrate-archive re-run failed"
 
+echo "=== T51: validName accepts leading digit, rejects leading separator ==="
+# Leading digit: 321DONE-web, 9to5
+node "$RENG" init "$BASE/n321" --name "321DONE-web" >/dev/null 2>&1 && pass "init accepts name starting with a digit (321DONE-web)" || fail "init rejected name starting with a digit"
+node "$RENG" init "$BASE/n9to5" --name "9to5" >/dev/null 2>&1 && pass "init accepts name 9to5" || fail "init rejected 9to5"
+# Leading separator still rejected
+NSOUT="$(node "$RENG" init "$BASE/nbad1" --name "_foo" 2>&1)"; NSCC=$?
+[ "$NSCC" = "5" ] && echo "$NSOUT" | grep -q "start with a letter or digit" && pass "init rejects name starting with underscore" || fail "init wrongly accepted _foo or wrong error (exit $NSCC)"
+NSOUT2="$(node "$RENG" init "$BASE/nbad2" --name "-foo" 2>&1)"; NSCC2=$?
+[ "$NSCC2" = "5" ] && pass "init rejects name starting with hyphen" || fail "init wrongly accepted -foo (exit $NSCC2)"
+
+echo "=== T52: migrate-archive pre-flight auto-restores tracked files deleted in the worktree ==="
+PF="$BASE/preflight"
+node "$RENG" init "$PF" --name PfProj >/dev/null 2>&1
+# Make it a real git repo so ls-files works
+( cd "$PF" && git init --quiet && git config user.email t@t.t && git config user.name t && git add -A 2>/dev/null && git commit -q -m initial 2>/dev/null ) >/dev/null 2>&1
+# Delete a tracked, migration-relevant file from the worktree only (still in HEAD)
+rm "$PF/AGENTS.md"
+[ ! -f "$PF/AGENTS.md" ] && pass "AGENTS.md deleted from worktree pre-archive" || fail "test setup: AGENTS.md not gone"
+# Also delete a non-relevant tracked file - the pre-flight must NOT restore it
+echo "stub" > "$PF/IRRELEVANT.txt"
+( cd "$PF" && git add IRRELEVANT.txt && git commit -q -m irrelevant ) >/dev/null 2>&1
+rm "$PF/IRRELEVANT.txt"
+PFOUT="$(node "$PF/AIDOCS/tools/engine.mjs" migrate-archive --name PfProj 2>&1)"
+echo "$PFOUT" | grep -q "pre-flight restored 1 tracked file" && pass "pre-flight reports the restored count" || fail "pre-flight did not report restore (output: $PFOUT)"
+echo "$PFOUT" | grep -q "+ AGENTS.md" && pass "pre-flight names the restored file" || fail "pre-flight did not name AGENTS.md"
+[ -f "$PF/AIDOCS/PfProj_SETUP_ARCHIVE/AGENTS.md" ] && pass "restored AGENTS.md got archived (not the empty scaffold)" || fail "restored AGENTS.md not archived"
+[ ! -f "$PF/IRRELEVANT.txt" ] && pass "pre-flight left the non-migration deletion alone" || fail "pre-flight wrongly restored IRRELEVANT.txt"
+
+echo "=== T53: migrate-archive writes MANIFEST.json; migrate-import --from-archive reads it ==="
+MF="$BASE/manifest"
+node "$RENG" init "$MF" --name MfProj >/dev/null 2>&1
+# Lay a legacy-named data doc (the WD_ prefix + SESSION_HANDOFF infix) to test classification
+mkdir -p "$MF/AIDOCS"
+cat > "$MF/AIDOCS/WD_OLDPROJ_SESSION_HANDOFF_EXTENDED.md" <<'EOF'
+# WD_OLDPROJ SESSION (depth)
+
+## LIFO
+
+### Archived legacy session entry one
+
+Body of the legacy entry one.
+
+### Archived legacy session entry two
+
+Body of the legacy entry two.
+EOF
+cat > "$MF/AIDOCS/WD_OLDPROJ_MEMORY_EXTENDED.md" <<'EOF'
+# WD_OLDPROJ MEMORY (depth)
+
+## LIFO
+
+### Archived legacy memory entry
+
+Body of the legacy memory entry.
+EOF
+node "$MF/AIDOCS/tools/engine.mjs" migrate-archive --name MfProj >/dev/null 2>&1
+MFMF="$MF/AIDOCS/MfProj_SETUP_ARCHIVE/MANIFEST.json"
+[ -f "$MFMF" ] && pass "migrate-archive wrote MANIFEST.json into the archive" || fail "MANIFEST.json missing"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(j.target_project_name==="MfProj" && j.source_project_name==="WD_OLDPROJ" && Array.isArray(j.moved) ? 0 : 1)' "$MFMF" && pass "MANIFEST.json carries target + detected source prefix (prefers non-target prefix)" || fail "MANIFEST.json missing target / source (heuristic picked the wrong prefix?)"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const s=j.moved.find(m=>m.role==="session_extended"&&m.legacy_naming==="SESSION_HANDOFF");process.exit(s && s.old_prefix==="WD_OLDPROJ" ? 0 : 1)' "$MFMF" && pass "MANIFEST records SESSION_HANDOFF legacy_naming + WD_OLDPROJ prefix" || fail "MANIFEST classifyMove failed on legacy naming"
+# Re-init the relay: migrate-archive carried _index.json into the archive, so init lays a
+# fresh one (and the canonical scaffolds) before migrate-import can run against the registry.
+node "$RENG" init "$MF" --name MfProj >/dev/null 2>&1
+# migrate-import --from-archive resolves --from from MANIFEST
+MFIOUT="$(node "$MF/AIDOCS/tools/engine.mjs" migrate-import --from-archive "AIDOCS/MfProj_SETUP_ARCHIVE" --skill updatesession --dry-run 2>&1)"
+echo "$MFIOUT" | grep -q "resolved from manifest" && pass "migrate-import --from-archive reports resolution from manifest" || fail "migrate-import did not resolve from manifest (output: $MFIOUT)"
+echo "$MFIOUT" | grep -q "WD_OLDPROJ_SESSION_HANDOFF_EXTENDED" && pass "migrate-import resolved the legacy-named source file via manifest" || fail "migrate-import did not pick the SESSION_HANDOFF file"
+
 echo "=== T50: migrate-import --audit surfaces fuzzy candidates for entries not found verbatim ==="
 FZ="$BASE/fuzzy"
 node "$RENG" init "$FZ" --name FzProj >/dev/null 2>&1

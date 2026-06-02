@@ -133,7 +133,7 @@ export async function cmdInit(args) {
   }
   const name = flag(args, "--name");
   if (!validName(name)) {
-    console.error("init requires --name <PROJECT> (start with a letter, then letters / digits / _ / - only).");
+    console.error("init requires --name <PROJECT> (start with a letter or digit, then letters / digits / _ / - only).");
     process.exit(5);
   }
   const force = args.includes("--force");

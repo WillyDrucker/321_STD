@@ -8,7 +8,17 @@
 // .gitignore at root right after archiving the old one, so the project is never without
 // ignore rules during the reinstall (the old copy is preserved in the archive for the
 // migrate-restore union-merge).
+//
+// Two hardenings the archive owns on top of the moves:
+// 1. Pre-flight: detect tracked content deleted in the worktree but present in HEAD,
+//    auto-restore it from HEAD before archiving. Without this, the archive captures
+//    empty scaffolds and the reconcile pass has nothing real to fold.
+// 2. Post-flight: write MANIFEST.json into the archive recording each moved path with
+//    its detected role (memory_extended, session_extended, dev_standards, root_doc,
+//    registry, automemory_seed, etc) and the old project-name prefix. The reconcile
+//    pass and migrate-import read it instead of re-deriving from filenames.
 
+import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -24,12 +34,86 @@ import { fromHomeRef, repoRoot } from "./paths.mjs";
 // bodies (SKILL) are snapshotted separately below. README and source are never touched.
 const KNOWN = ["AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore", "AIDOCS/_index.json", "AIDOCS/automemory", "WDDOCS"];
 
+// Paths the pre-flight will auto-restore from HEAD if git reports them deleted in the
+// worktree. Restricted to the migration's known surface so an unrelated worktree
+// deletion (the user staged a code-file removal) is left alone.
+function isMigrationRelevant(relPath) {
+  if (relPath === "AGENTS.md" || relPath === "CLAUDE.md" || relPath === "CHANGELOG.md" || relPath === ".gitignore") return true;
+  if (relPath.startsWith("AIDOCS/") || relPath.startsWith("WDDOCS/")) return true;
+  return false;
+}
+
+// Detect tracked content the user deleted in the worktree but still present in HEAD,
+// and auto-restore it before the archive runs. Without this, migrate-archive's
+// `if (!existsSync(src)) continue` silently skips the deleted content and the
+// reconcile pass folds an empty scaffold. Auto-restore is the documented contract -
+// the reconcile is downstream and cannot recover content the archive never saw.
+// No-op when git is unavailable or the cwd is not a repo.
+function preflightRestoreDeleted(root) {
+  let out;
+  try {
+    out = execFileSync("git", ["ls-files", "--deleted"], { cwd: root, encoding: "utf8" }).trim();
+  } catch {
+    return [];   // not a git repo, or git not on PATH
+  }
+  if (!out) return [];
+  const relevant = out.split("\n").filter(Boolean).filter(isMigrationRelevant);
+  if (relevant.length === 0) return [];
+  try {
+    execFileSync("git", ["restore", "--source=HEAD", "--", ...relevant], { cwd: root });
+  } catch (e) {
+    console.warn(`migrate-archive: pre-flight tried to restore ${relevant.length} deleted file(s) from HEAD but git restore failed (${e.message}). Continuing - the archive may capture less content than HEAD held.`);
+    return [];
+  }
+  return relevant;
+}
+
+// Classify a moved path so the manifest carries its role. The reconcile pass uses this
+// to find the right archive source per skill / per config doc, instead of re-deriving
+// from filenames (which fails on legacy naming variants like SESSION_HANDOFF). Returns
+// { role, old_prefix?, legacy_naming? }. Accepts both POSIX and Windows separators.
+function classifyMove(relRaw) {
+  const rel = relRaw.replace(/\\/g, "/");   // normalize Windows backslashes before pattern match
+  if (rel === "AGENTS.md" || rel === "CLAUDE.md" || rel === "CHANGELOG.md") return { role: "root_doc" };
+  if (rel === ".gitignore") return { role: "gitignore" };
+  if (rel === "AIDOCS/_index.json") return { role: "registry" };
+  if (rel === "AIDOCS/automemory" || rel.startsWith("AIDOCS/automemory/")) return { role: "automemory_seed" };
+  if (rel === "WDDOCS" || rel.startsWith("WDDOCS/")) return { role: "wddocs" };
+  if (rel.startsWith("AIDOCS/") && rel.endsWith(".md")) {
+    const base = rel.slice("AIDOCS/".length, -3);
+    const checks = [
+      [/^(.+?)_(MEMORY)(_EXTENDED)?$/, (m) => ({ role: `memory${m[3] ? "_extended" : ""}`, old_prefix: m[1] })],
+      [/^(.+?)_(SESSION)(_EXTENDED)?$/, (m) => ({ role: `session${m[3] ? "_extended" : ""}`, old_prefix: m[1] })],
+      [/^(.+?)_BACKLOG$/, (m) => ({ role: "backlog", old_prefix: m[1] })],
+      [/^(.+?)_DEV-AUDIT$/, (m) => ({ role: "dev_audit", old_prefix: m[1] })],
+      [/^(.+?)_AUTO-PUSH$/, (m) => ({ role: "auto_push", old_prefix: m[1] })],
+      // Legacy naming variants the pre-engine projects used:
+      [/^(.+?)_SESSION_HANDOFF(_EXTENDED)?$/, (m) => ({ role: `session${m[2] ? "_extended" : ""}`, old_prefix: m[1], legacy_naming: "SESSION_HANDOFF" })],
+      [/^(.+?)_DEV_STANDARDS$/, (m) => ({ role: "dev_standards", old_prefix: m[1], legacy_naming: "DEV_STANDARDS" })],
+    ];
+    for (const [re, build] of checks) {
+      const m = base.match(re);
+      if (m) return build(m);
+    }
+  }
+  return { role: "other" };
+}
+
 export function cmdMigrateArchive(args) {
   const name = flag(args, "--name");
-  if (!validName(name)) { console.error("migrate-archive needs --name <PROJECT> (letter, then letters / digits / _ / - only)"); process.exit(5); }
+  if (!validName(name)) { console.error("migrate-archive needs --name <PROJECT> (letter or digit, then letters / digits / _ / - only)"); process.exit(5); }
   const root = repoRoot();
   const archive = join(root, "AIDOCS", `${name}_SETUP_ARCHIVE`);
-  let moved = 0;
+
+  // Pre-flight: restore deleted-in-worktree content from HEAD so the archive captures
+  // it. Loud-warn the user since they may not have realized the content was deleted in
+  // the worktree but still tracked in HEAD - a common state after a manual cleanup that
+  // leaned on git to hold the recovery copy.
+  const restored = preflightRestoreDeleted(root);
+  if (restored.length > 0) {
+    console.warn(`migrate-archive: pre-flight restored ${restored.length} tracked file(s) deleted from the worktree (still in HEAD), so the archive captures the real content:`);
+    for (const f of restored) console.warn(`  + ${f}`);
+  }
 
   // Read the registry before the move loop carries _index.json into the archive: the
   // external memory path (auto_memory.path, the runtime source of truth) so the project's
@@ -44,6 +128,8 @@ export function cmdMigrateArchive(args) {
     if (ref) { const ext = fromHomeRef(ref); if (existsSync(ext)) externalDir = ext; }
   } catch { /* no registry - default privacy, nothing to snapshot */ }
 
+  const movedEntries = [];   // { path, role, old_prefix?, legacy_naming? } - feeds MANIFEST.json
+
   for (const rel of KNOWN) {
     const src = join(root, rel);
     if (!existsSync(src)) continue;
@@ -51,7 +137,7 @@ export function cmdMigrateArchive(args) {
     if (existsSync(dst)) continue;   // already archived - keep the first copy (idempotent re-run)
     mkdirSync(dirname(dst), { recursive: true });
     renameSync(src, dst);
-    moved++;
+    movedEntries.push({ path: rel, ...classifyMove(rel) });
   }
 
   // Re-lay a canonical .gitignore the instant the old one is archived, so the project is
@@ -81,7 +167,8 @@ export function cmdMigrateArchive(args) {
       if (existsSync(dst)) continue;   // already archived - keep the first copy
       mkdirSync(join(archive, "AIDOCS"), { recursive: true });
       renameSync(p, dst);
-      moved++;
+      const relForward = `AIDOCS/${f}`;   // POSIX-style in manifest, portable across platforms
+      movedEntries.push({ path: relForward, ...classifyMove(relForward) });
     }
   }
 
@@ -107,7 +194,7 @@ export function cmdMigrateArchive(args) {
     mkdirSync(dirname(legacySkillsDst), { recursive: true });
     renameSync(legacySkillsSrc, legacySkillsDst);
     legacySkillsMoved = true;
-    moved++;
+    movedEntries.push({ path: "AIDOCS/SKILLS", role: "legacy_skills" });
   }
 
   // Snapshot the external Claude memory (the runtime source of truth) into the archive so
@@ -119,8 +206,47 @@ export function cmdMigrateArchive(args) {
     if (!existsSync(dst)) { cpSync(externalDir, dst, { recursive: true }); externalSnapshot = true; }
   }
 
+  // Write MANIFEST.json describing what moved, with detected roles + old prefix +
+  // legacy-naming flags. The reconcile pass and migrate-import read this instead of
+  // re-deriving from filenames, removing the AI's guesswork for legacy naming variants.
+  // Idempotent: a re-run with an existing manifest keeps the first one (so the same
+  // detection result survives a partial-run resume) and appends nothing.
+  const manifestPath = join(archive, "MANIFEST.json");
+  if (!existsSync(manifestPath) && movedEntries.length > 0) {
+    // Detect the source project name from the data-doc prefixes. Prefer a prefix that
+    // differs from the target `name` (the renamed-migration case), so a project moving
+    // from WD_OLDPROJ to MfProj records WD_OLDPROJ as source, not MfProj. Fall back to
+    // the most common prefix (the same-name re-install case) when no non-target prefix
+    // exists. Ties go to the first encountered prefix.
+    const counts = {};
+    for (const e of movedEntries) { if (e.old_prefix) counts[e.old_prefix] = (counts[e.old_prefix] || 0) + 1; }
+    let sourceProjectName = null, maxCount = 0;
+    for (const [prefix, count] of Object.entries(counts)) {
+      if (prefix !== name && count > maxCount) { sourceProjectName = prefix; maxCount = count; }
+    }
+    if (!sourceProjectName) {
+      for (const [prefix, count] of Object.entries(counts)) {
+        if (count > maxCount) { sourceProjectName = prefix; maxCount = count; }
+      }
+    }
+    const manifest = {
+      schema_version: 1,
+      target_project_name: name,
+      source_project_name: sourceProjectName,
+      moved: movedEntries,
+      skill_snapshot: skillSnapshot,
+      legacy_skills_moved: legacySkillsMoved,
+      external_snapshot: externalSnapshot,
+      gitignore_relaid: gitignoreRelaid,
+      preflight_restored: restored,
+    };
+    mkdirSync(archive, { recursive: true });
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  }
+
+  const moved = movedEntries.length;
   const tail = `${skillSnapshot ? " + snapshotted AIDOCS/SKILL" : ""}${legacySkillsMoved ? " + swept legacy AIDOCS/SKILLS plural" : ""}${externalSnapshot ? " + captured external memory" : ""}`;
   console.log(`migrate-archive: moved ${moved} path(s)${tail} into ${archive} (move, not delete - the recovery net).`);
   if (gitignoreRelaid) console.log("migrate-archive: re-laid a canonical .gitignore at the project root (closes the no-ignore window before reinstall).");
-  installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE${gitignoreRelaid ? ", re-laid root .gitignore" : ""}.`);
+  installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE${gitignoreRelaid ? ", re-laid root .gitignore" : ""}${restored.length > 0 ? `, pre-flight restored ${restored.length} deleted file(s) from HEAD` : ""}.`);
 }
