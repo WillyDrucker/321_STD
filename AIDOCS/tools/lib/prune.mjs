@@ -56,9 +56,18 @@ function trim(main, extended, mainCap, mainPruneTo, extCap, extPruneTo, isProtec
     if (!stillMainOver && !stillExtOver) break;
     const lifo = findSectionBounds(lines, "lifo");
     if (!lifo) break;
+    // When only extended is over cap, dropping a main bullet that has no anchor would
+    // shrink main without reducing extended at all - the prune would never converge on
+    // extended. Target the bottom-most anchored ([+]) bullet so the paired sub-section
+    // comes with it. When main is over cap, any unprotected bullet reduces main, so the
+    // anchor filter is dropped.
+    const extOnly = !stillMainOver && stillExtOver;
     let dropIdx = -1;
     for (let i = lifo.endIdx - 1; i > lifo.startIdx; i--) {
-      if (lines[i].startsWith("- ") && !isProtected(lines[i])) { dropIdx = i; break; }
+      if (!lines[i].startsWith("- ") || isProtected(lines[i])) continue;
+      if (extOnly && !bulletExtendedAnchor(lines[i])) continue;
+      dropIdx = i;
+      break;
     }
     if (dropIdx === -1) break;
     const bullet = lines[dropIdx];

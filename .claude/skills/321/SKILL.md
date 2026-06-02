@@ -14,7 +14,7 @@ description: Router for the /321 skill family. Resolves -<Flag> against AIDOCS/_
 /321 -SessionUpdate    refresh SESSION (Current State + LIFO)
 /321 -MemoryUpdate     distill MEMORY (LIFO + Big-6) + BACKLOG
 /321 -Update           the daily driver: chain -SessionUpdate then -MemoryUpdate
-/321 -SYNC             update the engine code from upstream (project data untouched)
+/321 -SYNC             upgrade from upstream: engine, skills, router, manifest ops (project content + customizations[] preserved)
 /321 -DevAudit         audit the source against DEV-AUDIT.md (-FULL)
 /321 -AutoPush         capture, commit, and push to the anchored remote
 /321 -Compact          emit ready-to-paste /compact instructions for the next conversation

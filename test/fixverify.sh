@@ -453,6 +453,125 @@ node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFile
 node "$LG/AIDOCS/tools/engine.mjs" doctor >/dev/null 2>&1 && pass "doctor passes on legacy auto_memory.source" || fail "doctor failed on legacy source schema"
 node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -A1 "Auto-memory pointers" | grep -q "ok" && pass "auto-memory mirror check stays active on legacy source (fallback honored)" || fail "auto-memory check went inert on legacy source"
 
+echo "=== T31: upgrade applies missing manifest operations (registry_extend, file_add_template), records names, bumps version ==="
+UP="$BASE/upgrade"
+node "$RENG" init "$UP" --name UpProj >/dev/null 2>&1
+UPENG="$UP/AIDOCS/tools/engine.mjs"
+# Build a tweaked source: copy the real engine into a sibling dir, write a custom
+# MANIFEST.json with two ops, bump engine.version.
+UPSRC="$BASE/upgradesrc"
+mkdir -p "$UPSRC/AIDOCS" "$UPSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$UPSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$UPSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$UPSRC/AIDOCS/automemory"
+cp "$REAL/.claude/skills/321/SKILL.md" "$UPSRC/.claude/skills/321/SKILL.md"
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));j.engine.version="9.9.9";fs.writeFileSync(process.argv[2],JSON.stringify(j,null,2)+"\n")' "$REAL/AIDOCS/_index.json" "$UPSRC/AIDOCS/_index.json"
+cat > "$UPSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "extend_test_key", "type": "registry_extend", "path": "sizes.test_key", "value": { "cap": 100, "prune_to": 50 } },
+    { "name": "add_template_file", "type": "file_add_template", "file": "AIDOCS/PROJECTNAME_TEST.md", "body": "# PROJECTNAME - TEST\n\n**Purpose:** test template.\n" }
+  ]
+}
+EOF
+node "$UPENG" fetch-engine --from "$UPSRC" >/dev/null 2>&1
+UCOUT="$(node "$UPENG" upgrade 2>&1)"; UCC=$?
+[ "$UCC" = "0" ] && pass "upgrade exits 0" || fail "upgrade failed (exit $UCC): $UCOUT"
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).sizes?.test_key?.cap === 100 ? 0 : 1)' "$UP/AIDOCS/_index.json" && pass "registry_extend op set sizes.test_key" || fail "registry_extend op did not set sizes.test_key"
+[ -f "$UP/AIDOCS/UpProj_TEST.md" ] && pass "file_add_template wrote AIDOCS/UpProj_TEST.md" || fail "file_add_template did not write the file"
+grep -q 'UpProj - TEST' "$UP/AIDOCS/UpProj_TEST.md" 2>/dev/null && pass "PROJECTNAME substituted to UpProj in template body" || fail "PROJECTNAME not substituted"
+node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied;process.exit((a.includes("extend_test_key")&&a.includes("add_template_file"))?0:1)' "$UP/AIDOCS/_index.json" && pass "operations_applied[] records both op names" || fail "operations_applied missing op names"
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.version === "9.9.9" ? 0 : 1)' "$UP/AIDOCS/_index.json" && pass "engine.version bumped to source value (9.9.9)" || fail "engine.version not bumped"
+
+echo "=== T32: upgrade is idempotent (a re-run applies no new ops) ==="
+APPLIED_BEFORE=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied.length)' "$UP/AIDOCS/_index.json")
+node "$UPENG" upgrade >/dev/null 2>&1
+APPLIED_AFTER=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied.length)' "$UP/AIDOCS/_index.json")
+[ "$APPLIED_BEFORE" = "$APPLIED_AFTER" ] && pass "re-run upgrade did not duplicate ops (still $APPLIED_AFTER applied)" || fail "ops duplicated on re-run (before=$APPLIED_BEFORE after=$APPLIED_AFTER)"
+
+echo "=== T33: customizations[] preserves a project-edited canonical skill body across the copy ==="
+CU="$BASE/customize"
+node "$RENG" init "$CU" --name CuProj >/dev/null 2>&1
+CUENG="$CU/AIDOCS/tools/engine.mjs"
+printf '\nCUSTOM_MARKER_IN_SYNC: project-edited canonical body.\n' >> "$CU/AIDOCS/SKILL/SKILL_SYNC.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_SYNC.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CU/AIDOCS/_index.json"
+node "$CUENG" fetch-engine --from "$UPSRC" >/dev/null 2>&1
+node "$CUENG" upgrade >/dev/null 2>&1
+grep -q 'CUSTOM_MARKER_IN_SYNC' "$CU/AIDOCS/SKILL/SKILL_SYNC.md" && pass "customizations[] preserved the project-edited SKILL_SYNC.md" || fail "customized SKILL_SYNC.md was overwritten"
+
+echo "=== T34: upgrade without a source MANIFEST.json runs the copy step cleanly (manifest-less engine is supported) ==="
+NM="$BASE/nomanifest"
+node "$RENG" init "$NM" --name NmProj >/dev/null 2>&1
+NMENG="$NM/AIDOCS/tools/engine.mjs"
+UPSRC2="$BASE/nomanifestsrc"
+mkdir -p "$UPSRC2/AIDOCS" "$UPSRC2/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$UPSRC2/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$UPSRC2/AIDOCS/SKILL"
+cp "$REAL/AIDOCS/_index.json" "$UPSRC2/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$UPSRC2/.claude/skills/321/SKILL.md"
+node "$NMENG" fetch-engine --from "$UPSRC2" >/dev/null 2>&1
+NMOUT="$(node "$NMENG" upgrade 2>&1)"; NMCC=$?
+[ "$NMCC" = "0" ] && pass "upgrade with no source MANIFEST.json exits 0" || fail "upgrade with no manifest failed (exit $NMCC): $NMOUT"
+echo "$NMOUT" | grep -q '0 applied' && pass "upgrade reports 0 applied on a manifest-less source" || fail "upgrade did not report 0 applied"
+
+echo "=== T35: doctor flags malformed engine.operations_applied (non-array) ==="
+BD="$BASE/baddoctor"
+node "$RENG" init "$BD" --name BdProj >/dev/null 2>&1
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.engine.operations_applied="not-an-array";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$BD/AIDOCS/_index.json"
+BDOUT="$(node "$BD/AIDOCS/tools/engine.mjs" doctor 2>&1)"; BDCC=$?
+echo "$BDOUT" | grep -q "operations_applied is not an array" && pass "doctor reports malformed operations_applied" || fail "doctor missed malformed operations_applied"
+[ "$BDCC" = "20" ] && pass "doctor exits 20 (error) on malformed schema" || fail "doctor did not exit 20 on malformed schema (exit $BDCC)"
+
+echo "=== T36: upgrade --dry-run writes nothing (no file mutations, no registry write, no install log) ==="
+DR="$BASE/dryrun"
+node "$RENG" init "$DR" --name DrProj >/dev/null 2>&1
+DRENG="$DR/AIDOCS/tools/engine.mjs"
+# Reuse the upgrade source built in T31 - carries a real two-op manifest.
+node "$DRENG" fetch-engine --from "$UPSRC" >/dev/null 2>&1
+BEFORE_INDEX=$(node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1]))))' "$DR/AIDOCS/_index.json")
+DROUT="$(node "$DRENG" upgrade --dry-run 2>&1)"; DRCC=$?
+[ "$DRCC" = "0" ] && pass "upgrade --dry-run exits 0" || fail "upgrade --dry-run failed (exit $DRCC): $DROUT"
+echo "$DROUT" | grep -q "dry-run" && pass "upgrade --dry-run header carries the dry-run marker" || fail "no dry-run marker in header"
+AFTER_INDEX=$(node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1]))))' "$DR/AIDOCS/_index.json")
+[ "$BEFORE_INDEX" = "$AFTER_INDEX" ] && pass "_index.json byte-equal after --dry-run (no registry write)" || fail "_index.json changed during --dry-run"
+[ ! -f "$DR/AIDOCS/DrProj_TEST.md" ] && pass "file_add_template wrote no file under --dry-run" || fail "file_add_template wrote a file under --dry-run"
+if [ -f "$DR/INSTALL/INSTALL.log" ]; then
+  grep -q '^upgrade:' "$DR/INSTALL/INSTALL.log" && fail "install log written during --dry-run" || pass "install log carries no upgrade line after --dry-run"
+else
+  pass "install log absent after --dry-run"
+fi
+node "$DRENG" upgrade >/dev/null 2>&1
+[ -f "$DR/AIDOCS/DrProj_TEST.md" ] && pass "a subsequent real upgrade after --dry-run still applies the ops" || fail "real upgrade after --dry-run failed"
+
+echo "=== T37: upgrade aborts before copy + version bump when a handler throws (fail-fast) ==="
+FF="$BASE/failfast"
+node "$RENG" init "$FF" --name FfProj >/dev/null 2>&1
+FFENG="$FF/AIDOCS/tools/engine.mjs"
+FFSRC="$BASE/failfastsrc"
+mkdir -p "$FFSRC/AIDOCS" "$FFSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$FFSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$FFSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$FFSRC/AIDOCS/automemory"
+cp "$REAL/.claude/skills/321/SKILL.md" "$FFSRC/.claude/skills/321/SKILL.md"
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));j.engine.version="9.9.99";fs.writeFileSync(process.argv[2],JSON.stringify(j,null,2)+"\n")' "$REAL/AIDOCS/_index.json" "$FFSRC/AIDOCS/_index.json"
+# Manifest pairs one valid registry_extend with one automemory_add pointing at a seed
+# file the source does not carry. The seed-missing handler throws, fail-fast aborts.
+cat > "$FFSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "ff_extend_first", "type": "registry_extend", "path": "sizes.ff_first", "value": { "cap": 50, "prune_to": 25 } },
+    { "name": "ff_missing_seed", "type": "automemory_add", "file": "feedback_does_not_exist.md" }
+  ]
+}
+EOF
+node "$FFENG" fetch-engine --from "$FFSRC" >/dev/null 2>&1
+FFOUT="$(node "$FFENG" upgrade 2>&1)"; FFCC=$?
+[ "$FFCC" = "20" ] && pass "upgrade exits 20 on a thrown handler" || fail "upgrade did not exit 20 (got $FFCC): $FFOUT"
+echo "$FFOUT" | grep -q "FAIL ff_missing_seed" && pass "upgrade names the failing op" || fail "no FAIL ff_missing_seed in output"
+echo "$FFOUT" | grep -q "aborting before copy step" && pass "upgrade reports the abort reason" || fail "no abort reason in output"
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.version === "9.9.99" ? 1 : 0)' "$FF/AIDOCS/_index.json" && pass "engine.version NOT bumped (abort before version write)" || fail "engine.version was bumped despite a failing op"
+node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied;process.exit(a.includes("ff_extend_first")?1:0)' "$FF/AIDOCS/_index.json" && pass "operations_applied stays empty (no partial commit on abort)" || fail "operations_applied carries the first op despite the abort"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED

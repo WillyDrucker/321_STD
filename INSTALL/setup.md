@@ -98,7 +98,7 @@ The target holds content worth preserving. Land the canonical structure, then la
    ```bash
    node AIDOCS/tools/engine.mjs help
    ```
-   Confirm the Commands list carries `migrate-archive`, `migrate-restore`, `verdict`, `state`, `scrub`, and `graduate`. If any is missing, the fetched engine was stale - STOP, re-fetch a current engine (`fetch-engine --repo <upstream>` or re-run install), re-run the `init` above, then re-verify before continuing.
+   Confirm the Commands list carries `migrate-archive`, `migrate-restore`, `migrate-import`, `verdict`, `state`, `scrub`, and `graduate`. If any is missing, the fetched engine was stale - STOP, re-fetch a current engine (`fetch-engine --repo <upstream>` or re-run install), re-run the `init` above, then re-verify before continuing.
 5. **Restore the project's own content (A - deterministic).**
    ```bash
    node AIDOCS/tools/engine.mjs migrate-restore --name <PROJECT>

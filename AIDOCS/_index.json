@@ -62,8 +62,10 @@
   },
   "engine": {
     "version": "0.1.1",
-    "upstream": ""
+    "upstream": "",
+    "operations_applied": []
   },
+  "customizations": [],
   "skills": {
     "router": "/321",
     "dispatch": {

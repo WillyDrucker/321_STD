@@ -5,7 +5,7 @@
 // engine - and is overridable with --root, so a fetched onboarding engine can
 // operate on a separate target without being copied into it.
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,22 @@ export function resolveFile(index, key) {
   return fromRoot(rel);
 }
 
+// Read a registered file's text by its domain-owned key. Returns null when the
+// key is unregistered or the resolved path is not a regular file (a directory
+// where a file should be, a dangling symlink). Read-only convenience used by
+// the doctor checks - the throwing variant is resolveFile + readFileSync.
+export function readRegisteredFile(index, key) {
+  const rel = index.files?.[key];
+  if (!rel) return null;
+  const abs = fromRoot(rel);
+  try {
+    if (!statSync(abs).isFile()) return null;
+  } catch {
+    return null;   // best-effort: missing path reads as null, not a throw
+  }
+  return readFileSync(abs, "utf8");
+}
+
 // Canonicalize a path: realpath its longest existing ancestor (resolving symlinks,
 // junctions, and case) and re-append the not-yet-created tail lexically. A symlink in
 // the existing part then cannot redirect the result outside an intended root, which a
@@ -76,11 +92,11 @@ function memoryHome() { return process.env.STD321_MEMORY_HOME || homedir(); }
 // Claude Code's native per-project memory directory for a project root - the runtime
 // source of truth, loaded by the harness each session (the in-project AIDOCS/automemory
 // is only the shippable seed). The harness keys the folder off the project cwd with the
-// drive letter lowercased and the colon, separators, and underscores collapsed to "-"
-// (observed in Claude Code 2.1.x: c:\Dev\321_STD -> c--Dev-321-STD). Derived once at
-// install and recorded in _index.json (auto_memory.path), so later passes read the
-// recorded value rather than re-deriving against an encoding that can shift between
-// Claude Code versions. Returns an absolute path (the dir need not exist yet).
+// drive letter lowercased and the colon, separators, and underscores collapsed to "-".
+// Derived once at install and recorded in _index.json (auto_memory.path), so later
+// passes read the recorded value rather than re-deriving against an encoding that can
+// shift between Claude Code releases. Returns an absolute path (the dir need not exist
+// yet).
 export function claudeMemoryKey(root) {
   return resolve(root).replace(/^([A-Za-z]):/, (_, d) => `${d.toLowerCase()}:`).replace(/[:\\/_]/g, "-");
 }

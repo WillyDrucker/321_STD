@@ -17,7 +17,7 @@
 #   --repo URL    / STD321_REPO     engine repo to clone when no local engine is found.
 #   --privacy M   / STD321_PRIVACY  tracking mode: private (default - tracks the project's
 #                                   memory / auto-memory / WDDOCS) or public (gates them
-#                                   local; the engine is tracked either way).
+#                                   local, the engine is tracked either way).
 
 set -eu
 

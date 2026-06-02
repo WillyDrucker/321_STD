@@ -20,10 +20,11 @@ import { cmdPrivacy } from "./lib/privacy.mjs";
 import { cmdScrub } from "./lib/scrub.mjs";
 import { cmdState } from "./lib/state.mjs";
 import { cmdSync } from "./lib/sync.mjs";
+import { cmdUpgrade } from "./lib/upgrade.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -61,6 +62,7 @@ async function main() {
     case "scrub":    cmdScrub(index, args); break;
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
+    case "upgrade":  cmdUpgrade(index, args); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "migrate-import": await cmdMigrateImport(index, args); break;
@@ -86,6 +88,11 @@ Commands:
             [--path <file>]
   sync      Rebuild skills.dispatch in _index.json from the AIDOCS/SKILL/ bodies.
             [--dry-run]
+  upgrade   Drive the project up to the fetched engine's manifest plus refresh the
+            engine-class paths (AIDOCS/tools, AIDOCS/SKILL, .claude/skills/321/SKILL.md).
+            Diffs MANIFEST.json operations against engine.operations_applied[], applies
+            each missing op (idempotent), skips paths in customizations[], bumps
+            engine.version. Requires a prior fetch-engine. [--dry-run]
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <sessionupdate | memoryupdate>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
