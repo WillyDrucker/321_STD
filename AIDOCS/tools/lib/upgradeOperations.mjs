@@ -9,7 +9,7 @@
 // land in this file - the driver's loop does not need to change.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 
 import { overwriteSection } from "./mutators.mjs";
 import { fromHomeRef, isContained } from "./paths.mjs";
@@ -33,6 +33,12 @@ export const HANDLERS = {
 // (symlink-resolved) paths so a symlink in the existing prefix cannot redirect the
 // target outside the intended root.
 function resolveContained(opName, root, relPath) {
+  if (typeof relPath !== "string" || relPath === "") {
+    throw new Error(`${opName}: relative path is required (got ${JSON.stringify(relPath)})`);
+  }
+  if (isAbsolute(relPath)) {
+    throw new Error(`${opName}: "${relPath}" must be project-relative, not absolute`);
+  }
   const target = join(root, relPath);
   if (!isContained(root, target)) {
     throw new Error(`${opName}: "${relPath}" escapes the project root`);

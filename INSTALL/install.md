@@ -44,7 +44,7 @@ The same command serves a fresh or an existing project, and it is non-destructiv
 An AI assistant landed at a 321 project should distinguish two lifecycle paths and pick the lighter one when it applies:
 
 - **Install** (this runbook + `setup.md`) - laying the structure on a fresh or pre-321 target, or migrating a stale legacy install. Heavyweight: archives, reinstalls, restores, captures, reconciles. The right path when the project has no `_index.json`, when the data docs are stale or malformed, or when the user explicitly asked to (re)install.
-- **Update** (`/321 -UpdateSync`) - refreshing the engine code, skill bodies, router, and manifest-driven structural changes from `engine.upstream`. Lightweight: touches engine-class paths only, leaves project data alone, runs in seconds. The right path when the registry is healthy and the project just needs the latest engine.
+- **Update** (`/321 -UpdateSync`) - refreshing the engine code, skill bodies, router, and manifest-driven structural changes from `engine.upstream`. Lightweight: touches engine-class paths and, via `section_text_diff` manifest ops, canonical sections of project data templates (unless the file is in `customizations[]`). Project-authored content is preserved, runs in seconds. The right path when the registry is healthy and the project just needs the latest engine.
 
 The install scripts (`install.sh`, `install.ps1`) print a notice when they detect an existing 321 install (registry present), pointing at `/321 -UpdateSync` as the lighter alternative, and continue with the full install if the user proceeds. An AI invoked into an existing-and-healthy 321 project should prefer `-UpdateSync` over re-running install, unless the user explicitly asked for a reinstall or migration.
 

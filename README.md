@@ -14,7 +14,7 @@ Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321do
 
 **Existing project?** Same prompt, and your assistant runs it straight through without asking. Your files are preserved, and setup migrates what is already there, including a legacy or stale 321 install, by archiving first and never deleting. Then `/321 -Update` reconciles it into final shape.
 
-**Already on 321 and just want the latest engine?** Run `/321 -UpdateSync` from the project. It pulls the engine, skill bodies, router, and any manifest-driven structural changes from your `engine.upstream` (the URL the install used), and leaves your data files alone. The full install above is the heavy path - reinstall only when the registry is gone or the project needs the full migration treatment.
+**Already on 321 and just want the latest engine?** Run `/321 -UpdateSync` from the project. It pulls the engine, skill bodies, router, and any manifest-driven structural changes from your `engine.upstream` (the URL the install used). Project-authored content is preserved. Canonical project-data sections may update through manifest ops unless the file is listed in `customizations[]`. The full install above is the heavy path - reinstall only when the registry is gone or the project needs the full migration treatment.
 
 ### What the install writes
 
@@ -64,7 +64,7 @@ A short reference for day-to-day use. The full command surface is in [the /321 s
 | `/321 -Update -FULL` | Rebuild both lanes from the full conversation (not the incremental tail). For drifted SESSION/MEMORY. |
 | `/321 -UpdateSession -FULL` | Rebuild only SESSION from the full conversation. Ignores the watermark. |
 | `/321 -UpdateMemory -FULL` | Rebuild only MEMORY. Re-derives every Big-6 section against current evidence. |
-| `/321 -UpdateSync` | Refresh the engine from `engine.upstream`. Project data is never touched. |
+| `/321 -UpdateSync` | Refresh the engine from `engine.upstream`. Project-authored content is preserved. Canonical sections may update via manifest ops unless the file is in `customizations[]`. |
 | `/321 -DevAudit` | Audit the source against `DEV-AUDIT.md`. `-FULL` audits and refactors. |
 | `/321 -AutoPush` | Capture, commit, and push to the anchored remote. Composes the CHANGELOG at release time. |
 | `/321 -Compact` | Emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation. |

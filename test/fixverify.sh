@@ -826,8 +826,20 @@ node "$PCENG" fetch-engine --from "$PCSRC" >/dev/null 2>&1
 PCOUT="$(node "$PCENG" upgrade 2>&1)"; PCCC=$?
 [ "$PCCC" = "20" ] && pass "file_add_template rejects ../ escape with exit 20" || fail "file_add_template accepted escape (exit $PCCC)"
 [ ! -f "$BASE/escape.md" ] && pass "no file written outside the project root" || fail "escape.md written outside the project root"
+# Absolute paths are also rejected (resolveContained explicitly checks isAbsolute).
+cat > "$PCSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "evil_absolute_path", "type": "file_add_template", "file": "/tmp/abs.md", "body": "evil" }
+  ]
+}
+EOF
+node "$PCENG" fetch-engine --from "$PCSRC" >/dev/null 2>&1
+PCOUT2="$(node "$PCENG" upgrade 2>&1)"; PCCC2=$?
+[ "$PCCC2" = "20" ] && pass "file_add_template rejects absolute path with exit 20" || fail "file_add_template accepted absolute path (exit $PCCC2)"
+echo "$PCOUT2" | grep -q "must be project-relative" && pass "absolute path rejected with project-relative message" || fail "absolute path rejection lacks project-relative message"
 
-echo "=== T47: init --upstream records engine.upstream (write-if-empty, preserves user fork URL on reinstall) ==="
+echo "=== T47: init --upstream records engine.upstream (explicit wins, write-if-missing preserves user fork URL on reinstall) ==="
 UP="$BASE/initupstream"
 node "$RENG" init "$UP" --name UpInit --upstream "https://example.com/fork.git" >/dev/null 2>&1
 node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://example.com/fork.git" ? 0 : 1)' "$UP/AIDOCS/_index.json" && pass "init --upstream recorded the URL into engine.upstream" || fail "init --upstream did not record the URL"
@@ -853,6 +865,15 @@ mv "$UPM/AIDOCS/_index.json" "$UPM/AIDOCS/UpRecall_SETUP_ARCHIVE/AIDOCS/_index.j
 # Reinstall (no --upstream this time) - recall must pull from the archive.
 node "$RENG" init "$UPM" --name UpRecall >/dev/null 2>&1
 node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://recall.example.com/origin.git" ? 0 : 1)' "$UPM/AIDOCS/_index.json" && pass "migration reinstall recalls engine.upstream from SETUP_ARCHIVE (no loss)" || fail "migration reinstall lost engine.upstream"
+# Forked source with a non-empty engine.upstream still honors an explicit --upstream
+# (the previous "write-if-source-empty" check would have silently ignored the flag).
+UPF="$BASE/initupstreamfork"
+FORK="$BASE/forksrc"
+mkdir -p "$FORK"
+cp -r "$REAL/." "$FORK/" 2>/dev/null
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.engine.upstream="https://forked-source.example.com/fork.git";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FORK/AIDOCS/_index.json"
+node "$FORK/AIDOCS/tools/engine.mjs" init "$UPF" --name UpFork --upstream "https://user-explicit.example.com/wanted.git" >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://user-explicit.example.com/wanted.git" ? 0 : 1)' "$UPF/AIDOCS/_index.json" && pass "explicit --upstream overrides a non-empty source engine.upstream (fork-source case)" || fail "explicit --upstream silently ignored when source had a value"
 
 echo "=== T46: upgrade cleans up INSTALL/engine after success; removes INSTALL/ if it becomes empty ==="
 CL="$BASE/cleanup"

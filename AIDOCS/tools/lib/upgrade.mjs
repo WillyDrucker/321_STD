@@ -125,19 +125,22 @@ export function cmdUpgrade(index, args) {
   for (const s of copyReport.skipList) console.log(`  SKIP ${s} (customizations[])`);
   if (versionNote) console.log(`  ${versionNote}`);
 
-  // Install log is the persistent audit trail - dry-run leaves no trail. Cleanup
-  // also lives in this block (dry-run pretends the writes did not happen, so it
-  // pretends about cleanup too). A failed run was already aborted above by the
-  // fail-fast process.exit(20), so reaching here means success.
+  // Install log is the persistent audit trail under INSTALL/. Skip it on a graduated
+  // project because the cleanup below removes INSTALL/ wholesale (the log would be a
+  // ghost trail with no surviving home). Dry-run leaves no trail either. A failed run
+  // was already aborted above by the fail-fast process.exit(20), so reaching here is
+  // success. Cleanup is best-effort: if rmSync trips on a locked file (Windows AV,
+  // editor handle), warn and keep the success exit so the upgrade itself is honored.
   if (!dryRun) {
-    installLog(root, `upgrade: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${copyReport.copied} files copied, ${copyReport.skipped} skipped${versionNote ? `, ${versionNote}` : ""}`);
-    // The fetched engine served its purpose - the copy step landed its files into
-    // the project and the manifest ops applied. Leaving INSTALL/engine around is a
-    // relic. On a graduated project, INSTALL/ itself should not persist either - it
-    // was only recreated by fetch-engine for the upgrade. Mid-migration INSTALL/ still
-    // has the runbooks plus INSTALL.log for the in-progress install/setup flow, so
-    // it survives this cleanup and waits for graduate.
-    cleanupInstallAfterUpgrade(root, index.graduated === true);
+    const graduated = index.graduated === true;
+    if (!graduated) {
+      installLog(root, `upgrade: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${copyReport.copied} files copied, ${copyReport.skipped} skipped${versionNote ? `, ${versionNote}` : ""}`);
+    }
+    try {
+      cleanupInstallAfterUpgrade(root, graduated);
+    } catch (e) {
+      console.warn(`upgrade: cleanup of INSTALL/ failed (${e.message}). The upgrade itself succeeded - remove INSTALL/engine by hand.`);
+    }
   }
 }
 
@@ -146,7 +149,8 @@ function cleanupInstallAfterUpgrade(root, graduated) {
   if (!existsSync(installDir)) return;
   if (graduated) {
     // Post-graduation: fetch-engine recreated INSTALL/ purely for the upgrade. The
-    // whole tree (engine, any log we just appended, anything else inside) is a relic.
+    // whole tree (engine, anything else inside) is a relic. installLog above was
+    // skipped on graduated so no audit trail dies here.
     rmSync(installDir, { recursive: true, force: true });
     return;
   }

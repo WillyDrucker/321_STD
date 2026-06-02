@@ -1,6 +1,6 @@
 ---
 name: updatesync
-description: Refresh the project's engine code, skill bodies, router, manifest-driven structural changes, and canonical sections of project data file templates from its configured upstream. Reads engine.upstream, fetches, applies the manifest delta, copies engine-class paths with customization preservation, rebuilds dispatch, and runs doctor. Project content is never touched. Offline or no upstream is a clean no-op.
+description: Refresh the project's engine code, skill bodies, router, manifest-driven structural changes, and canonical sections of project data file templates from its configured upstream. Reads engine.upstream, fetches, applies the manifest delta, copies engine-class paths with customization preservation, rebuilds dispatch, and runs doctor. Project-authored content is preserved. Canonical sections may update via section_text_diff manifest ops unless the file is in customizations[]. Offline or no upstream is a clean no-op.
 ---
 
 # /321 -UpdateSync

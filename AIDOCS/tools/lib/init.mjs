@@ -232,14 +232,16 @@ export async function cmdInit(args) {
   // the source ships the "full" shape, which is wrong for both downstream modes.
   // engine.upstream resolves through three layers: an explicit --upstream / STD321_UPSTREAM
   // wins, else a recalled value (live registry or SETUP_ARCHIVE copy, so a migration's
-  // reinstall preserves the original install's upstream), else empty (the source dogfood
-  // case). The write only happens when the source value is empty, so a user-customized
-  // fork URL survives a reinstall.
+  // reinstall preserves the original install's upstream), else the source's own value
+  // (typically empty in the dogfood case, but a fork's source could carry one). When a
+  // resolved upstream exists it always wins on the scaffold write - a user-customized
+  // fork URL survives a reinstall because _index.json is write-if-missing, not by us
+  // refusing to overwrite the scaffold value.
   const explicitUpstream = flag(args, "--upstream") || process.env.STD321_UPSTREAM || "";
   const recalledUpstream = explicitUpstream ? "" : await recallUpstream(target, name);
   const upstream = explicitUpstream || recalledUpstream;
   const idxObj = { ...source, privacy, auto_memory: { ...source.auto_memory, path: memRef } };
-  if (upstream && !idxObj.engine?.upstream) {
+  if (upstream) {
     idxObj.engine = { ...(idxObj.engine || {}), upstream };
   }
   scaffolds.push({ dst: join(target, "AIDOCS", "_index.json"), body: sub(`${JSON.stringify(idxObj, null, 2)}\n`) });
