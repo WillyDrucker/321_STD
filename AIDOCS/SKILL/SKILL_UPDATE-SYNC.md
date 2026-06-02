@@ -5,11 +5,13 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
 # /321 -UpdateSync
 
-**Purpose:** Refresh the project's engine and engine-managed canonical content from its configured upstream. The only sanctioned upgrade path, separate from the daily-driver `-Update` chain. Engine code, skill bodies, the router, the manifest operations, the auto-memory seed, and the canonical sections of project data file templates all refresh from upstream. Project data (memory, session, backlog content, custom skill bodies, project specifics in templates) stays untouched. `customizations[]` and `engine.operations_applied[]` in `_index.json` are the two project-side bookkeeping arrays this flow honors.
+**Purpose:** Refresh the project's engine and engine-managed canonical content from its configured upstream. The only sanctioned upgrade path, separate from the daily-driver `-Update` chain. Engine code, skill bodies, the router, the manifest operations, the auto-memory seed, and the canonical sections of project data file templates all refresh from upstream. Project-authored content stays untouched: LIFO bullets, the project-specifics sub-sections in templates, custom skill bodies (no source counterpart), and anything listed in `customizations[]`. Canonical sections in template files (DEV-AUDIT baseline, AUTO-PUSH baseline, CHANGELOG header) may refresh via `section_text_diff` manifest ops unless the file is in `customizations[]`. `customizations[]` and `engine.operations_applied[]` in `_index.json` are the two project-side bookkeeping arrays this flow honors.
 
 ## Run
 
 1. **Read the pointer and the gate.** Read `engine.version` and `engine.upstream` from `_index.json`. Empty `upstream` reports "no upstream configured, nothing to sync" and stops. A project sets `upstream` to the repo it pulls its engine from. Also read `node AIDOCS/tools/engine.mjs state` - if it reports `reconcile_pending: true`, stop. The reconcile pass owns the project's surface until it clears the gate (`/321 -Update` runs that pass), and an engine refresh mid-reconcile can overwrite in-flight hand edits via `section_text_diff` or the engine-class copy. The engine itself refuses `upgrade` while the gate is set unless `--force` is passed - this stop honors that contract from the AI side too.
+
+   **Crossing from a pre-0.1.x engine line.** If `engine.upstream` is unset and the project's local engine is older than 0.1.x (no `MANIFEST.json`, no `engine.operations_applied[]`, no `-UpdateSync` first-class skill), the steps below describe the modern path. The one-shot bootstrap from pre-0.1.x is: set `engine.upstream` to the upstream repo URL by hand, then run the modern flow (the old engine's `-Update -Sync` mode body cannot describe `upgrade` and the rename ops because they did not exist at its release).
 
 2. **Fetch.**
    ```bash
@@ -36,7 +38,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    node AIDOCS/tools/engine.mjs sync
    node AIDOCS/tools/engine.mjs doctor
    ```
-   `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the surface is clean. Read the doctor output. Real findings on project content (banned prose, oversized buckets) are pre-existing project debt for `-Update` / `scrub --fix` to handle, not sync failures.
+   `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the structural surface is clean. Read the doctor output. **A clean upgrade can still exit non-zero from pre-existing project content** - banned prose in CHANGELOG history, semicolons in over-long EXTENDED entries, sub-section budget hints, oversized buckets. Those are project debt for `/321 -Update` / `scrub --fix` to handle, not sync failures. Report them as pre-existing, do not retry the upgrade.
 
 6. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 

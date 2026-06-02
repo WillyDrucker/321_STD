@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { flag, validName } from "./args.mjs";
 import { buildGitignore, PRIVACY_MODES } from "./gitignore.mjs";
+import { recallMemoryPath, recallPrivacy, recallUpstream } from "./initRecall.mjs";
 import { installLog } from "./installLog.mjs";
 import { canonicalPath, claudeMemoryDir, fromHomeRef, SOURCE_ROOT, toHomeRef } from "./paths.mjs";
 
@@ -49,52 +50,6 @@ function recognizeTarget(target) {
     return "generic-existing";
   }
   return "fresh";
-}
-
-// Recall a project's recorded privacy across a reinstall so a migration keeps its mode:
-// the live registry first, then the post-archive copy in SETUP_ARCHIVE (migrate-archive
-// moves _index.json there). Default private - the safe default tracks everything, so a
-// missed call cannot silently hide a private project. A public repo passes --privacy.
-async function recallPrivacy(target, name) {
-  for (const p of [
-    join(target, "AIDOCS", "_index.json"),
-    join(target, "AIDOCS", `${name}_SETUP_ARCHIVE`, "AIDOCS", "_index.json"),
-  ]) {
-    if (!existsSync(p)) continue;
-    try { const v = JSON.parse(await readFile(p, "utf8")).privacy; if (v) return v; } catch { /* malformed - skip */ }
-  }
-  return "private";
-}
-
-// Recall a recorded external-memory path across a reinstall (the live registry, then the
-// post-archive copy in SETUP_ARCHIVE), so a re-migration keeps the folder it already uses.
-// A legacy project recorded it absolute, a rebuilt one home-relative - either is returned
-// as stored and normalized to absolute by the caller.
-async function recallMemoryPath(target, name) {
-  for (const p of [
-    join(target, "AIDOCS", "_index.json"),
-    join(target, "AIDOCS", `${name}_SETUP_ARCHIVE`, "AIDOCS", "_index.json"),
-  ]) {
-    if (!existsSync(p)) continue;
-    try { const v = JSON.parse(await readFile(p, "utf8")).auto_memory?.path; if (v) return v; } catch { /* malformed - skip */ }
-  }
-  return null;
-}
-
-// Recall a recorded engine.upstream URL across a reinstall: the live registry, then the
-// post-archive copy in SETUP_ARCHIVE. Without this, a migration's reinstall (which moves
-// the live registry into the archive before re-laying scaffolds) would silently drop the
-// upstream the original install recorded, leaving the project unable to -UpdateSync. An
-// explicit --upstream flag on the reinstall still wins via the caller's precedence.
-async function recallUpstream(target, name) {
-  for (const p of [
-    join(target, "AIDOCS", "_index.json"),
-    join(target, "AIDOCS", `${name}_SETUP_ARCHIVE`, "AIDOCS", "_index.json"),
-  ]) {
-    if (!existsSync(p)) continue;
-    try { const v = JSON.parse(await readFile(p, "utf8")).engine?.upstream; if (v) return v; } catch { /* malformed - skip */ }
-  }
-  return "";
 }
 
 // The external memory path to seed and record (absolute): an explicit override wins, else

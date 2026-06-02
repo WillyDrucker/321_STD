@@ -8,8 +8,10 @@ import { join } from "node:path";
 
 import { fromRoot, indexPath } from "./paths.mjs";
 
-// "SKILL_UPDATE-SESSION.md" -> flag "-UpdateSession", key "updatesession".
-function flagFromFilename(file) {
+// "SKILL_UPDATE-SESSION.md" -> flag "-UpdateSession", key "updatesession". Exported so the
+// router quick-ref reconciler and upgrade's rename summary derive the user-facing flag the
+// same way the dispatch builder does (one canonical home for the SKILL_*.md -> flag rule).
+export function flagFromFilename(file) {
   const stem = file.replace(/^SKILL_/, "").replace(/\.md$/, "");
   const camel = stem.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("");
   return { flag: `-${camel}`, key: camel.toLowerCase() };
@@ -17,8 +19,9 @@ function flagFromFilename(file) {
 
 // Pull one named frontmatter field, with quote-stripping for `flag: "-MySkill"`-style values.
 // Empty string when the block or field is missing, so a skill without an override just
-// falls through to the filename-derived default.
-function frontmatterField(content, field) {
+// falls through to the filename-derived default. Exported so the router quick-ref reconciler
+// reuses the same parse the dispatch builder uses.
+export function frontmatterField(content, field) {
   const block = content.match(/^---\n([\s\S]*?)\n---/);
   if (!block) return "";
   const line = block[1].match(new RegExp(`^${field}:\\s*(.+)$`, "m"));

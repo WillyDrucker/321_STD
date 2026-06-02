@@ -87,8 +87,13 @@ function classifyMove(relRaw) {
       [/^(.+?)_BACKLOG$/, (m) => ({ role: "backlog", old_prefix: m[1] })],
       [/^(.+?)_DEV-AUDIT$/, (m) => ({ role: "dev_audit", old_prefix: m[1] })],
       [/^(.+?)_AUTO-PUSH$/, (m) => ({ role: "auto_push", old_prefix: m[1] })],
-      // Legacy naming variants the pre-engine projects used:
+      // Legacy naming variants the pre-engine projects used. DEV-STANDARDS exists in two
+      // legacy forms: hyphen (the pre-engine 321 shape) and underscore (the even-older
+      // pre-rename shape). Both fold into the current dev_audit lane at reconcile, so
+      // both are classified as role: dev_standards with the legacy_naming flag pinned
+      // to the original form, so the reconcile pass knows which it is reading.
       [/^(.+?)_SESSION_HANDOFF(_EXTENDED)?$/, (m) => ({ role: `session${m[2] ? "_extended" : ""}`, old_prefix: m[1], legacy_naming: "SESSION_HANDOFF" })],
+      [/^(.+?)_DEV-STANDARDS$/, (m) => ({ role: "dev_standards", old_prefix: m[1], legacy_naming: "DEV-STANDARDS" })],
       [/^(.+?)_DEV_STANDARDS$/, (m) => ({ role: "dev_standards", old_prefix: m[1], legacy_naming: "DEV_STANDARDS" })],
     ];
     for (const [re, build] of checks) {

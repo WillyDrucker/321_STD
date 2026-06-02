@@ -20,14 +20,22 @@ import { basename, join, resolve } from "node:path";
 import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { slugify } from "./markdown.mjs";
+import { auditImport } from "./migrate-import-audit.mjs";
 import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
-import { isContained, repoRoot, resolveFile, stagingDir } from "./paths.mjs";
+import { isContained, repoRoot, stagingDir } from "./paths.mjs";
 import { loadStaging } from "./state.mjs";
 
 // Headings that are an EXTENDED file's own authoring guide, not durable content - plus
 // the Big-6 mirror headings a legacy EXTENDED carried at its top (overview ... conventions),
 // which are schema scaffold, so a legacy import never lands them as new LIFO bullets.
 const META_HEADING = /^(what goes in|what doesn't|what does not|pruning.*|purpose|lifo|overview|stack|architecture|environment|pipeline|conventions)$/i;
+// Sub-label H3 patterns under a numbered H2 parent ("Why:", "What:", "Status:",
+// "Files touched:"). A legacy EXTENDED that uses these as a fixed sub-structure
+// would otherwise scavenge as one top-level LIFO bullet per label per parent,
+// over-splitting a 4-arc SESSION into ~16 fragments most of which are meaningless
+// ("Status:", "Why: (3)"). Folding them keeps the heading inline in the parent
+// entry's body so the structure survives without polluting LIFO.
+const SUB_LABEL = /^[A-Z][A-Za-z0-9\s/_-]{0,40}:$/;
 // No code in EXTENDED. A fenced block becomes this marker so a code-only entry does
 // not collapse to an empty body, and the validator's no-fence rule on body_md holds.
 const CODE_MARKER = "(code example elided on import - summarize the takeaway in prose)";
@@ -161,69 +169,6 @@ export async function cmdMigrateImport(index, args) {
   console.log(`  next: validate --skill ${skill}, then commit --skill ${skill}, then verify what landed.`);
 }
 
-// --audit (read-only): re-parse the archive and diff it against the distilled
-// EXTENDED, surfacing archived entries with no surviving ### sub-section. A rewrite
-// (kept under a new title) shows up alongside true merges and drops, so this lists
-// candidates to confirm, not a clean loss list - the AI judges each. For each "gone"
-// entry, fuzzy-match against surviving slugs and surface the top 1-2 candidates so
-// the AI sees a likely merge / rewrite target alongside the loss list, rather than
-// hand-walking every gone title against every surviving heading.
-function auditImport(index, extKey, entries, from) {
-  const extPath = resolveFile(index, extKey);
-  if (!existsSync(extPath)) { console.error(`migrate-import --audit: ${extKey} not found on disk`); process.exit(16); }
-  const surviving = new Set();
-  for (const line of readFileSync(extPath, "utf8").split("\n")) {
-    const m = line.match(/^###\s+(.+?)\s*$/);
-    if (m) surviving.add(slugify(m[1]));
-  }
-  const goneEntries = entries.filter((e) => !surviving.has(slugify(e.title)));
-  const survived = entries.length - goneEntries.length;
-  console.log(`migrate-import --audit: ${entries.length} archived entr${entries.length === 1 ? "y" : "ies"} from ${from}, ${survived} survive verbatim, ${goneEntries.length} not found.`);
-  if (goneEntries.length === 0) { console.log("  every archived entry has a verbatim survivor."); return; }
-  console.log("  not found verbatim (merged, rewritten, or intentionally dropped) - confirm each:");
-  const survivingArr = [...surviving];
-  for (const e of goneEntries) {
-    console.log(`  - ${e.title}`);
-    for (const match of fuzzyMatches(slugify(e.title), survivingArr)) {
-      console.log(`      possible match: ${match}`);
-    }
-  }
-}
-
-// Token fuzzy match: split each slug on hyphens, ignore tokens shorter than three
-// chars (the / a / of / etc). Score by the better of Jaccard (good for similar-length
-// rewrites) and containment of the smaller side (good for headline trims where the
-// distilled survivor is much shorter than the archive). A noise gate requires at
-// least two meaningful tokens overlap, so a single common word does not match. Returns
-// the top candidates at or above either threshold, capped at two so a noisy mid-score
-// match does not crowd the report.
-function fuzzyMatches(goneSlug, survivingSlugs, jaccardThreshold = 0.4, containmentThreshold = 0.7, limit = 2) {
-  const goneTokens = tokensOf(goneSlug);
-  if (goneTokens.size === 0) return [];
-  const scored = [];
-  for (const surv of survivingSlugs) {
-    const survTokens = tokensOf(surv);
-    if (survTokens.size === 0) continue;
-    let inter = 0;
-    for (const t of goneTokens) if (survTokens.has(t)) inter++;
-    if (inter < 2) continue;
-    const union = goneTokens.size + survTokens.size - inter;
-    const jaccard = union === 0 ? 0 : inter / union;
-    const containment = inter / Math.min(goneTokens.size, survTokens.size);
-    if (jaccard >= jaccardThreshold || containment >= containmentThreshold) {
-      scored.push({ slug: surv, score: Math.max(jaccard, containment) });
-    }
-  }
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((x) => x.slug);
-}
-
-function tokensOf(slug) {
-  const out = new Set();
-  for (const t of slug.split("-")) if (t.length >= 3) out.add(t);
-  return out;
-}
-
 // The hybrid handoff - what the script could not land cleanly, for the AI to verify
 // and re-feed through the normal skill using the archived text. Silent-clean when the
 // scavenge was uneventful.
@@ -281,9 +226,19 @@ function parseEntries(content) {
 
     if (h1) { flush(); skipping = true; continue; }
     if (heading) {
-      flush();
-      currentDepth = heading[1].length;
+      const depth = heading[1].length;
       const title = heading[2].trim();
+      // Fold sub-label H3s (Why:, Status:, Files touched:) under their H2 parent
+      // instead of promoting them to their own LIFO bullets. Recognized only when
+      // we are inside a non-skipped H2 entry, so a structured EXTENDED with real H3
+      // topics is unaffected. The heading line is kept verbatim in the parent body
+      // so the structure reads when the entry renders.
+      if (current && !skipping && depth === 3 && currentDepth === 2 && SUB_LABEL.test(title)) {
+        current.bodyLines.push(line);
+        continue;
+      }
+      flush();
+      currentDepth = depth;
       if (META_HEADING.test(title)) { skipping = true; continue; }
       skipping = false;
       current = { title: stripTrailingPeriod(title), bodyLines: [] };

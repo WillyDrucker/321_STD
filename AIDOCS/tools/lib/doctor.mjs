@@ -12,7 +12,7 @@ import { runIntegrityChecks } from "./doctorIntegrity.mjs";
 // (size caps, import residue), advisory warnings are steady-state and gate nothing
 // (privacy drift, sub-section budget). The summary counts the two classes apart so
 // "warnings present" does not misread as "reconcile pending" on a graduated project.
-const RECONCILE_WARN = new Set(["Size caps", "Import residue"]);
+const RECONCILE_WARN = new Set(["Size caps", "Import residue", "Banned prose in historical (reconcile target)"]);
 
 export function cmdDoctor(index) {
   const integrity = runIntegrityChecks(index);

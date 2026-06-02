@@ -46,7 +46,11 @@ export function reconcilePending() {
 // or an unresolved import marker is the signature of an incomplete reconcile. The
 // data lanes are scanned, the project's own name is the baseline, so any other
 // project's doc ref is residue. Returns human-readable lines, empty when clean.
-const DOC_REF = /\b([A-Za-z][A-Za-z0-9_-]*)_(MEMORY|SESSION|BACKLOG|DEV-AUDIT|AUTO-PUSH)(?:_EXTENDED|_ARCHIVE)?\.md\b/g;
+// The prefix group mirrors validName's [A-Za-z0-9] leader so a digit-leading project
+// (321DONE-web, 9to5) is captured whole. The earlier letter-first form skipped the
+// leading "321DONE-" and matched on "web_MEMORY.md", flagging every correct self-ref
+// as a stale cross-project ref - the gate then refused to clear without --force.
+const DOC_REF = /\b([A-Za-z0-9][A-Za-z0-9_-]*)_(MEMORY|SESSION|BACKLOG|DEV-AUDIT|AUTO-PUSH)(?:_EXTENDED|_ARCHIVE)?\.md\b/g;
 function scanReconcileResidue() {
   const out = [];
   let index;

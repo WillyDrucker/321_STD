@@ -8,19 +8,34 @@ import { readFileSync } from "node:fs";
 
 import { readRegisteredFile } from "./paths.mjs";
 import { authoredTargets, scanBanned } from "./prose.mjs";
+import { reconcilePending } from "./state.mjs";
 
-// Banned prose is an error (the engine's output ships with house voice). The rest are
-// warnings - caps and residue clear as the reconcile pass distills, sub-section
-// budget is a steady-state advisory the next memory-update summarizes down.
+// Banned prose splits two ways. In steady state every authored doc is a hard error -
+// the engine and the AI write to house voice. During the reconcile window, prose in
+// files that the migration RESTORED VERBATIM (CHANGELOG) or IMPORTED 1:1 (the depth
+// _EXTENDED files) is historical content the reconcile pass will distill - keeping it
+// as a hard error blocks the gate on exactly the prose UPDATE-RECONCILE.md says to
+// defer. So during reconcile_pending those findings ride as reconcile warnings (they
+// clear naturally as distillation lands), while everything else stays a hard error.
+const HISTORICAL_PROSE_PATTERNS = [
+  /(^|[\\/])CHANGELOG\.md$/,
+  /_EXTENDED\.md$/,
+];
+function isHistoricalProseTarget(absPath) {
+  return HISTORICAL_PROSE_PATTERNS.some((re) => re.test(absPath));
+}
+
 export function runContentChecks(index) {
+  const prose = checkProse(index);
   return {
     errors: {
-      "Banned prose": checkProse(index),
+      "Banned prose": prose.errors,
     },
     warns: {
       "Size caps":          checkCaps(index),
       "Import residue":     checkResidue(index),
       "Sub-section budget": checkSubsectionBudget(index),
+      "Banned prose in historical (reconcile target)": prose.historical,
     },
   };
 }
@@ -54,17 +69,20 @@ function checkResidue(index) {
 }
 
 // House-voice scan of our authored prose (prose.mjs owns the target set and the
-// scanner that skips code fences and inline code). Error-tier: this is the output
-// the engine and the AI write, so a flag here is a real voice miss.
+// scanner that skips code fences and inline code). Returns errors vs historical
+// reconcile-warns. The historical bucket is non-empty only while reconcile_pending
+// is set, so a steady-state project still gates on every banned-prose finding.
 function checkProse(index) {
-  const issues = [];
+  const out = { errors: [], historical: [] };
+  const inReconcile = reconcilePending();
   for (const abs of authoredTargets(index)) {
     const name = abs.split(/[\\/]/).pop();
     let text;
     try { text = readFileSync(abs, "utf8"); } catch { continue; }
-    for (const v of scanBanned(text)) issues.push(`${name}:${v.line} ${v.kind}`);
+    const bucket = inReconcile && isHistoricalProseTarget(abs) ? out.historical : out.errors;
+    for (const v of scanBanned(text)) bucket.push(`${name}:${v.line} ${v.kind}`);
   }
-  return issues;
+  return out;
 }
 
 // EXTENDED sub-sections target 6 lines, soft cap 10. A long sub-section bloats EXTENDED
