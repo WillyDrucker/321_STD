@@ -40,16 +40,16 @@
       "prune_to": 75
     },
     "memoryupdate.memory_extended": {
-      "cap": 400,
-      "prune_to": 200
+      "cap": 1200,
+      "prune_to": 600
     },
     "sessionupdate.session": {
       "cap": 100,
       "prune_to": 50
     },
     "sessionupdate.session_extended": {
-      "cap": 400,
-      "prune_to": 200
+      "cap": 800,
+      "prune_to": 400
     },
     "memoryupdate.backlog": {
       "cap": 100,
@@ -71,6 +71,11 @@
         "flag": "-AutoPush",
         "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
         "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at setup / reconcile."
+      },
+      "compact": {
+        "flag": "-Compact",
+        "body": "./AIDOCS/SKILL/SKILL_COMPACT.md",
+        "description": "Generate a ready-to-paste /compact instruction block that carries the session's load-bearing state into the next conversation. Walks the current session arc, files touched, open items, constraints, and prints the block inside a fenced code box for one-click copy."
       },
       "devaudit": {
         "flag": "-DevAudit",

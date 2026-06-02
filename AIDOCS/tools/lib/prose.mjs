@@ -42,27 +42,6 @@ export function authoredTargets(index) {
   return [...set].filter((abs) => isFile(abs) && !/feedback_no_em_dashes\.md$/.test(abs));
 }
 
-// The WDDOCS docs - user / working content (design, business, research notes). Scanned
-// only at warning-tier (doctor reports, never fails), because banned prose here is the
-// user's authorship, not ours, so the house-voice rule does not gate on it. A migration
-// restores these verbatim, so they would otherwise trip the error gate on every run.
-// ARCHIVE is frozen legacy prose, and the gitignored handoff / deploy scratch is
-// local-only, so skip both.
-export function wddocsTargets(index) {
-  const set = new Set();
-  const wddocs = fromRoot(index.paths?.wddocs || "./WDDOCS");
-  if (existsSync(wddocs)) {
-    const walk = (dir) => {
-      for (const e of readdirSync(dir, { withFileTypes: true })) {
-        if (e.isDirectory()) { if (e.name !== "ARCHIVE") walk(join(dir, e.name)); }
-        else if (/\.md$/.test(e.name) && !/SESSION_HANDOFF|STD_PAGE_DEPLOY/.test(e.name)) set.add(join(dir, e.name));
-      }
-    };
-    walk(wddocs);
-  }
-  return [...set].filter((abs) => isFile(abs));
-}
-
 // Banned characters in authored prose, skipping code fences and inline code.
 export function scanBanned(content) {
   const out = [];

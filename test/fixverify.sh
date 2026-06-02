@@ -251,11 +251,11 @@ node "$ENG" state 2>&1 | grep -q '"reconcile_pending": true' && pass "gate stays
 node "$ENG" state --clear-reconcile --force >/dev/null 2>&1 && pass "clear-reconcile --force overrides" || fail "--force did not override"
 mv "$MEM.bak" "$MEM"
 
-echo "=== T13: doctor banned-prose scans restored WDDOCS ==="
+echo "=== T13: doctor leaves WDDOCS prose alone (user authorship is out of scope) ==="
 WD="$PROJ/WDDOCS/userdoc.md"
 cp "$WD" "$WD.bak"
 printf '\nThis line has an em dash \xe2\x80\x94 right here.\n' >> "$WD"
-node "$ENG" doctor 2>&1 | grep -q "em dash" && pass "doctor flags em dash in WDDOCS" || fail "em dash in WDDOCS not flagged"
+node "$ENG" doctor 2>&1 | grep -q "em dash" && fail "doctor flagged em dash in WDDOCS (user authorship should not gate)" || pass "doctor does not scan WDDOCS prose (em dash ignored)"
 mv "$WD.bak" "$WD"
 
 echo "=== T14: init --privacy generates a tier-aware .gitignore (public gates, private tracks) ==="
@@ -318,7 +318,7 @@ echo "$FOUT" | grep -qi "data-loss path" && pass "refusal explains the data-loss
 FRF="$BASE/forcefresh"; mkdir -p "$FRF"
 node "$RENG" init "$FRF" --name FreshForce --force >/dev/null 2>&1 && pass "init --force still accepted on a fresh target" || fail "init --force wrongly refused on a fresh target"
 
-echo "=== T19: WDDOCS prose is warning-tier (doctor stays clean); core authored prose is error-tier ==="
+echo "=== T19: doctor scans core authored prose only (WDDOCS is user authorship, ignored) ==="
 TP="$BASE/prosetier"
 node "$RENG" init "$TP" --name ProseTier >/dev/null 2>&1
 TPENG="$TP/AIDOCS/tools/engine.mjs"
@@ -326,8 +326,8 @@ node "$TPENG" doctor >/dev/null 2>&1 && pass "fresh project doctor clean (baseli
 mkdir -p "$TP/WDDOCS/DESIGN"
 printf '# Design notes\n\nA user design line with a semicolon; in it.\n' > "$TP/WDDOCS/DESIGN/notes.md"
 WOUT="$(node "$TPENG" doctor 2>&1)"; WCODE=$?
-echo "$WOUT" | grep -q "WDDOCS prose" && pass "WDDOCS semicolon reported under WDDOCS prose" || fail "WDDOCS prose not reported"
-[ "$WCODE" = "0" ] && pass "WDDOCS prose is warning-tier (doctor exits 0)" || fail "WDDOCS prose wrongly failed doctor (exit $WCODE)"
+echo "$WOUT" | grep -q "WDDOCS prose" && fail "WDDOCS prose section wrongly reported (should be removed)" || pass "WDDOCS prose section absent from doctor output"
+[ "$WCODE" = "0" ] && pass "WDDOCS prose ignored, doctor exits 0" || fail "doctor wrongly failed on WDDOCS prose (exit $WCODE)"
 printf '\nA capture line with a semicolon; here.\n' >> "$TP/AIDOCS/ProseTier_MEMORY.md"
 CCODE=0; node "$TPENG" doctor >/dev/null 2>&1 || CCODE=$?
 [ "$CCODE" != "0" ] && pass "core authored semicolon is error-tier (doctor exits $CCODE)" || fail "core authored semicolon did not fail doctor"
@@ -349,19 +349,20 @@ mkdir -p "$BASE/fesrc"; printf 'x' > "$BASE/fesrc/marker.txt"
 node "$FE/AIDOCS/tools/engine.mjs" fetch-engine --from "$BASE/fesrc" >/dev/null 2>&1
 [ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -Sync)" || fail "fetch-engine did not recreate INSTALL/"
 
-echo "=== T22: auto-prune creates <doc>_ARCHIVE.md on demand (no pre-seeded folder needed) ==="
+echo "=== T22: auto-prune creates <doc>_ARCHIVE/ folder with a datestamped file on demand ==="
 PR="$BASE/prunetest"
 node "$RENG" init "$PR" --name PruneTest >/dev/null 2>&1
 PRENG="$PR/AIDOCS/tools/engine.mjs"
 # Over-cap MEMORY.md (memoryupdate.memory cap is 150): a ## LIFO of 160 plain bullets.
 { printf '# PruneTest - MEMORY\n\n**Purpose:** prune test.\n\n## LIFO\n\n'; for n in $(seq 1 160); do printf -- '- legacy bullet %s\n' "$n"; done; } > "$PR/AIDOCS/PruneTest_MEMORY.md"
-# One fresh bullet, then commit (commit applies it, then auto-prune fires - reconcile is not pending on a fresh init).
 printf '{"actions":[{"op":"lifo_insert","file":"memoryupdate.memory","section":"LIFO","bullet":"a fresh protected bullet"}]}\n' > "$PR/AIDOCS/tools/staging/memoryupdate.json"
-rm -f "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md"
+rm -rf "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE"
 PCOUT="$(node "$PRENG" commit --skill memoryupdate 2>&1)"; PCC=$?
-[ "$PCC" = "0" ] && pass "commit+auto-prune exits 0 with no pre-seeded archive" || fail "commit/prune failed (exit $PCC): $PCOUT"
-[ -f "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md" ] && pass "auto-prune created PruneTest_MEMORY_ARCHIVE.md on demand" || fail "prune did NOT create the archive file"
-grep -q 'legacy bullet' "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE.md" 2>/dev/null && pass "pruned bullets archived (recovery net intact)" || fail "no pruned content in archive"
+[ "$PCC" = "0" ] && pass "commit+auto-prune exits 0 with no pre-seeded archive folder" || fail "commit/prune failed (exit $PCC): $PCOUT"
+[ -d "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE" ] && pass "auto-prune created PruneTest_MEMORY_ARCHIVE/ folder on demand" || fail "prune did NOT create the archive folder"
+ARCH_FILE=$(ls "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE/" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{4}_PruneTest_MEMORY\.md$' | head -1)
+[ -n "$ARCH_FILE" ] && pass "datestamped archive file landed (YYYYMMDD-HHMM_<doc>.md)" || fail "no YYYYMMDD-HHMM datestamped archive file found"
+[ -n "$ARCH_FILE" ] && grep -q 'legacy bullet' "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE/$ARCH_FILE" 2>/dev/null && pass "pruned bullets archived (recovery net intact)" || fail "no pruned content in archive"
 grep -q 'a fresh protected bullet' "$PR/AIDOCS/PruneTest_MEMORY.md" && pass "fresh bullet protected from prune" || fail "fresh bullet was wrongly pruned"
 
 echo "=== T23: clear-reconcile drops legacy watermark keys, keeps the canonical shape ==="
@@ -413,6 +414,36 @@ node "$ME/AIDOCS/tools/engine.mjs" migrate-archive --name MemExt >/dev/null 2>&1
 SNAP="$ME/AIDOCS/MemExt_SETUP_ARCHIVE/external-automemory"
 [ -f "$SNAP/feedback_project_custom.md" ] && pass "external custom rule snapshotted into the archive" || fail "external memory not snapshotted"
 [ -f "$MEDIR/feedback_project_custom.md" ] && pass "external memory left in place (copy, not move - live global state)" || fail "external memory was moved/deleted"
+
+echo "=== T29: extended-triggered prune drops a paired bullet+sub-section, both files archived under one timestamp ==="
+EP="$BASE/extprune"
+node "$RENG" init "$EP" --name ExtPrune >/dev/null 2>&1
+EPENG="$EP/AIDOCS/tools/engine.mjs"
+# Main has 5 paired [+] bullets, well under the 150 cap. Extended carries 5 ### sub-sections
+# at 250 lines each (1250+ total), over the 1200 cap. Extended triggers, paired drop fires.
+{ printf '# ExtPrune - MEMORY\n\n**Purpose:** ext prune test.\n\n## Overview\n(fill in)\n## Stack\n(fill in)\n## Architecture\n(fill in)\n## Environment\n(fill in)\n## Pipeline\n(fill in)\n## Conventions\n(fill in)\n\n---\n\n## LIFO\n\n'; for n in $(seq 1 5); do printf -- '- [+] Entry %s body\n' "$n"; done; } > "$EP/AIDOCS/ExtPrune_MEMORY.md"
+{ printf '# ExtPrune - MEMORY (Extended)\n\n**Purpose:** ext.\n\n## LIFO\n\n'; for n in $(seq 1 5); do printf -- '### Entry %s body\n' "$n"; for m in $(seq 1 250); do printf -- 'filler line %s\n' "$m"; done; done; } > "$EP/AIDOCS/ExtPrune_MEMORY_EXTENDED.md"
+printf '{"actions":[{"op":"lifo_insert","file":"memoryupdate.memory","section":"LIFO","bullet":"fresh head"}]}\n' > "$EP/AIDOCS/tools/staging/memoryupdate.json"
+rm -rf "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE"
+EPCOUT="$(node "$EPENG" commit --skill memoryupdate 2>&1)"; EPCC=$?
+[ "$EPCC" = "0" ] && pass "commit+extended-triggered prune exits 0" || fail "extended-triggered prune failed (exit $EPCC): $EPCOUT"
+[ -d "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE" ] && pass "extended-triggered prune created the archive folder" || fail "extended-triggered prune did not create the folder"
+PAIR_MAIN=$(ls "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE/" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{4}_ExtPrune_MEMORY\.md$' | head -1)
+PAIR_EXT=$(ls "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE/" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{4}_ExtPrune_MEMORY_EXTENDED\.md$' | head -1)
+[ -n "$PAIR_MAIN" ] && [ -n "$PAIR_EXT" ] && pass "both bullets file and sub-sections file archived as a pair" || fail "paired archive files missing (main=$PAIR_MAIN ext=$PAIR_EXT)"
+MAIN_STAMP="${PAIR_MAIN%_ExtPrune_MEMORY.md}"
+EXT_STAMP="${PAIR_EXT%_ExtPrune_MEMORY_EXTENDED.md}"
+[ "$MAIN_STAMP" = "$EXT_STAMP" ] && [ -n "$MAIN_STAMP" ] && pass "paired files share the same timestamp ($MAIN_STAMP)" || fail "timestamp drift between paired files (main=$MAIN_STAMP ext=$EXT_STAMP)"
+
+echo "=== T30: doctor reports sub-sections over the 10-line soft cap as advisory (sub-section budget) ==="
+SB="$BASE/subbudget"
+node "$RENG" init "$SB" --name SubBudget >/dev/null 2>&1
+SBENG="$SB/AIDOCS/tools/engine.mjs"
+{ printf '# SubBudget - MEMORY (Extended)\n\n**Purpose:** subsection budget test.\n\n## LIFO\n\n### Big Entry\n'; for n in $(seq 1 15); do printf -- 'body line %s\n' "$n"; done; } > "$SB/AIDOCS/SubBudget_MEMORY_EXTENDED.md"
+DOUT="$(node "$SBENG" doctor 2>&1)"
+echo "$DOUT" | grep -q "Sub-section budget" && pass "doctor reports the Sub-section budget category" || fail "no Sub-section budget category in doctor output"
+echo "$DOUT" | grep -qi "Big Entry" && pass "doctor names the offending sub-section" || fail "offending sub-section not named in advisory"
+echo "$DOUT" | grep -q "advisory warning" && pass "sub-section budget is advisory tier (not reconcile)" || fail "sub-section budget not advisory"
 
 echo "=== T28: legacy auto_memory.source still passes doctor (the seed rename is non-breaking) ==="
 LG="$BASE/legacyam"

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { hasPrivacyBlock } from "./gitignore.mjs";
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
 import { fromRoot } from "./paths.mjs";
-import { authoredTargets, isFile, scanBanned, wddocsTargets } from "./prose.mjs";
+import { authoredTargets, isFile, scanBanned } from "./prose.mjs";
 
 const BIG6 = ["Overview", "Stack", "Architecture", "Environment", "Pipeline", "Conventions"];
 
@@ -33,10 +33,10 @@ export function cmdDoctor(index) {
   // markers still in place, so these are expected mid-migration - the reconcile pass
   // drives them to zero by distilling, and a fully clean doctor is its gate.
   const warnChecks = {
-    "Size caps":      checkCaps(index),
-    "Import residue": checkResidue(index),
-    "Privacy drift":  checkPrivacyDrift(index),
-    "WDDOCS prose":   checkWddocsProse(index),
+    "Size caps":          checkCaps(index),
+    "Import residue":     checkResidue(index),
+    "Privacy drift":      checkPrivacyDrift(index),
+    "Sub-section budget": checkSubsectionBudget(index),
   };
   // Caps and import residue are reconcile targets - a migration capture distills them
   // to zero. Privacy drift and WDDOCS prose are steady-state advisories no distillation
@@ -60,7 +60,7 @@ export function cmdDoctor(index) {
   if (errors === 0) {
     const msgs = [];
     if (reconcileWarns) msgs.push(`${reconcileWarns} reconcile warning(s) - expected mid-migration, cleared by distillation`);
-    if (otherWarns) msgs.push(`${otherWarns} advisory warning(s) - steady-state (privacy / WDDOCS prose), not a reconcile target`);
+    if (otherWarns) msgs.push(`${otherWarns} advisory warning(s) - steady-state (privacy drift, sub-section budget), not a reconcile target`);
     console.log(`\ndoctor: structure clean. ${msgs.join(". ")}.`);
     return;
   }
@@ -271,17 +271,33 @@ function checkProse(index) {
   return issues;
 }
 
-// Banned prose in user-owned WDDOCS (design / business / working docs). Warning-tier,
-// not error: it is the user's authorship, not ours, so the no-em-dash / no-semicolon
-// rule does not gate on it. A migration restores these verbatim, so without this split
-// a project with user docs that use semicolons could never reach a clean doctor.
-function checkWddocsProse(index) {
+// EXTENDED sub-sections target 6 lines, soft cap 10. A long sub-section bloats EXTENDED
+// independent of the main LIFO bullet count, so it is the structural lever to keep
+// EXTENDED and main autoprune timing in sync. Advisory-tier - the AI summarizes
+// oversized entries on the next pass, the rule does not gate steady-state runs.
+function checkSubsectionBudget(index) {
+  const TARGET = 6, SOFT_CAP = 10;
   const issues = [];
-  for (const abs of wddocsTargets(index)) {
-    const name = abs.split(/[\\/]/).pop();
-    let text;
-    try { text = readFileSync(abs, "utf8"); } catch { continue; }
-    for (const v of scanBanned(text)) issues.push(`${name}:${v.line} ${v.kind}`);
+  for (const key of Object.keys(index.files || {})) {
+    if (!key.endsWith("_extended")) continue;
+    const content = readReg(index, key);
+    if (content === null) continue;
+    const lines = content.split("\n");
+    let subStart = -1, subTitle = "";
+    const finalize = (endIdx) => {
+      if (subStart === -1) return;
+      const subLen = endIdx - subStart;
+      if (subLen > SOFT_CAP) issues.push(`${key}: "${subTitle}" runs ${subLen} lines (target ${TARGET}, soft cap ${SOFT_CAP} - summarize)`);
+    };
+    for (let i = 0; i < lines.length; i++) {
+      if (/^###\s+/.test(lines[i])) {
+        finalize(i);
+        subStart = i;
+        subTitle = lines[i].replace(/^###\s+/, "").trim();
+      }
+    }
+    finalize(lines.length);
   }
   return issues;
 }
+

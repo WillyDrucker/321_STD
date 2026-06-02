@@ -6,7 +6,7 @@
 
 These override every individual rule below.
 
-1. **Cohesion over count.** One concept per file. If the file's job needs "and" to describe, inspect. A 600-line cohesive file beats three fragmented 200-line files.
+1. **Small files win, cohesion shapes the cut.** Files at or under ~300 lines. Past 300 the model's edit accuracy drops and regressions cluster, so 10 x 300 beats 5 x 600. One concept per file. If the file's job needs "and" to describe, inspect. Cohesion decides HOW to split (along a real seam, into distinctly named modules), not WHETHER. Never fragment for the number alone, never keep a 400+ file whole for cohesion alone.
 2. **Names are contracts.** Intuitive domain vocabulary. A name should let a reader predict the function's signature before opening it. No generic labels (`utils`, `helpers`, `misc`).
 3. **One canonical home per concern.** A rule, token, or pattern lives in exactly one file. Cross-reference, do not duplicate. Promote a shared helper when the same logic appears in two places.
 4. **Index registries as the spine.** `_index.json` owns paths, sizes, skill bodies, and the engine pointer. Code reads from it. Nothing hardcodes a path.
@@ -33,10 +33,11 @@ Audit-facing copy of the auto-memory inventory in `AIDOCS/automemory`. The audit
 ### Code structure
 
 - **Module index.** A registry doc lists every module and its key exports. Update on add or rename.
-- **File sizes.** Soft 200 (inspection trigger). Hard 400 (split or justify cohesion). Cohesive 600 (ceiling). `-FULL` mode sweeps everything over 300 for a cohesion review regardless.
+- **File sizes.** Target ~300 (soft, the noise/regression threshold, not a hard 301-line cliff). 200 stays the inspection trigger. 300-400: keep cohesive unless a split lays groundwork for future scaling (a growth-prone area, a strategy/layer seam). 400+: split outright, even at some cohesion cost. Never split just to cross 300. `-FULL` sweeps everything over 300 for a split-or-justify review.
 - **Directory size.** Soft 12 files. Above that, can you predict each file's job from the name alone? If not, consolidate.
 - **Cohesion test.** One sentence with no "and" describes the file's job. "And" is an inspection trigger, not an automatic split.
 - **Split heuristics.** Only when the result yields two semantically distinct names. Reaching for `-helpers` or `-main` is a "don't split" signal.
+- **Re-export on extraction.** When splitting a module that others import, keep the original path as the public face: re-export the moved types/functions, or keep the entry function local. The split is an internal seam, not an API break.
 - **Prefer direct imports over barrel re-exports.** Re-export indexes hide the real home. Use barrels only where the framework expects them (package public API, framework convention).
 - **No dead exports.** Every export has a caller.
 

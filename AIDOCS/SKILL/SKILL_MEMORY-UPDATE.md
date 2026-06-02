@@ -44,15 +44,16 @@ SESSION (just refreshed) plus the conversation plus the codebase are the source 
 |---|---|---|
 | Durable observation (codebase, conversation, distilled from SESSION) | MEMORY LIFO | `lifo_insert` on `memoryupdate.memory`, section `LIFO` |
 | An empty Big-6 section you can fill from evidence | that section | `overwrite_section` on `memoryupdate.memory`, section `<Section>` |
-| Specific feature ask (user-named, ready to implement) | BACKLOG Features | `lifo_insert` on `memoryupdate.backlog`, section `Features` |
-| Other future work (refactor, polish, exploratory, deferred bug) | BACKLOG Ideas | `lifo_insert` on `memoryupdate.backlog`, section `Ideas` |
+| Long-term feature direction (user-committed eventually, not immediate) | BACKLOG Features | `lifo_insert` on `memoryupdate.backlog`, section `Features` |
+| Long-term exploratory or what-if direction | BACKLOG Ideas | `lifo_insert` on `memoryupdate.backlog`, section `Ideas` |
+| Immediate follow-up, next step of in-flight work, cross-track flag | DROP - SessionUpdate's lane | (n/a) |
 | AGENTS / auto-memory suggestion | MEMORY LIFO, as a `**Suggested for ...:**` bullet | `lifo_insert` |
 | Project-specific event or active state | DROP - SessionUpdate's lane | (n/a) |
 | Code-applicable pattern (lint / grep enforceable) | DROP - DevAudit's lane | (n/a) |
 
 ### BACKLOG capture filter
 
-Capture only when one holds: explicit user future intent ("we should do X"), user directional weight ("would be nice if..."), or AI-surfaced with user consent (tag `_(source: ai-surfaced)_`). Format: `**<title>.** <one-line description> _(source: user|ai-surfaced)_`. Features = specific and ready. Ideas = everything else worth remembering. When in doubt -> Ideas.
+BACKLOG is long-term direction only - items the project may pursue eventually, not immediate items marked for review. The bar: a "don't forget this at some point" entry earns BACKLOG, a "store these here for now" entry does not. Follow-ups, cross-track flags, and the next step of in-flight work belong in SESSION, not here. Capture for BACKLOG only when one of these holds: explicit user future intent ("we should do X eventually"), user directional weight ("would be nice if..."), or AI-surfaced with user consent (tag `_(source: ai-surfaced)_`). Format: `**<title>.** <one-line description> _(source: user|ai-surfaced)_`. Features = committed long-term direction. Ideas = exploratory, what-if. When in doubt -> Ideas. When still in doubt -> drop, the SESSION lane will catch it as an event.
 
 ## Step 4: Big-6 gap-fill (empty sections only)
 

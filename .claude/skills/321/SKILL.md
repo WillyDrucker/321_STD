@@ -17,6 +17,7 @@ description: Router for the /321 skill family. Resolves -<Flag> against AIDOCS/_
 /321 -Update -Sync     update the engine itself from upstream (project data untouched)
 /321 -DevAudit         audit the source against DEV-AUDIT.md (-FULL)
 /321 -AutoPush         capture, commit, and push to the anchored remote
+/321 -Compact          emit ready-to-paste /compact instructions for the next conversation
 ```
 
 `/321` alone prints this usage block.

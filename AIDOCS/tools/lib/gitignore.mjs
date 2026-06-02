@@ -100,7 +100,9 @@ AIDOCS/*_SESSION_EXTENDED.md
 AIDOCS/*_BACKLOG.md
 AIDOCS/*_DEV-AUDIT.md
 AIDOCS/*_AUTO-PUSH.md
-# Pruned LIFO overflow: auto-prune writes <doc>_ARCHIVE.md as the recovery net.
+# Pruned LIFO overflow: auto-prune writes <doc>_<LANE>_ARCHIVE/<datestamp>_*.md as the
+# recovery net (the legacy flat-file *_ARCHIVE.md pattern is kept ignored for backcompat).
+AIDOCS/*_ARCHIVE/
 AIDOCS/*_ARCHIVE.md
 AIDOCS/automemory/*
 !AIDOCS/automemory/.gitkeep
@@ -161,6 +163,7 @@ export const TIER_B_TRACKED = [
   "AIDOCS/*_BACKLOG.md",
   "AIDOCS/*_DEV-AUDIT.md",
   "AIDOCS/*_AUTO-PUSH.md",
+  "AIDOCS/*_ARCHIVE",
   "AIDOCS/*_ARCHIVE.md",
   "AIDOCS/automemory",
   "WDDOCS/ARCHIVE",
