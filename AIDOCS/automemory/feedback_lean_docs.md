@@ -16,7 +16,7 @@ Read-order tiers, top to bottom:
 - `AIDOCS/<PROJECT>_DEV-AUDIT.md` - code-applicable rules only (language conventions, comment specifics, lint patterns).
 - Auto-memory files - one rule per file.
 
-Exact size targets + pruning policy live in the relevant skill bodies (`/321 -SessionUpdate`, `/321 -MemoryUpdate`). This memory just states the tier ordering.
+Exact size targets + pruning policy live in the relevant skill bodies (`/321 -UpdateSession`, `/321 -UpdateMemory`). This memory just states the tier ordering.
 
 **Why:** Session start has to fit a budget. If a tier balloons beyond its window with detail that doesn't carry forward, a cold-start session re-reads pages of stale specifics. Detail belongs where it's still useful but doesn't crowd the entry point.
 

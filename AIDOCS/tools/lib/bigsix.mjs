@@ -1,7 +1,7 @@
 // bigsix.mjs - the deterministic pre-fill for the two Big-6 sections a script can
 // read straight from the project: Stack (language, runtime, framework, key deps) and
 // Pipeline (the build / test / release scripts). It drafts fact bullets from
-// package.json and the obvious config files, never prose. The MemoryUpdate skill feeds
+// package.json and the obvious config files, never prose. The UpdateMemory skill feeds
 // the draft to the AI, which writes the house-voice section and fills the four judgment
 // sections (Overview / Architecture / Environment / Conventions) itself. With no
 // package.json the draft is empty and every section stays the AI's to fill.

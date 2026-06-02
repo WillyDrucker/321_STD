@@ -1,6 +1,6 @@
 # PROJECTNAME - MEMORY
 
-**Purpose:** Project identity, durable decisions, and distilled learnings. Six static sections at the top hold the schema (the Big 6). Below the divider, LIFO (newest on top) holds durable observations plus suggestive bullets for AGENTS / auto-memory.
+**Purpose:** Project identity, durable decisions, and distilled learnings. Six static sections at the top hold the schema (the Big 6). Below the divider, LIFO (newest on top) holds durable observations plus suggestive bullets for AGENTS / auto-memory. Anchored detail in `PROJECTNAME_MEMORY_EXTENDED.md`.
 
 ## Overview
 
@@ -30,4 +30,4 @@
 
 ## LIFO
 
-(no entries yet - routine `/321 -MemoryUpdate` lands here)
+(no entries yet - routine `/321 -UpdateMemory` lands here)

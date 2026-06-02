@@ -74,32 +74,32 @@ function checkRegistry(index) {
 
 function checkMemoryShape(index) {
   const issues = [];
-  const mem = readRegisteredFile(index, "memoryupdate.memory");
-  if (mem === null) { issues.push("memoryupdate.memory not found"); }
+  const mem = readRegisteredFile(index, "updatememory.memory");
+  if (mem === null) { issues.push("updatememory.memory not found"); }
   else {
     needPurpose(mem, "MEMORY", issues);
     for (const s of BIG6) if (!mem.includes(`## ${s}`)) issues.push(`MEMORY: missing Big-6 section "## ${s}"`);
     if (!mem.includes("\n---")) issues.push("MEMORY: missing --- divider");
     if (!mem.includes("## LIFO")) issues.push("MEMORY: missing ## LIFO");
   }
-  const ext = readRegisteredFile(index, "memoryupdate.memory_extended");
-  if (ext === null) issues.push("memoryupdate.memory_extended not found");
+  const ext = readRegisteredFile(index, "updatememory.memory_extended");
+  if (ext === null) issues.push("updatememory.memory_extended not found");
   else { needPurpose(ext, "MEMORY_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("MEMORY_EXTENDED: missing ## LIFO"); needNoFence(ext, "MEMORY_EXTENDED", issues); }
   return issues;
 }
 
 function checkSessionShape(index) {
   const issues = [];
-  const ses = readRegisteredFile(index, "sessionupdate.session");
-  if (ses === null) { issues.push("sessionupdate.session not found"); }
+  const ses = readRegisteredFile(index, "updatesession.session");
+  if (ses === null) { issues.push("updatesession.session not found"); }
   else {
     needPurpose(ses, "SESSION", issues);
     if (!ses.includes("## Current State")) issues.push("SESSION: missing ## Current State");
     if (!ses.includes("\n---")) issues.push("SESSION: missing --- divider");
     if (!ses.includes("## LIFO")) issues.push("SESSION: missing ## LIFO");
   }
-  const ext = readRegisteredFile(index, "sessionupdate.session_extended");
-  if (ext === null) issues.push("sessionupdate.session_extended not found");
+  const ext = readRegisteredFile(index, "updatesession.session_extended");
+  if (ext === null) issues.push("updatesession.session_extended not found");
   else { needPurpose(ext, "SESSION_EXTENDED", issues); if (!ext.includes("## LIFO")) issues.push("SESSION_EXTENDED: missing ## LIFO"); needNoFence(ext, "SESSION_EXTENDED", issues); }
   return issues;
 }

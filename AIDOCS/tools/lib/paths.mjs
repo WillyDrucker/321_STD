@@ -36,7 +36,7 @@ export function loadIndex() {
 }
 
 // Absolute path of a registered file by its domain-owned key (e.g.
-// "memoryupdate.memory"). Throws if the key is not registered.
+// "updatememory.memory"). Throws if the key is not registered.
 export function resolveFile(index, key) {
   const rel = index.files?.[key];
   if (!rel) throw new Error(`no file registered under key "${key}"`);
@@ -97,7 +97,7 @@ function memoryHome() { return process.env.STD321_MEMORY_HOME || homedir(); }
 // passes read the recorded value rather than re-deriving against an encoding that can
 // shift between Claude Code releases. Returns an absolute path (the dir need not exist
 // yet).
-export function claudeMemoryKey(root) {
+function claudeMemoryKey(root) {
   return resolve(root).replace(/^([A-Za-z]):/, (_, d) => `${d.toLowerCase()}:`).replace(/[:\\/_]/g, "-");
 }
 export function claudeMemoryDir(root) {

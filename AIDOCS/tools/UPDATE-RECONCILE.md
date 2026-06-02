@@ -37,7 +37,7 @@ A wholesale reshape (dozens of sub-sections down to a handful) is far more relia
 
 ## Auto-memory merge (Claude's native memory is the source of truth)
 
-Auto-memory lives in Claude Code's native external memory (`auto_memory.path`, loaded by the harness each session), seeded by `init` from the in-repo seed (`auto_memory.seed` = `AIDOCS/automemory`). Setup snapshotted the project's prior external memory into `<PROJECT>_SETUP_ARCHIVE/external-automemory` (and any scattered memory-like files the sweep routed in). This pass reconciles the external memory against that snapshot - the one sanctioned write to auto-memory (routine `-MemoryUpdate` never touches it), scoped to this gated pass.
+Auto-memory lives in Claude Code's native external memory (`auto_memory.path`, loaded by the harness each session), seeded by `init` from the in-repo seed (`auto_memory.seed` = `AIDOCS/automemory`). Setup snapshotted the project's prior external memory into `<PROJECT>_SETUP_ARCHIVE/external-automemory` (and any scattered memory-like files the sweep routed in). This pass reconciles the external memory against that snapshot - the one sanctioned write to auto-memory (routine `-UpdateMemory` never touches it), scoped to this gated pass.
 
 - **Keep the user profile.** A filled `user_*.md` is project data, not a canonical rule - make sure it sits in the external memory (restore it from the snapshot), and point the AGENTS Hard-rules entry at the real filename (doctor checks the seed pointer both ways).
 - **Refresh the canonical rules.** `init` seeded write-if-missing, so an existing rule kept its prior wording - overwrite the canonical-named files in the external memory from the seed so they carry the current engine's version. The profile and project-custom rules stay.
@@ -50,7 +50,7 @@ Auto-memory lives in Claude Code's native external memory (`auto_memory.path`, l
 
 - **DEV-AUDIT `## Project specifics`.** Walk each restored entry against the canonical baseline above the `---` (anchor principles, hard rules, audit dimensions, which `init` writes identically everywhere). Drop what duplicates the baseline or restates MEMORY (MEMORY owns codebase-identity rules), keep what is genuinely project-specific (build / lint commands, language version, framework gotchas) or extends the baseline, surface contradictions. Never touch the baseline above the divider.
 - **AUTO-PUSH `## Project release steps`.** Confirm the restored steps are the project's real cycle (version bump, CHANGELOG, build, deploy / publish), dropping generic restatement the baseline already covers. When nothing real was restored (only generic boilerplate, or a non-321 source with no AUTO-PUSH doc), derive the steps from the archived release skill body (`<PROJECT>_SETUP_ARCHIVE/AIDOCS/SKILL/SKILL_AUTO-PUSH.md`, see the skill-body fold below), the CHANGELOG, and the build config, or leave the placeholder when there is no signal.
-- **CHANGELOG.** Voice-scrub to house style (`scrub --fix` rewrites em dashes and flags semicolons) and confirm the canonical structure. Invent no entries - AutoPush owns CHANGELOG composition at release, this pass only reformats what migrated.
+- **CHANGELOG.** Voice-scrub to house style (`scrub --fix`) and confirm the canonical structure. Invent no entries - AutoPush owns CHANGELOG composition at release, this pass only reformats what migrated.
 
 ## Skill-body fold (legacy in-place customizations)
 
@@ -86,8 +86,8 @@ A capable pass meets these naturally. They give a lighter pass concrete targets:
 First audit each distilled lane against its archive - the verify of what took and what did not. Point `--audit` at the same archived EXTENDED Setup imported from:
 
 ```bash
-node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION_EXTENDED.md --skill sessionupdate --audit
-node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_MEMORY_EXTENDED.md  --skill memoryupdate  --audit
+node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION_EXTENDED.md --skill updatesession --audit
+node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_MEMORY_EXTENDED.md  --skill updatememory  --audit
 ```
 
 Each run lists the archived entries with no surviving `### sub-section`. Confirm every one is a deliberate merge or drop, not a lost entry, and re-derive any that should have stayed. (Add the same `--old <OLD> --new <PROJECT>` the import used if the project was renamed, so the archive titles normalize before the diff.)
@@ -112,7 +112,7 @@ node AIDOCS/tools/engine.mjs sync
 node AIDOCS/tools/engine.mjs doctor
 ```
 
-`graduate` deregisters `-Setup` (drops its body and dispatch entry), removes `INSTALL/`, and marks the project `graduated` so a later `-SYNC` does not re-add `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean. The onboarding lib modules `init` laid stay in place, unused once `INSTALL/` and `-Setup` are gone - no skill invokes them after graduation (the `--root` model carries no engine carve).
+`graduate` deregisters `-Setup` (drops its body and dispatch entry), removes `INSTALL/`, and marks the project `graduated` so a later `-UpdateSync` does not re-add `-Setup`. It refuses while `reconcile_pending` is set, so a project never loses its onboarding tier before it has distilled. `sync` rebuilds dispatch without `-Setup`, and `doctor` confirms the steady surface is clean. The onboarding lib modules `init` laid stay in place, unused once `INSTALL/` and `-Setup` are gone - no skill invokes them after graduation (the `--root` model carries no engine carve).
 
 **Confirm the router quick-ref.** `sync` rewrites the `_index.json` registry but not the router prose, so verify they agree: every skill in `skills.dispatch` is listed in the `.claude/skills/321/SKILL.md` How to invoke block, and the deregistered `-Setup` no longer appears there. Edit the router by hand to close any drift, since nothing else does.
 

@@ -1,7 +1,7 @@
 // doctorContent.mjs - the content-quality arm of doctor: LIFO files sit under their
 // registered caps, no unresolved migrate-import markers survive distillation, the
-// authored prose targets carry no em dashes or semicolons, and EXTENDED sub-sections
-// stay within the 6-line target / 10-line soft cap. "Is the content within bounds?"
+// authored prose targets hold to the house voice, and EXTENDED sub-sections stay
+// within the 6-line target / 10-line soft cap. "Is the content within bounds?"
 // Distinct from doctorIntegrity, which validates structure.
 
 import { readFileSync } from "node:fs";
@@ -53,9 +53,9 @@ function checkResidue(index) {
   return issues;
 }
 
-// Em dashes and semicolons in our authored prose (prose.mjs owns the target set and
-// the scanner that skips code fences and inline code). Error-tier: this is the output
-// the engine and the AI write, so banned glyphs here are a real house-voice miss.
+// House-voice scan of our authored prose (prose.mjs owns the target set and the
+// scanner that skips code fences and inline code). Error-tier: this is the output
+// the engine and the AI write, so a flag here is a real voice miss.
 function checkProse(index) {
   const issues = [];
   for (const abs of authoredTargets(index)) {

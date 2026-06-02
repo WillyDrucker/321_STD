@@ -5,7 +5,7 @@
 // section-shaped docs (DEV-AUDIT specifics, AUTO-PUSH release steps, the BACKLOG
 // Features + Ideas lists) copied verbatim with legacy + rename normalization, and
 // CHANGELOG verbatim. The knowledge files (MEMORY / SESSION / Big-6) are not restored
-// here - they are captured through SessionUpdate / MemoryUpdate and distilled by the
+// here - they are captured through UpdateSession / UpdateMemory and distilled by the
 // gated -Update reconcile pass instead, and so is the dedup / reformat of the sections
 // this lane copies. ENV is left in place by migrate-archive.
 
@@ -131,7 +131,7 @@ export function cmdMigrateRestore(args) {
   if (existsSync(clArchived)) { cpSync(clArchived, join(root, "CHANGELOG.md")); done.push("CHANGELOG (verbatim)"); }
 
   console.log(`migrate-restore: restored ${done.length ? done.join(", ") : "nothing"} from ${archive}.`);
-  console.log("  knowledge files (MEMORY / SESSION / Big-6) are captured through SessionUpdate / MemoryUpdate, then distilled by the gated /321 -Update reconcile pass, not restored here.");
+  console.log("  knowledge files (MEMORY / SESSION / Big-6) are captured through UpdateSession / UpdateMemory, then distilled by the gated /321 -Update reconcile pass, not restored here.");
   console.log("  the copied config sections are deduped / reformatted by the -Update reconcile pass.");
   installLog(root, `migrate-restore: restored ${done.length ? done.join(", ") : "nothing"} from AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fromRoot, indexPath, stagingDir, statePath } from "./paths.mjs";
 
 // The skill domains that own a staging lane plus a state watermark.
-export const SKILLS = ["sessionupdate", "memoryupdate"];
+export const SKILLS = ["updatesession", "updatememory"];
 
 function stagingPath(skill) {
   return join(stagingDir(), `${skill}.json`);
@@ -52,7 +52,7 @@ function scanReconcileResidue() {
   let index;
   try { index = JSON.parse(readFileSync(indexPath(), "utf8")); } catch { return out; }
   const current = index.project_name;
-  for (const key of ["memoryupdate.memory", "memoryupdate.memory_extended", "sessionupdate.session", "sessionupdate.session_extended"]) {
+  for (const key of ["updatememory.memory", "updatememory.memory_extended", "updatesession.session", "updatesession.session_extended"]) {
     const rel = index.files?.[key];
     if (!rel) continue;
     const abs = fromRoot(rel);

@@ -84,7 +84,7 @@ Commands:
   doctor    Validate this project against its registry: registry resolves, memory
             and session shapes, auto-memory pointers, banned prose. Read-only.
   scrub     House-voice gate over authored files. --check (default) reports banned
-            prose, --fix rewrites em dashes to " - " (semicolons flagged, not removed).
+            prose, --fix auto-rewrites the safe cases (ambiguous ones flagged, not removed).
             [--path <file>]
   sync      Rebuild skills.dispatch in _index.json from the AIDOCS/SKILL/ bodies.
             [--dry-run]
@@ -92,13 +92,14 @@ Commands:
             engine-class paths (AIDOCS/tools, AIDOCS/SKILL, .claude/skills/321/SKILL.md).
             Diffs MANIFEST.json operations against engine.operations_applied[], applies
             each missing op (idempotent), skips paths in customizations[], bumps
-            engine.version. Requires a prior fetch-engine. [--dry-run]
+            engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending
+            is set ([--force] overrides). [--dry-run]
   validate  Check a staging file's actions are well-formed. Read-only.
-            --skill <sessionupdate | memoryupdate>
+            --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
             clears staging on success.
-            --skill <sessionupdate | memoryupdate>
-  fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -SYNC / re-setup).
+            --skill <updatesession | updatememory>
+  fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -UpdateSync / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.
   state     Print state.json, or flip the reconcile gate (the Setup -> Update handoff).
             [--set-reconcile | --clear-reconcile [--force]]. Clear refuses on reconcile
@@ -115,13 +116,13 @@ Commands:
   migrate-import  Lossless-import an archived EXTENDED file into a staging file the
             commit pipeline applies (paired [+] bullets + ### sub-sections), or --audit
             it against the distilled EXTENDED at reconcile.
-            --from <file> --skill <sessionupdate | memoryupdate> [--old <N> --new <N>] [--append | --dry-run | --audit]
+            --from <file> --skill <updatesession | updatememory> [--old <N> --new <N>] [--append | --dry-run | --audit]
   verdict   Validate or apply a migration verdict (the AI's scan result), a JSON
             array of {path, type, confidence, action}: --validate <file>, or
             --apply <file> --name <PROJECT> (move / copy to the archive, or leave).
             --suggest [--out <file>] drafts a candidate verdict from a heuristic scan, for AI review.
   bigsix    --suggest    Draft the two script-readable Big-6 sections (Stack +
-            Pipeline) from package.json, for the MemoryUpdate fill to refine.
+            Pipeline) from package.json, for the UpdateMemory fill to refine.
   graduate  Tear down onboarding: deregister -Setup, remove INSTALL/, mark graduated.
             Refuses while reconcile_pending is set ([--force] overrides).
   init      Lay the project skeleton into a target, substituting the name. --privacy

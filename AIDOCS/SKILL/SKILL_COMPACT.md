@@ -5,7 +5,7 @@ description: Generate a ready-to-paste /compact instruction block that carries t
 
 # /321 -Compact
 
-**Purpose:** Generate a ready-to-paste `/compact` instruction block that captures the current session's load-bearing state for the next conversation. The skill composes the block, prints it inside a fenced code block for one-click copy, and stops. The user pastes the block into the next prompt - this skill does not run `/compact` itself.
+**Purpose:** Generate a ready-to-paste `/compact` instruction block that captures this session's load-bearing state for the next conversation. The skill composes the block, prints it inside a fenced code box, and stops. The user pastes the block into the next prompt - this skill does not run `/compact` itself.
 
 ## What goes in the block
 
@@ -41,7 +41,7 @@ The user copies from `/compact` through the closing line and pastes that into th
 ## Rules
 
 - **You write the block, the user runs it.** Never invoke `/compact` yourself - the skill prints, the user paste-and-runs in the next conversation.
-- **No em dashes, no semicolons.** The generated text follows the house rule so the pasted block does not flag as banned prose in the next session.
+- **House voice.** The generated text follows the house voice so the pasted block does not flag as banned prose in the next session.
 - **Scale to significance.** A trivial session does not earn six expanded sections. A marathon does not get four bullets. Match the block to the work.
 - **Concrete over vague.** "Open items: finish migrate-restore.mjs union-merge edge case" beats "Open items: keep working on migration." Name the file, the function, the next call.
 - **No invented state.** Only what actually happened this session goes in the block. Drop an empty section rather than pad it.

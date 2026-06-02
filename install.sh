@@ -57,6 +57,11 @@ for marker in ".claude/skills/321" "AIDOCS" "AGENTS.md" "CLAUDE.md" "package.jso
   if [ -e "$TARGET/$marker" ]; then existing=true; break; fi
 done
 
+# Distinguish an existing 321 install (registry present) from a generic existing project,
+# so the install can point users at the lighter -UpdateSync path for an engine-only refresh.
+existing321=false
+if [ -f "$TARGET/AIDOCS/_index.json" ]; then existing321=true; fi
+
 # Engine source: the repo this script ships in if it carries the engine,
 # otherwise a shallow clone of REPO into a temp dir we remove afterward.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
@@ -78,6 +83,13 @@ echo "  Target: $TARGET"
 echo "  Name:   $NAME"
 echo ""
 
+if [ "$existing321" = true ]; then
+  echo "Note: an existing 321 install was detected at $TARGET."
+  echo "  For an engine-only refresh, /321 -UpdateSync (from the project) is the lighter path."
+  echo "  Continuing with the full install - it is write-if-missing, your data files are preserved."
+  echo ""
+fi
+
 echo "Scaffolding..."
 if [ -n "$PRIVACY" ]; then
   node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME" --privacy "$PRIVACY"
@@ -86,6 +98,11 @@ else
 fi
 
 cd "$TARGET"
+
+# Record the install source as engine.upstream so a later /321 -UpdateSync knows where to
+# pull from. Only sets when empty - a user-customized upstream (a fork URL) survives.
+node -e 'const f=process.argv[1],r=process.argv[2],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));if(j.engine && !j.engine.upstream){j.engine.upstream=r;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");console.log("Set engine.upstream to "+r)}' AIDOCS/_index.json "$REPO"
+
 echo ""
 echo "Registering skills..."
 node AIDOCS/tools/engine.mjs sync

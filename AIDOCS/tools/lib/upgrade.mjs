@@ -3,19 +3,23 @@
 // the operations against engine.operations_applied[], applies each missing op
 // through the HANDLERS dispatcher (idempotent), copies the engine-class paths into
 // the project skipping any path in customizations[], bumps engine.version from the
-// source, and writes the registry. -SYNC drives fetch + this + sync + doctor in
-// sequence (the run order lives in AIDOCS/tools/SYNC.md, the body the skill loads).
+// source, and writes the registry. -UpdateSync drives fetch + this + sync + doctor
+// in sequence (the run order lives in AIDOCS/SKILL/SKILL_UPDATE-SYNC.md).
 //
 // --dry-run gates every disk-mutating call (handler writes, the copy step, the
 // version bump's index write, the install log). Any handler that throws aborts
-// the run before the copy step so a partial state never reaches disk - the index
-// write is the commit point.
+// the run before the copy step, the version bump, and the index write - the
+// index write is the commit point for the upgrade's bookkeeping. Earlier
+// successful ops in the same run may have already touched files (handler writes
+// are not transactional across ops); re-run resumes where the failure landed
+// because every op is idempotent.
 
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { installLog } from "./installLog.mjs";
 import { indexPath, installEngineDir, repoRoot } from "./paths.mjs";
+import { reconcilePending } from "./state.mjs";
 import { HANDLERS } from "./upgradeOperations.mjs";
 
 // Paths the copy step refreshes, project-relative. Engine code, canonical skill
@@ -32,6 +36,16 @@ export function cmdUpgrade(index, args) {
   const root = repoRoot();
   const source = installEngineDir();
   const dryRun = args.includes("--dry-run");
+  const force = args.includes("--force");
+
+  // Block upgrade during the reconcile window: a section_text_diff op or the engine-class
+  // copy step can overwrite an in-flight hand edit unless customizations[] was prefilled,
+  // and a graduating project may not have set those yet. Refuse, point at the right tool,
+  // and let --force punch through for manual recovery (mirrors graduate's pattern).
+  if (reconcilePending() && !force) {
+    console.error("upgrade: refusing while reconcile_pending is set. Run /321 -Update to distill first, or --force for manual recovery.");
+    process.exit(20);
+  }
 
   if (!existsSync(source)) {
     console.error(`upgrade: no fetched engine at ${source}. Run \`fetch-engine\` first.`);
@@ -104,8 +118,9 @@ export function cmdUpgrade(index, args) {
     writeFileSync(indexPath(), `${JSON.stringify(index, null, 2)}\n`, "utf8");
   }
 
-  const header = `upgrade${dryRun ? " (dry-run)" : ""}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${counts.failed} failed; ${copyReport.copied} file(s) copied, ${copyReport.skipped} skipped`;
-  console.log(header);
+  const tag = dryRun ? " (dry-run)" : "";
+  console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
+  console.log(`copy${tag}: ${copyReport.copied} file(s) copied, ${copyReport.skipped} skipped`);
   for (const n of opNotes) console.log(`  ${n}`);
   for (const s of copyReport.skipList) console.log(`  SKIP ${s} (customizations[])`);
   if (versionNote) console.log(`  ${versionNote}`);

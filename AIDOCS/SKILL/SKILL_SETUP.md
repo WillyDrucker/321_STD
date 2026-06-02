@@ -5,7 +5,7 @@ description: Make a project usable. Auto-detects fresh-install vs migration. Fre
 
 # /321 -Setup
 
-**Purpose:** Make a project usable after install. This is the onboarding runner - it reads the `INSTALL/setup.md` runbook and executes it. The depth lives in that file, this body just drives it. Deregistered when the project graduates.
+**Purpose:** Make a project usable after install. The onboarding runner reads `INSTALL/setup.md` and executes it. Depth lives in the runbook, this body just drives it. Deregistered when the project graduates.
 
 ## Run
 
@@ -13,7 +13,7 @@ description: Make a project usable. Auto-detects fresh-install vs migration. Fre
 2. Execute it step by step - detect mode (fresh vs migration), then follow that path.
 3. Stop where the runbook stops, at the reconcile gate. Migration sets `reconcile_pending` and hands off to `/321 -Update`. Do not distill or graduate here.
 
-If `INSTALL/setup.md` is absent, the project has already graduated (onboarding torn down) and there is nothing to set up. Report that and stop.
+If `INSTALL/setup.md` is absent, the project has graduated (onboarding torn down). Report that and stop.
 
 ## Rules
 

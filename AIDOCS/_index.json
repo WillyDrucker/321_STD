@@ -14,44 +14,44 @@
     "skills_bodies": "./AIDOCS/SKILL"
   },
   "files": {
-    "memoryupdate.memory": "./AIDOCS/PROJECTNAME_MEMORY.md",
-    "memoryupdate.memory_extended": "./AIDOCS/PROJECTNAME_MEMORY_EXTENDED.md",
-    "memoryupdate.backlog": "./AIDOCS/PROJECTNAME_BACKLOG.md",
-    "sessionupdate.session": "./AIDOCS/PROJECTNAME_SESSION.md",
-    "sessionupdate.session_extended": "./AIDOCS/PROJECTNAME_SESSION_EXTENDED.md",
+    "updatememory.memory": "./AIDOCS/PROJECTNAME_MEMORY.md",
+    "updatememory.memory_extended": "./AIDOCS/PROJECTNAME_MEMORY_EXTENDED.md",
+    "updatememory.backlog": "./AIDOCS/PROJECTNAME_BACKLOG.md",
+    "updatesession.session": "./AIDOCS/PROJECTNAME_SESSION.md",
+    "updatesession.session_extended": "./AIDOCS/PROJECTNAME_SESSION_EXTENDED.md",
     "devaudit.audit": "./AIDOCS/PROJECTNAME_DEV-AUDIT.md",
     "autopush.config": "./AIDOCS/PROJECTNAME_AUTO-PUSH.md"
   },
   "buckets": {
-    "memoryupdate.memory": [
+    "updatememory.memory": [
       "lifo"
     ],
-    "sessionupdate.session": [
+    "updatesession.session": [
       "lifo"
     ],
-    "memoryupdate.backlog": [
+    "updatememory.backlog": [
       "features",
       "ideas"
     ]
   },
   "sizes": {
-    "memoryupdate.memory": {
+    "updatememory.memory": {
       "cap": 150,
       "prune_to": 75
     },
-    "memoryupdate.memory_extended": {
+    "updatememory.memory_extended": {
       "cap": 1200,
       "prune_to": 600
     },
-    "sessionupdate.session": {
+    "updatesession.session": {
       "cap": 100,
       "prune_to": 50
     },
-    "sessionupdate.session_extended": {
+    "updatesession.session_extended": {
       "cap": 800,
       "prune_to": 400
     },
-    "memoryupdate.backlog": {
+    "updatememory.backlog": {
       "cap": 100,
       "prune_to": 50
     }
@@ -66,13 +66,14 @@
     "operations_applied": []
   },
   "customizations": [],
+  "graduated": false,
   "skills": {
     "router": "/321",
     "dispatch": {
       "autopush": {
         "flag": "-AutoPush",
         "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
-        "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at setup / reconcile."
+        "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at -Setup / reconcile."
       },
       "compact": {
         "flag": "-Compact",
@@ -82,32 +83,32 @@
       "devaudit": {
         "flag": "-DevAudit",
         "body": "./AIDOCS/SKILL/SKILL_DEV-AUDIT.md",
-        "description": "Audit the source against DEV-AUDIT.md - anchor principles, hard rules, audit dimensions, project specifics. The skill is thin, with the substance in the audit file, which setup / reconcile enrich over time. Default reports findings, -FULL audits and refactors."
-      },
-      "memoryupdate": {
-        "flag": "-MemoryUpdate",
-        "body": "./AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md",
-        "description": "Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes SessionUpdate first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline."
-      },
-      "sessionupdate": {
-        "flag": "-SessionUpdate",
-        "body": "./AIDOCS/SKILL/SKILL_SESSION-UPDATE.md",
-        "description": "Refresh SESSION (Current State + LIFO) from this conversation. The project-history backbone log. Writes through the staging pipeline (validate + commit). BACKLOG, MEMORY static, and CHANGELOG belong to other skills."
+        "description": "Audit the source against DEV-AUDIT.md - anchor principles, hard rules, audit dimensions, project specifics. The skill is thin, with the substance in the audit file, which -Setup / reconcile enrich over time. Default reports findings, -FULL audits and refactors."
       },
       "setup": {
         "flag": "-Setup",
         "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
         "description": "Make a project usable. Auto-detects fresh-install vs migration. Fresh fills the Big 6 from code signals through the normal skills. Migration archives existing content, reinstalls the canonical structure, captures it back, and sets the reconcile gate for -Update. Deregistered at graduation."
       },
-      "sync": {
-        "flag": "-SYNC",
-        "body": "./AIDOCS/SKILL/SKILL_SYNC.md",
-        "description": "Refresh the project's engine code, skill bodies, and router from its configured upstream. Reads engine.upstream, fetches, compares versions, copies the engine-class paths when newer, bumps the local engine.version, then rebuilds dispatch and runs doctor. Project data (memory, session, backlog, registry, auto-memory, WDDOCS) is never touched. Offline or no upstream is a clean no-op."
+      "updatememory": {
+        "flag": "-UpdateMemory",
+        "body": "./AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md",
+        "description": "Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes -UpdateSession first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline."
+      },
+      "updatesession": {
+        "flag": "-UpdateSession",
+        "body": "./AIDOCS/SKILL/SKILL_UPDATE-SESSION.md",
+        "description": "Refresh SESSION (Current State + LIFO) from this conversation. The project-history backbone log. Writes through the staging pipeline (validate + commit). BACKLOG, MEMORY static, and CHANGELOG belong to other skills."
+      },
+      "updatesync": {
+        "flag": "-UpdateSync",
+        "body": "./AIDOCS/SKILL/SKILL_UPDATE-SYNC.md",
+        "description": "Refresh the project's engine code, skill bodies, router, manifest-driven structural changes, and canonical sections of project data file templates from its configured upstream. Reads engine.upstream, fetches, applies the manifest delta, copies engine-class paths with customization preservation, rebuilds dispatch, and runs doctor. Project content is never touched. Offline or no upstream is a clean no-op."
       },
       "update": {
         "flag": "-Update",
         "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
-        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates. The engine self-update path lives in /321 -SYNC, separate from this skill."
+        "description": "The daily driver. Chains -UpdateSession then -UpdateMemory in one pass so SESSION and MEMORY both refresh from this conversation. -FULL propagates to each lane's full-rebuild mode. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run hands off to AIDOCS/tools/UPDATE-RECONCILE.md instead. The engine self-update path lives in /321 -UpdateSync, separate from this skill."
       }
     }
   }

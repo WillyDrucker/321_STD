@@ -1,6 +1,6 @@
 # PROJECTNAME - Auto-Push
 
-**Purpose:** Release reference. Loaded by `/321 -AutoPush` (registry key `autopush.config`). The generic commit-and-push baseline applies to every project. The project's real release cycle (version, CHANGELOG, build, deploy) is filled into `## Project release steps` at the bottom, which setup and reconcile enrich as the cycle settles. Not a workflow narration - the skill runs what is here.
+**Purpose:** Release reference. Loaded by `/321 -AutoPush` (registry key `autopush.config`). The generic commit-and-push baseline applies to every project. The project's real release cycle (version, CHANGELOG, build, deploy) is filled into `## Project release steps` at the bottom, which `-Setup` and reconcile enrich as the cycle settles. Not a workflow narration - the skill runs what is here.
 
 ## What stays generic vs filled in
 
@@ -36,7 +36,20 @@ Push goes to the anchored remote (`origin`). If no remote exists yet, that is a 
 
 Generic projects stop after the push. Fill in the project's real cycle here: the version-bump rule, the CHANGELOG block, the build command, the deploy / publish target. A project that diverges customizes this section, and reconcile records it so an engine update preserves the project's pipeline rather than reverting it to generic.
 
+**Shape (when the pipeline grows beyond the generic three steps):**
+
+- **Cross-file invariants** - when something must stay aligned across multiple files (a version number in N places, a build flag mirrored across configs), name it above the steps as a bold callout: `**Invariant: <name>.** <statement>. <failure mode the engineer is likely to miss>.`
+- **Pre-flight gates** - open with a numbered step that lists machine-checkable conditions: branch match, clean working tree, build pass, no banned glyphs in source, version-sync. Each gate names the command or rule that verifies it.
+- **Production hardening (optional)** - items intentionally off during pre-launch that switch on before public traffic (transactional swaps, CI gates, smoke tests). A dedicated `## Production hardening` section below names them so they ship at GA rather than being forgotten or shipped prematurely.
+- **CHANGELOG voice reference** - when the project ships a CHANGELOG, the release step that composes the entry should close with `Voice reference: the most recent dated entries already in CHANGELOG.md` so the next entry inherits the established tone. Pair with a one-line banner under the standard Keep-a-Changelog header in `CHANGELOG.md` itself: `Composed by /321 -AutoPush at release. <voice rules in one sentence>.`
+
 (fill in)
+
+## Production hardening (optional)
+
+Items deliberately off during pre-launch that switch on before public traffic. Each names what is off today, what to switch on, and the launch condition (a date, a GA milestone, a usage threshold). Omit this whole section when the project has no launch event (a library, an internal tool, a published artifact with no live serving surface).
+
+(fill in or remove section)
 
 ## Rules
 

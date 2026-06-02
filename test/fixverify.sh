@@ -188,7 +188,7 @@ grep -q 'MARKER_BACKLOG_FEATURE' AIDOCS/NEW321_BACKLOG.md && pass "BACKLOG Featu
 grep -q 'MARKER_BACKLOG_IDEA' AIDOCS/NEW321_BACKLOG.md && pass "BACKLOG Ideas restored from archive" || fail "BACKLOG Ideas NOT restored"
 
 echo "=== T4: migrate-import skips the legacy Big-6 mirror, keeps the real LIFO entry ==="
-IMP="$(node "$ENG" migrate-import --from "$ARCH/OLD321_MEMORY_EXTENDED.md" --skill memoryupdate --old OLD321 --new NEW321 --dry-run 2>&1)"
+IMP="$(node "$ENG" migrate-import --from "$ARCH/OLD321_MEMORY_EXTENDED.md" --skill updatememory --old OLD321 --new NEW321 --dry-run 2>&1)"
 echo "$IMP" | grep -q 'A Real Durable Decision' && pass "real LIFO entry imported" || fail "real LIFO entry NOT imported"
 if echo "$IMP" | grep -qiE '#\s+(Overview|Stack|Architecture|Environment|Pipeline|Conventions)'; then fail "Big-6 mirror section was imported as a bullet"; else pass "Big-6 mirror sections skipped on import"; fi
 
@@ -228,7 +228,7 @@ echo "$BS" | grep -q 'Language: TypeScript' && pass "bigsix detects TypeScript" 
 echo "$BS" | grep -q 'npm run build' && pass "bigsix lists the build script" || fail "bigsix missed the build script"
 
 echo "=== T10: doctor flags a skill body missing frontmatter description ==="
-SK="$PROJ/AIDOCS/SKILL/SKILL_SESSION-UPDATE.md"
+SK="$PROJ/AIDOCS/SKILL/SKILL_UPDATE-SESSION.md"
 cp "$SK" "$SK.bak"
 grep -v '^description:' "$SK.bak" > "$SK"
 node "$ENG" doctor 2>&1 | grep -q "frontmatter missing description" && pass "doctor flags missing skill description" || fail "missing skill description not flagged"
@@ -347,17 +347,17 @@ node "$RENG" init "$FE" --name FetchGrad >/dev/null 2>&1
 rm -rf "$FE/INSTALL"
 mkdir -p "$BASE/fesrc"; printf 'x' > "$BASE/fesrc/marker.txt"
 node "$FE/AIDOCS/tools/engine.mjs" fetch-engine --from "$BASE/fesrc" >/dev/null 2>&1
-[ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -SYNC)" || fail "fetch-engine did not recreate INSTALL/"
+[ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -UpdateSync)" || fail "fetch-engine did not recreate INSTALL/"
 
 echo "=== T22: auto-prune creates <doc>_ARCHIVE/ folder with a datestamped file on demand ==="
 PR="$BASE/prunetest"
 node "$RENG" init "$PR" --name PruneTest >/dev/null 2>&1
 PRENG="$PR/AIDOCS/tools/engine.mjs"
-# Over-cap MEMORY.md (memoryupdate.memory cap is 150): a ## LIFO of 160 plain bullets.
+# Over-cap MEMORY.md (updatememory.memory cap is 150): a ## LIFO of 160 plain bullets.
 { printf '# PruneTest - MEMORY\n\n**Purpose:** prune test.\n\n## LIFO\n\n'; for n in $(seq 1 160); do printf -- '- legacy bullet %s\n' "$n"; done; } > "$PR/AIDOCS/PruneTest_MEMORY.md"
-printf '{"actions":[{"op":"lifo_insert","file":"memoryupdate.memory","section":"LIFO","bullet":"a fresh protected bullet"}]}\n' > "$PR/AIDOCS/tools/staging/memoryupdate.json"
+printf '{"actions":[{"op":"lifo_insert","file":"updatememory.memory","section":"LIFO","bullet":"a fresh protected bullet"}]}\n' > "$PR/AIDOCS/tools/staging/updatememory.json"
 rm -rf "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE"
-PCOUT="$(node "$PRENG" commit --skill memoryupdate 2>&1)"; PCC=$?
+PCOUT="$(node "$PRENG" commit --skill updatememory 2>&1)"; PCC=$?
 [ "$PCC" = "0" ] && pass "commit+auto-prune exits 0 with no pre-seeded archive folder" || fail "commit/prune failed (exit $PCC): $PCOUT"
 [ -d "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE" ] && pass "auto-prune created PruneTest_MEMORY_ARCHIVE/ folder on demand" || fail "prune did NOT create the archive folder"
 ARCH_FILE=$(ls "$PR/AIDOCS/PruneTest_MEMORY_ARCHIVE/" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{4}_PruneTest_MEMORY\.md$' | head -1)
@@ -376,11 +376,11 @@ node "$SNENG" state --clear-reconcile --force >/dev/null 2>&1
 SJ="$(cat "$SN/AIDOCS/tools/state.json")"
 echo "$SJ" | grep -q 'session_update' && fail "legacy session_update survived clear-reconcile" || pass "legacy session_update dropped on clear-reconcile"
 echo "$SJ" | grep -q 'memory_update' && fail "legacy memory_update survived clear-reconcile" || pass "legacy memory_update dropped on clear-reconcile"
-echo "$SJ" | grep -q '"sessionupdate"' && pass "canonical sessionupdate kept" || fail "canonical sessionupdate missing after normalize"
+echo "$SJ" | grep -q '"updatesession"' && pass "canonical updatesession kept" || fail "canonical updatesession missing after normalize"
 echo "$SJ" | grep -q '"reconcile_pending": false' && pass "reconcile_pending cleared" || fail "reconcile_pending not false after clear"
 
 echo "=== T24: migrate-import --from rejects a path escaping the root (isContained) ==="
-node "$ENG" migrate-import --from "../../../etc/passwd" --skill memoryupdate >/dev/null 2>&1; RC=$?
+node "$ENG" migrate-import --from "../../../etc/passwd" --skill updatememory >/dev/null 2>&1; RC=$?
 [ "$RC" = "5" ] && pass "migrate-import --from rejects an escaping path (exit 5)" || fail "migrate-import --from accepted an escaping path (exit $RC)"
 
 echo "=== T25: migrate-archive snapshots AIDOCS/SKILL (copy, not move) for in-place customization recovery ==="
@@ -423,9 +423,9 @@ EPENG="$EP/AIDOCS/tools/engine.mjs"
 # at 250 lines each (1250+ total), over the 1200 cap. Extended triggers, paired drop fires.
 { printf '# ExtPrune - MEMORY\n\n**Purpose:** ext prune test.\n\n## Overview\n(fill in)\n## Stack\n(fill in)\n## Architecture\n(fill in)\n## Environment\n(fill in)\n## Pipeline\n(fill in)\n## Conventions\n(fill in)\n\n---\n\n## LIFO\n\n'; for n in $(seq 1 5); do printf -- '- [+] Entry %s body\n' "$n"; done; } > "$EP/AIDOCS/ExtPrune_MEMORY.md"
 { printf '# ExtPrune - MEMORY (Extended)\n\n**Purpose:** ext.\n\n## LIFO\n\n'; for n in $(seq 1 5); do printf -- '### Entry %s body\n' "$n"; for m in $(seq 1 250); do printf -- 'filler line %s\n' "$m"; done; done; } > "$EP/AIDOCS/ExtPrune_MEMORY_EXTENDED.md"
-printf '{"actions":[{"op":"lifo_insert","file":"memoryupdate.memory","section":"LIFO","bullet":"fresh head"}]}\n' > "$EP/AIDOCS/tools/staging/memoryupdate.json"
+printf '{"actions":[{"op":"lifo_insert","file":"updatememory.memory","section":"LIFO","bullet":"fresh head"}]}\n' > "$EP/AIDOCS/tools/staging/updatememory.json"
 rm -rf "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE"
-EPCOUT="$(node "$EPENG" commit --skill memoryupdate 2>&1)"; EPCC=$?
+EPCOUT="$(node "$EPENG" commit --skill updatememory 2>&1)"; EPCC=$?
 [ "$EPCC" = "0" ] && pass "commit+extended-triggered prune exits 0" || fail "extended-triggered prune failed (exit $EPCC): $EPCOUT"
 [ -d "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE" ] && pass "extended-triggered prune created the archive folder" || fail "extended-triggered prune did not create the folder"
 PAIR_MAIN=$(ls "$EP/AIDOCS/ExtPrune_MEMORY_ARCHIVE/" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{4}_ExtPrune_MEMORY\.md$' | head -1)
@@ -493,11 +493,11 @@ echo "=== T33: customizations[] preserves a project-edited canonical skill body 
 CU="$BASE/customize"
 node "$RENG" init "$CU" --name CuProj >/dev/null 2>&1
 CUENG="$CU/AIDOCS/tools/engine.mjs"
-printf '\nCUSTOM_MARKER_IN_SYNC: project-edited canonical body.\n' >> "$CU/AIDOCS/SKILL/SKILL_SYNC.md"
-node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_SYNC.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CU/AIDOCS/_index.json"
+printf '\nCUSTOM_MARKER_IN_SYNC: project-edited canonical body.\n' >> "$CU/AIDOCS/SKILL/SKILL_UPDATE-SYNC.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_UPDATE-SYNC.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CU/AIDOCS/_index.json"
 node "$CUENG" fetch-engine --from "$UPSRC" >/dev/null 2>&1
 node "$CUENG" upgrade >/dev/null 2>&1
-grep -q 'CUSTOM_MARKER_IN_SYNC' "$CU/AIDOCS/SKILL/SKILL_SYNC.md" && pass "customizations[] preserved the project-edited SKILL_SYNC.md" || fail "customized SKILL_SYNC.md was overwritten"
+grep -q 'CUSTOM_MARKER_IN_SYNC' "$CU/AIDOCS/SKILL/SKILL_UPDATE-SYNC.md" && pass "customizations[] preserved the project-edited SKILL_UPDATE-SYNC.md" || fail "customized SKILL_UPDATE-SYNC.md was overwritten"
 
 echo "=== T34: upgrade without a source MANIFEST.json runs the copy step cleanly (manifest-less engine is supported) ==="
 NM="$BASE/nomanifest"
@@ -571,6 +571,261 @@ echo "$FFOUT" | grep -q "FAIL ff_missing_seed" && pass "upgrade names the failin
 echo "$FFOUT" | grep -q "aborting before copy step" && pass "upgrade reports the abort reason" || fail "no abort reason in output"
 node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.version === "9.9.99" ? 1 : 0)' "$FF/AIDOCS/_index.json" && pass "engine.version NOT bumped (abort before version write)" || fail "engine.version was bumped despite a failing op"
 node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied;process.exit(a.includes("ff_extend_first")?1:0)' "$FF/AIDOCS/_index.json" && pass "operations_applied stays empty (no partial commit on abort)" || fail "operations_applied carries the first op despite the abort"
+
+echo "=== T38: registry_rename moves a dotted-path key and is idempotent on re-run ==="
+RN="$BASE/rename"
+node "$RENG" init "$RN" --name RnProj >/dev/null 2>&1
+RNENG="$RN/AIDOCS/tools/engine.mjs"
+# Project carries the legacy auto_memory.source field (the WAT321 case).
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={source:"./AIDOCS/automemory",path:""};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RN/AIDOCS/_index.json"
+# Source manifest carries the rename op.
+RNSRC="$BASE/renamesrc"
+mkdir -p "$RNSRC/AIDOCS" "$RNSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$RNSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$RNSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$RNSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$RNSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$RNSRC/.claude/skills/321/SKILL.md"
+cat > "$RNSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "rename_auto_memory_source_to_seed", "type": "registry_rename", "from": "auto_memory.source", "to": "auto_memory.seed" }
+  ]
+}
+EOF
+node "$RNENG" fetch-engine --from "$RNSRC" >/dev/null 2>&1
+RNOUT="$(node "$RNENG" upgrade 2>&1)"; RNCC=$?
+[ "$RNCC" = "0" ] && pass "registry_rename upgrade exits 0" || fail "upgrade failed (exit $RNCC): $RNOUT"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit((j.auto_memory.seed==="./AIDOCS/automemory" && j.auto_memory.source===undefined)?0:1)' "$RN/AIDOCS/_index.json" && pass "registry_rename moved auto_memory.source to .seed" || fail "registry_rename did not move the key"
+node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied;process.exit(a.includes("rename_auto_memory_source_to_seed")?0:1)' "$RN/AIDOCS/_index.json" && pass "registry_rename op name recorded in operations_applied[]" || fail "op name not in operations_applied"
+# Re-run: from-absent + to-present is the post-migration state, should no-op clean.
+node "$RNENG" fetch-engine --from "$RNSRC" >/dev/null 2>&1
+RN2OUT="$(node "$RNENG" upgrade 2>&1)"; RN2CC=$?
+[ "$RN2CC" = "0" ] && pass "registry_rename re-run exits 0" || fail "re-run failed (exit $RN2CC): $RN2OUT"
+echo "$RN2OUT" | grep -q '0 applied' && pass "registry_rename re-run reports 0 applied (idempotent)" || fail "registry_rename re-run reported a non-zero applied count"
+
+echo "=== T39: registry_rename no-ops when from is absent and to is absent ==="
+RNAB="$BASE/renameabsent"
+node "$RENG" init "$RNAB" --name RnAbProj >/dev/null 2>&1
+RNABENG="$RNAB/AIDOCS/tools/engine.mjs"
+# Strip auto_memory entirely so both from and to are absent.
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));delete j.auto_memory;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RNAB/AIDOCS/_index.json"
+node "$RNABENG" fetch-engine --from "$RNSRC" >/dev/null 2>&1
+RNABOUT="$(node "$RNABENG" upgrade 2>&1)"; RNABCC=$?
+[ "$RNABCC" = "0" ] && pass "registry_rename with both keys absent exits 0" || fail "upgrade failed on both-absent (exit $RNABCC): $RNABOUT"
+echo "$RNABOUT" | grep -q "nothing to rename" && pass "registry_rename reports 'nothing to rename' on both-absent" || fail "registry_rename did not report nothing-to-rename"
+
+echo "=== T40: rename manifest end-to-end (skill bodies + registry keys, idempotent on re-run) ==="
+LEG="$BASE/legacy-rename"
+node "$RENG" init "$LEG" --name LegProj >/dev/null 2>&1
+LEGENG="$LEG/AIDOCS/tools/engine.mjs"
+# Synthesize a legacy project: revert the canonical SKILL bodies to old target-first naming,
+# revert _index.json file/bucket/size keys to the legacy form, plant a SKILL_SYNC.md so the
+# skill_delete op has something real to act on, and clear operations_applied so every op runs.
+mv "$LEG/AIDOCS/SKILL/SKILL_UPDATE-SESSION.md" "$LEG/AIDOCS/SKILL/SKILL_SESSION-UPDATE.md"
+mv "$LEG/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" "$LEG/AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md"
+cat > "$LEG/AIDOCS/SKILL/SKILL_SYNC.md" <<'EOF'
+---
+name: sync
+description: legacy sync body for the rename test.
+---
+
+# /321 -SYNC
+
+**Purpose:** legacy.
+EOF
+node -e '
+const f=process.argv[1],fs=require("fs");
+const j=JSON.parse(fs.readFileSync(f));
+const remap=(obj)=>{if(!obj)return;for(const k of Object.keys(obj)){let nk=k;if(k.startsWith("updatememory."))nk="memoryupdate."+k.slice("updatememory.".length);else if(k.startsWith("updatesession."))nk="sessionupdate."+k.slice("updatesession.".length);if(nk!==k){obj[nk]=obj[k];delete obj[k]}}};
+for(const sec of ["files","buckets","sizes"]) remap(j[sec]);
+j.engine={version:"0.1.1",upstream:"",operations_applied:[]};
+fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");
+' "$LEG/AIDOCS/_index.json"
+# Source carries the current REAL engine + the new manifest (17 ops).
+LEGSRC="$BASE/legacy-rename-src"
+mkdir -p "$LEGSRC/AIDOCS" "$LEGSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$LEGSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$LEGSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$LEGSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$LEGSRC/AIDOCS/_index.json"
+cp "$REAL/AIDOCS/MANIFEST.json" "$LEGSRC/AIDOCS/MANIFEST.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$LEGSRC/.claude/skills/321/SKILL.md"
+node "$LEGENG" fetch-engine --from "$LEGSRC" >/dev/null 2>&1
+LEGOUT="$(node "$LEGENG" upgrade 2>&1)"; LEGCC=$?
+[ "$LEGCC" = "0" ] && pass "rename manifest upgrade exits 0" || fail "upgrade failed (exit $LEGCC): $LEGOUT"
+[ ! -f "$LEG/AIDOCS/SKILL/SKILL_SESSION-UPDATE.md" ] && pass "skill_rename removed legacy SKILL_SESSION-UPDATE.md" || fail "legacy SKILL_SESSION-UPDATE.md still present"
+[ -f "$LEG/AIDOCS/SKILL/SKILL_UPDATE-SESSION.md" ] && pass "copy step landed new SKILL_UPDATE-SESSION.md" || fail "new SKILL_UPDATE-SESSION.md missing"
+[ ! -f "$LEG/AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md" ] && pass "skill_rename removed legacy SKILL_MEMORY-UPDATE.md" || fail "legacy SKILL_MEMORY-UPDATE.md still present"
+[ -f "$LEG/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" ] && pass "copy step landed new SKILL_UPDATE-MEMORY.md" || fail "new SKILL_UPDATE-MEMORY.md missing"
+[ ! -f "$LEG/AIDOCS/SKILL/SKILL_SYNC.md" ] && pass "skill_delete removed SKILL_SYNC.md (folded into UpdateSync)" || fail "SKILL_SYNC.md not deleted"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(j.files["updatememory.memory"] && j.files["updatesession.session"] ? 0 : 1)' "$LEG/AIDOCS/_index.json" && pass "registry_rename added updatememory.memory and updatesession.session" || fail "new file keys missing after rename"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(j.files["sessionupdate.session"]===undefined && j.files["memoryupdate.memory"]===undefined ? 0 : 1)' "$LEG/AIDOCS/_index.json" && pass "registry_rename removed legacy sessionupdate / memoryupdate file keys" || fail "legacy file keys still present after rename"
+node "$LEGENG" doctor 2>&1 | grep -q "all checks passed" && pass "doctor passes after rename manifest applies" || fail "doctor failed after rename"
+APPLIED_FIRST=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied.length)' "$LEG/AIDOCS/_index.json")
+node "$LEGENG" upgrade >/dev/null 2>&1
+APPLIED_SECOND=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.operations_applied.length)' "$LEG/AIDOCS/_index.json")
+[ "$APPLIED_FIRST" = "$APPLIED_SECOND" ] && pass "rename manifest is idempotent on re-run (applied count stable at $APPLIED_FIRST)" || fail "rename manifest re-applied ops (before=$APPLIED_FIRST after=$APPLIED_SECOND)"
+
+echo "=== T41: file_delete op removes an existing engine-class file, idempotent on re-run ==="
+FD="$BASE/filedelete"
+node "$RENG" init "$FD" --name FdProj >/dev/null 2>&1
+FDENG="$FD/AIDOCS/tools/engine.mjs"
+# Plant a stale engine-class file the upstream no longer ships.
+printf 'stale folded reference doc\n' > "$FD/AIDOCS/tools/STALE.md"
+FDSRC="$BASE/filedeletesrc"
+mkdir -p "$FDSRC/AIDOCS" "$FDSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$FDSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$FDSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$FDSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$FDSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$FDSRC/.claude/skills/321/SKILL.md"
+cat > "$FDSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "delete_stale_engine_file", "type": "file_delete", "file": "AIDOCS/tools/STALE.md" }
+  ]
+}
+EOF
+node "$FDENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1
+FDOUT="$(node "$FDENG" upgrade 2>&1)"; FDCC=$?
+[ "$FDCC" = "0" ] && pass "file_delete upgrade exits 0" || fail "upgrade failed (exit $FDCC): $FDOUT"
+[ ! -f "$FD/AIDOCS/tools/STALE.md" ] && pass "file_delete removed the stale file" || fail "stale file still present"
+# Re-run: from-absent is the post-deletion state, should no-op clean.
+node "$FDENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1
+FD2OUT="$(node "$FDENG" upgrade 2>&1)"; FD2CC=$?
+[ "$FD2CC" = "0" ] && pass "file_delete re-run exits 0" || fail "re-run failed (exit $FD2CC): $FD2OUT"
+echo "$FD2OUT" | grep -q '0 applied' && pass "file_delete re-run reports 0 applied (idempotent)" || fail "file_delete re-run reported a non-zero applied count"
+# Path-escape: a manifest with a `..` target is rejected.
+cat > "$FDSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "delete_stale_engine_file", "type": "file_delete", "file": "AIDOCS/tools/STALE.md" },
+    { "name": "evil_escape_attempt",      "type": "file_delete", "file": "../escape-target.md" }
+  ]
+}
+EOF
+node "$FDENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1
+FD3OUT="$(node "$FDENG" upgrade 2>&1)"; FD3CC=$?
+[ "$FD3CC" = "20" ] && pass "file_delete rejects ../ escape with exit 20" || fail "file_delete accepted ../ escape (exit $FD3CC)"
+echo "$FD3OUT" | grep -q 'escapes the project root' && pass "containment rejection names the cause" || fail "no 'escapes the project root' in output"
+
+echo "=== T42: upgrade refuses while reconcile_pending is set, --force overrides ==="
+RP="$BASE/reconcilepending"
+node "$RENG" init "$RP" --name RpProj >/dev/null 2>&1
+RPENG="$RP/AIDOCS/tools/engine.mjs"
+node "$RPENG" state --set-reconcile >/dev/null 2>&1
+node "$RPENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1   # reuse the FDSRC tree
+RPOUT="$(node "$RPENG" upgrade 2>&1)"; RPCC=$?
+[ "$RPCC" = "20" ] && pass "upgrade refuses while reconcile_pending is set (exit 20)" || fail "upgrade did not refuse (exit $RPCC)"
+echo "$RPOUT" | grep -q 'reconcile_pending' && pass "refusal names reconcile_pending" || fail "no reconcile_pending in refusal message"
+# --force should still be rejected because of the path-escape op in the manifest above.
+# Clean the manifest, then verify --force lets a valid upgrade through.
+cat > "$FDSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{ "operations": [] }
+EOF
+node "$RPENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1
+RP2OUT="$(node "$RPENG" upgrade --force 2>&1)"; RP2CC=$?
+[ "$RP2CC" = "0" ] && pass "upgrade --force overrides the reconcile guard" || fail "upgrade --force did not override (exit $RP2CC): $RP2OUT"
+
+echo "=== T44: skill_delete and skill_rename reject non-basename inputs (containment) ==="
+SE="$BASE/skillescape"
+node "$RENG" init "$SE" --name SeProj >/dev/null 2>&1
+SEENG="$SE/AIDOCS/tools/engine.mjs"
+SESRC="$BASE/skillescapesrc"
+mkdir -p "$SESRC/AIDOCS" "$SESRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$SESRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$SESRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$SESRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$SESRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$SESRC/.claude/skills/321/SKILL.md"
+cat > "$SESRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "evil_skill_delete_escape", "type": "skill_delete", "file": "../escape.md" }
+  ]
+}
+EOF
+node "$SEENG" fetch-engine --from "$SESRC" >/dev/null 2>&1
+SEOUT="$(node "$SEENG" upgrade 2>&1)"; SECC=$?
+[ "$SECC" = "20" ] && pass "skill_delete rejects non-basename path with exit 20" || fail "skill_delete accepted non-basename (exit $SECC)"
+echo "$SEOUT" | grep -q "must be a bare SKILL_\*.md basename" && pass "skill_delete rejection names the basename rule" || fail "no basename-rule message in output"
+# skill_rename with a `from` that escapes
+cat > "$SESRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "evil_skill_rename_escape", "type": "skill_rename", "from": "../escape.md", "to": "SKILL_UPDATE-NEW.md" }
+  ]
+}
+EOF
+node "$SEENG" fetch-engine --from "$SESRC" >/dev/null 2>&1
+SE2OUT="$(node "$SEENG" upgrade 2>&1)"; SE2CC=$?
+[ "$SE2CC" = "20" ] && pass "skill_rename rejects non-basename `from` with exit 20" || fail "skill_rename accepted non-basename from (exit $SE2CC)"
+# skill_delete with a non-SKILL_*.md basename
+cat > "$SESRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "evil_skill_delete_wrong_prefix", "type": "skill_delete", "file": "NOT_A_SKILL.md" }
+  ]
+}
+EOF
+node "$SEENG" fetch-engine --from "$SESRC" >/dev/null 2>&1
+SE3OUT="$(node "$SEENG" upgrade 2>&1)"; SE3CC=$?
+[ "$SE3CC" = "20" ] && pass "skill_delete rejects non-SKILL_*.md basename" || fail "skill_delete accepted non-SKILL basename (exit $SE3CC)"
+
+echo "=== T45: automemory_add writes external runtime when seed exists but external is missing ==="
+AM="$BASE/automemextonly"
+node "$RENG" init "$AM" --name AmProj >/dev/null 2>&1
+AMENG="$AM/AIDOCS/tools/engine.mjs"
+# Build a source that ships a new seed file.
+AMSRC="$BASE/automemextonly-src"
+mkdir -p "$AMSRC/AIDOCS/automemory" "$AMSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$AMSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$AMSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$AMSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$AMSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$AMSRC/.claude/skills/321/SKILL.md"
+printf -- '---\nname: feedback-new-rule\ndescription: A brand-new canonical rule for the test.\nmetadata:\n  type: feedback\n---\n\nbody\n' > "$AMSRC/AIDOCS/automemory/feedback_new_rule.md"
+cat > "$AMSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "add_feedback_new_rule", "type": "automemory_add", "file": "feedback_new_rule.md" }
+  ]
+}
+EOF
+# Pre-write the in-project seed (simulating a manual add or a prior partial run),
+# then delete it from external runtime so only the external is missing.
+printf -- '---\nname: feedback-new-rule\ndescription: A brand-new canonical rule for the test.\nmetadata:\n  type: feedback\n---\n\nbody\n' > "$AM/AIDOCS/automemory/feedback_new_rule.md"
+AMEXT="$(ls -d "$BASE"/home/.claude/projects/*automemextonly*/memory 2>/dev/null | head -1)"
+rm -f "$AMEXT/feedback_new_rule.md"
+node "$AMENG" fetch-engine --from "$AMSRC" >/dev/null 2>&1
+AMOUT="$(node "$AMENG" upgrade 2>&1)"; AMCC=$?
+[ "$AMCC" = "0" ] && pass "automemory_add seed-present + external-missing succeeds" || fail "automemory_add failed (exit $AMCC): $AMOUT"
+[ -f "$AMEXT/feedback_new_rule.md" ] && pass "external runtime got the new rule even though seed already existed" || fail "external runtime missing the new rule"
+echo "$AMOUT" | grep -q "external runtime" && pass "report names external runtime as written" || fail "no external runtime in report"
+
+echo "=== T43: file_add_template rejects an escaping path (containment) ==="
+PC="$BASE/pathcontain"
+node "$RENG" init "$PC" --name PcProj >/dev/null 2>&1
+PCENG="$PC/AIDOCS/tools/engine.mjs"
+PCSRC="$BASE/pathcontainsrc"
+mkdir -p "$PCSRC/AIDOCS" "$PCSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$PCSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$PCSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$PCSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$PCSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$PCSRC/.claude/skills/321/SKILL.md"
+cat > "$PCSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "evil_template_escape", "type": "file_add_template", "file": "../escape.md", "body": "evil" }
+  ]
+}
+EOF
+node "$PCENG" fetch-engine --from "$PCSRC" >/dev/null 2>&1
+PCOUT="$(node "$PCENG" upgrade 2>&1)"; PCCC=$?
+[ "$PCCC" = "20" ] && pass "file_add_template rejects ../ escape with exit 20" || fail "file_add_template accepted escape (exit $PCCC)"
+[ ! -f "$BASE/escape.md" ] && pass "no file written outside the project root" || fail "escape.md written outside the project root"
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi

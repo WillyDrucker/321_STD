@@ -1,3 +1,125 @@
 {
-  "operations": []
+  "operations": [
+    {
+      "name": "rename_auto_memory_source_to_seed",
+      "type": "registry_rename",
+      "from": "auto_memory.source",
+      "to": "auto_memory.seed"
+    },
+    {
+      "name": "rename_skill_body_session_update",
+      "type": "skill_rename",
+      "from": "SKILL_SESSION-UPDATE.md",
+      "to": "SKILL_UPDATE-SESSION.md",
+      "flag_to": "-UpdateSession"
+    },
+    {
+      "name": "rename_skill_body_memory_update",
+      "type": "skill_rename",
+      "from": "SKILL_MEMORY-UPDATE.md",
+      "to": "SKILL_UPDATE-MEMORY.md",
+      "flag_to": "-UpdateMemory"
+    },
+    {
+      "name": "delete_skill_body_sync_folded",
+      "type": "skill_delete",
+      "file": "SKILL_SYNC.md"
+    },
+    {
+      "name": "delete_tools_sync_reference_folded",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/SYNC.md"
+    },
+    {
+      "name": "rename_files_memoryupdate_memory",
+      "type": "dictionary_rename",
+      "dictionary": "files",
+      "from": "memoryupdate.memory",
+      "to": "updatememory.memory"
+    },
+    {
+      "name": "rename_files_memoryupdate_memory_extended",
+      "type": "dictionary_rename",
+      "dictionary": "files",
+      "from": "memoryupdate.memory_extended",
+      "to": "updatememory.memory_extended"
+    },
+    {
+      "name": "rename_files_memoryupdate_backlog",
+      "type": "dictionary_rename",
+      "dictionary": "files",
+      "from": "memoryupdate.backlog",
+      "to": "updatememory.backlog"
+    },
+    {
+      "name": "rename_files_sessionupdate_session",
+      "type": "dictionary_rename",
+      "dictionary": "files",
+      "from": "sessionupdate.session",
+      "to": "updatesession.session"
+    },
+    {
+      "name": "rename_files_sessionupdate_session_extended",
+      "type": "dictionary_rename",
+      "dictionary": "files",
+      "from": "sessionupdate.session_extended",
+      "to": "updatesession.session_extended"
+    },
+    {
+      "name": "rename_buckets_memoryupdate_memory",
+      "type": "dictionary_rename",
+      "dictionary": "buckets",
+      "from": "memoryupdate.memory",
+      "to": "updatememory.memory"
+    },
+    {
+      "name": "rename_buckets_sessionupdate_session",
+      "type": "dictionary_rename",
+      "dictionary": "buckets",
+      "from": "sessionupdate.session",
+      "to": "updatesession.session"
+    },
+    {
+      "name": "rename_buckets_memoryupdate_backlog",
+      "type": "dictionary_rename",
+      "dictionary": "buckets",
+      "from": "memoryupdate.backlog",
+      "to": "updatememory.backlog"
+    },
+    {
+      "name": "rename_sizes_memoryupdate_memory",
+      "type": "dictionary_rename",
+      "dictionary": "sizes",
+      "from": "memoryupdate.memory",
+      "to": "updatememory.memory"
+    },
+    {
+      "name": "rename_sizes_memoryupdate_memory_extended",
+      "type": "dictionary_rename",
+      "dictionary": "sizes",
+      "from": "memoryupdate.memory_extended",
+      "to": "updatememory.memory_extended"
+    },
+    {
+      "name": "rename_sizes_memoryupdate_backlog",
+      "type": "dictionary_rename",
+      "dictionary": "sizes",
+      "from": "memoryupdate.backlog",
+      "to": "updatememory.backlog"
+    },
+    {
+      "name": "rename_sizes_sessionupdate_session",
+      "type": "dictionary_rename",
+      "dictionary": "sizes",
+      "from": "sessionupdate.session",
+      "to": "updatesession.session"
+    },
+    {
+      "name": "rename_sizes_sessionupdate_session_extended",
+      "type": "dictionary_rename",
+      "dictionary": "sizes",
+      "from": "sessionupdate.session_extended",
+      "to": "updatesession.session_extended"
+    }
+  ]
 }

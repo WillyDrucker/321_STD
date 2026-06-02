@@ -16,9 +16,10 @@ import { fromRoot } from "./paths.mjs";
 export function isFile(p) { try { return statSync(p).isFile(); } catch { return false; } }
 
 // The authored-prose files: AGENTS, CHANGELOG, the router, every registered data
-// file, the skill bodies, and the INSTALL runbooks while they exist. Skips anything
-// not on disk. Code comments are not scanned (this is a markdown-prose scanner) - the
-// audit enforces the rule there.
+// file, the skill bodies, the INSTALL runbooks while they exist, and the engine
+// reference docs at AIDOCS/tools/*.md (PATTERN-* + UPDATE-RECONCILE). Skips anything
+// not on disk. Code comments are not scanned (this is a markdown-prose scanner) -
+// the audit enforces the rule there.
 export function authoredTargets(index) {
   const set = new Set();
   if (index.paths?.agents_md) set.add(fromRoot(index.paths.agents_md));
@@ -32,6 +33,13 @@ export function authoredTargets(index) {
   }
   const installDir = fromRoot("./INSTALL");
   if (existsSync(installDir)) for (const f of readdirSync(installDir).filter((f) => /\.md$/.test(f))) set.add(join(installDir, f));
+  // Engine reference docs: PATTERN-*.md + UPDATE-RECONCILE.md live alongside the
+  // engine code and ship with it, so they are our authored output and the same
+  // house-voice rules apply. Scanned at the engine-class tier with the skill bodies.
+  const toolsDir = fromRoot("./AIDOCS/tools");
+  if (existsSync(toolsDir)) {
+    for (const f of readdirSync(toolsDir).filter((f) => /^(PATTERN-.+|UPDATE-RECONCILE)\.md$/.test(f))) set.add(join(toolsDir, f));
+  }
   // README (the public front door) is ours. WDDOCS is scanned separately at warning-
   // tier (wddocsTargets) - it is user / working content (design, business, research),
   // not our authored output, so banned prose there does not gate.

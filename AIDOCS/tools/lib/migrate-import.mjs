@@ -3,7 +3,7 @@
 // content lands verbatim (one anchored ### sub-section per entry, with its paired [+]
 // main bullet) instead of distilled at capture. It is the script half of a hybrid:
 // the script grabs the text and emits a landing report, the AI verifies what landed
-// and re-feeds any gap through -SessionUpdate / -MemoryUpdate using the archived text.
+// and re-feeds any gap through -UpdateSession / -UpdateMemory using the archived text.
 // Deep verification, including the --audit diff of archive-vs-distilled, is the
 // reconciliation pass (the gated /321 -Update).
 //
@@ -34,7 +34,7 @@ const CODE_MARKER = "(code example elided on import - summarize the takeaway in 
 
 function stripTrailingPeriod(s) { return s.endsWith(".") ? s.slice(0, -1) : s; }
 
-// migrate-import --from <archived doc> --skill <sessionupdate | memoryupdate>
+// migrate-import --from <archived doc> --skill <updatesession | updatememory>
 //   [--old <NAME> --new <NAME>] [--append] [--dry-run]
 //   --audit re-reads the archive and diffs it against the distilled EXTENDED.
 export async function cmdMigrateImport(index, args) {
@@ -47,7 +47,7 @@ export async function cmdMigrateImport(index, args) {
   const audit = args.includes("--audit");
 
   if (!from) { console.error("migrate-import needs --from <archived doc>"); process.exit(5); }
-  if (!skill) { console.error("migrate-import needs --skill <sessionupdate | memoryupdate>"); process.exit(5); }
+  if (!skill) { console.error("migrate-import needs --skill <updatesession | updatememory>"); process.exit(5); }
 
   // Resolve the lane's main + EXTENDED file keys from the registry (the spine), so the
   // staging carries real keys the validator and commit accept.
@@ -159,7 +159,7 @@ function reportLanding(report, blob) {
   if (report.thin.length) notes.push(`${report.thin.length} entr${report.thin.length === 1 ? "y" : "ies"} captured little body (${report.thin.join(", ")}) - check the source for detail that did not land`);
   if (report.elided) notes.push(`${report.elided} code block(s) elided - summarize the takeaway in prose at reconcile`);
   if (notes.length === 0) { console.log("  landing report: clean - every entry captured with a body, no anomalies."); return; }
-  console.log("  landing report (verify these, re-feed any gap via -SessionUpdate / -MemoryUpdate from the archived text):");
+  console.log("  landing report (verify these, re-feed any gap via -UpdateSession / -UpdateMemory from the archived text):");
   for (const note of notes) console.log(`  - ${note}`);
 }
 

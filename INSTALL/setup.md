@@ -64,7 +64,7 @@ The authoritative lists live in the engine, which needs them to run at any time:
    node AIDOCS/tools/engine.mjs sync
    node AIDOCS/tools/engine.mjs doctor
    ```
-2. **Fill the Big 6 (C - script drafts Stack / Pipeline, AI fills the rest).** Run `/321 -MemoryUpdate` (read `AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md` and execute). Its gap-fill starts from `bigsix --suggest` (a deterministic draft of the two script-readable sections) and the AI refines that plus fills the four judgment sections from code, conversation, and SESSION through the staging pipeline. That is the judgment step where Setup earns its space.
+2. **Fill the Big 6 (C - script drafts Stack / Pipeline, AI fills the rest).** Run `/321 -UpdateMemory` (read `AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md` and execute). Its gap-fill starts from `bigsix --suggest` (a deterministic draft of the two script-readable sections) and the AI refines that plus fills the four judgment sections from code, conversation, and SESSION through the staging pipeline. That is the judgment step where Setup earns its space.
 3. **Optional first commit (A, optional).** Offer to commit the scaffold (stage explicitly, never `git add -A` on an unreviewed tree).
 
 ## Migration path
@@ -99,6 +99,8 @@ The target holds content worth preserving. Land the canonical structure, then la
    node AIDOCS/tools/engine.mjs help
    ```
    Confirm the Commands list carries `migrate-archive`, `migrate-restore`, `migrate-import`, `verdict`, `state`, `scrub`, and `graduate`. If any is missing, the fetched engine was stale - STOP, re-fetch a current engine (`fetch-engine --repo <upstream>` or re-run install), re-run the `init` above, then re-verify before continuing.
+
+   **Legacy custom skill names (B - AI judgement, optional).** Project-custom bodies (any `SKILL_*.md` not in the canonical inventory of 8: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`) survived the reinstall in `AIDOCS/SKILL/`. The naming convention is action-first (`SKILL_UPDATE-SCRAPER.md`, flag `-UpdateScraper`). If a custom body uses the older target-first shape - filename ending in `-UPDATE.md` / `-BACKUP.md` / `-RESTORE.md` with the verb second, or a frontmatter `flag:` styled `-<Target>Update` - surface the candidate rename before capture (`SKILL_SCRAPER-UPDATE.md` -> `SKILL_UPDATE-SCRAPER.md`, flag `-ScraperUpdate` -> `-UpdateScraper`, key `scraperupdate` -> `updatescraper`). The user approves or modifies. On approval, rename the body (filesystem rename plus the frontmatter `name:` field) and run `node AIDOCS/tools/engine.mjs sync` so dispatch picks up the new key. With no legacy customs present (the common case), this finishes silently.
 5. **Restore the project's own content (A - deterministic).**
    ```bash
    node AIDOCS/tools/engine.mjs migrate-restore --name <PROJECT>
@@ -113,28 +115,28 @@ The target holds content worth preserving. Land the canonical structure, then la
 8. **SESSION capture (C - script 1:1, then AI verify).** Two parts.
    - **Part A - the 1:1 scavenge.** `migrate-import` grabs the archived SESSION_EXTENDED into staging verbatim (one `[+]` bullet plus `### sub-section` per entry, the orphan check satisfied by construction), then validate and commit:
      ```bash
-     node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION_EXTENDED.md --skill sessionupdate --old <OLD> --new <PROJECT>
-     node AIDOCS/tools/engine.mjs validate --skill sessionupdate
-     node AIDOCS/tools/engine.mjs commit   --skill sessionupdate
+     node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_SESSION_EXTENDED.md --skill updatesession --old <OLD> --new <PROJECT>
+     node AIDOCS/tools/engine.mjs validate --skill updatesession
+     node AIDOCS/tools/engine.mjs commit   --skill updatesession
      ```
      Append each session-shaped swept doc onto the same scavenge with `--append` before validating. Read the **landing report** `migrate-import` prints - it flags what to check (a structureless blob, a heading with no slug-able text, thin bodies, elided code).
-   - **Part B - AI verify and fill.** Verify what landed against the report. For anything the script could not land cleanly, re-feed the archived text through `-SessionUpdate` (read `AIDOCS/SKILL/SKILL_SESSION-UPDATE.md` and execute in migration mode): write Current State from the archive plus the code, and add the main SESSION LIFO bullets the import did not carry. Do not re-add the entries Part A already imported. Validate and commit again (the gate still holds prune).
+   - **Part B - AI verify and fill.** Verify what landed against the report. For anything the script could not land cleanly, re-feed the archived text through `-UpdateSession` (read `AIDOCS/SKILL/SKILL_UPDATE-SESSION.md` and execute in migration mode): write Current State from the archive plus the code, and add the main SESSION LIFO bullets the import did not carry. Do not re-add the entries Part A already imported. Validate and commit again (the gate still holds prune).
    - **Standard project (no 321 EXTENDED).** Skip Part A. Part B captures from the swept docs plus the code scan, the handoff file first.
 9. **MEMORY capture (C - script 1:1, then the initial project check).** Same shape.
    - **Part A - the 1:1 scavenge.** `migrate-import` the archived MEMORY_EXTENDED:
      ```bash
-     node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_MEMORY_EXTENDED.md --skill memoryupdate --old <OLD> --new <PROJECT>
-     node AIDOCS/tools/engine.mjs validate --skill memoryupdate
-     node AIDOCS/tools/engine.mjs commit   --skill memoryupdate
+     node AIDOCS/tools/engine.mjs migrate-import --from AIDOCS/<PROJECT>_SETUP_ARCHIVE/AIDOCS/<OLD>_MEMORY_EXTENDED.md --skill updatememory --old <OLD> --new <PROJECT>
+     node AIDOCS/tools/engine.mjs validate --skill updatememory
+     node AIDOCS/tools/engine.mjs commit   --skill updatememory
      ```
-   - **Part B - the initial project check.** Run `-MemoryUpdate` (read `AIDOCS/SKILL/SKILL_MEMORY-UPDATE.md` and execute in migration mode - skip its SessionUpdate auto-invoke, step 8 already captured SESSION). It fills the Big 6 from the code scan plus the archive (a hand-rolled `CLAUDE.md` / `AGENTS.md` is prime Big-6 source) and adds durable observations the import did not carry. BACKLOG is already carried in by `migrate-restore` (step 5) and swept at reconcile, so leave it. Validate and commit.
-   - **Standard project.** Skip Part A. MemoryUpdate fills the Big 6 from code plus the discovered artifacts.
+   - **Part B - the initial project check.** Run `-UpdateMemory` (read `AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md` and execute in migration mode - skip its UpdateSession auto-invoke, step 8 already captured SESSION). It fills the Big 6 from the code scan plus the archive (a hand-rolled `CLAUDE.md` / `AGENTS.md` is prime Big-6 source) and adds durable observations the import did not carry. BACKLOG is already carried in by `migrate-restore` (step 5) and swept at reconcile, so leave it. Validate and commit.
+   - **Standard project.** Skip Part A. UpdateMemory fills the Big 6 from code plus the discovered artifacts.
 10. **Scrub and verify the capture (A).**
     ```bash
     node AIDOCS/tools/engine.mjs scrub --fix
     node AIDOCS/tools/engine.mjs doctor
     ```
-    Capture is AI-written, so it can carry em dashes or semicolons. `scrub --fix` rewrites em dashes to ` - ` across the authored files and flags any semicolons for a quick manual pass. Then `doctor` is the final mechanical gate before handoff, and it grades on two tiers. **Errors** must all pass: the registry resolves, the memory and session shapes survived the import (Purpose, the Big 6, Current State, the LIFO sections), the auto-memory pointers match, and no banned prose remains (the per-lane orphan-pair check already ran at each capture commit). **Warnings are expected here - leave them.** The capture is deliberately additive, so both lanes land over cap, and `migrate-import` leaves elided-code markers in the depth, so doctor reports size-cap and import-residue warnings and still exits clean. Restored user WDDOCS docs (design / business notes) surface as WDDOCS-prose warnings too - that is the user's authorship, never rewrite it to clear the warning. Those are the reconciliation pass's targets, not Setup's. Fix any error before the gate (a banned-prose flag means scrub missed a case - rescrub or fix it by hand), and pass the warnings through untouched.
+    Capture is AI-written, so it can carry banned prose. `scrub --fix` auto-rewrites the safe cases across the authored files and flags the rest for a quick manual pass. Then `doctor` is the final mechanical gate before handoff, and it grades on two tiers. **Errors** must all pass: the registry resolves, the memory and session shapes survived the import (Purpose, the Big 6, Current State, the LIFO sections), the auto-memory pointers match, and no banned prose remains (the per-lane orphan-pair check already ran at each capture commit). **Warnings are expected here - leave them.** The capture is deliberately additive, so both lanes land over cap, and `migrate-import` leaves elided-code markers in the depth, so doctor reports size-cap and import-residue warnings and still exits clean. Restored user WDDOCS docs (design / business notes) surface as WDDOCS-prose warnings too - that is the user's authorship, never rewrite it to clear the warning. Those are the reconciliation pass's targets, not Setup's. Fix any error before the gate (a banned-prose flag means scrub missed a case - rescrub or fix it by hand), and pass the warnings through untouched.
 11. **Stop and hand off (A).** Setup captures, it does not distill. The gate is set (step 6), so it stops here. The reconciliation pass - the gated `/321 -Update` that distills the capture under cap, resolves the import residue, dedups the restored config docs, folds the archived AGENTS / CLAUDE into the lean canonical ones, audits what landed against the archive, and clears the gate - is the next lifecycle phase. The gate holds auto-prune until that pass clears it, so the capture stays additive in the meantime. To graduate without the gated pass, curate the capture by hand and clear the gate with `state --clear-reconcile`.
 
     Tell the user the capture is parked at the gate, and `/321 -Update` runs the reconciliation pass when they are ready. If `/321` in this session is still the pre-install version, executing the reconcile runbook (`AIDOCS/SKILL/SKILL_UPDATE.md`) directly does the same thing. Graduation (`graduate`) comes later, once the project is steady - it is refused while the gate is set.
@@ -161,11 +163,12 @@ Step 2 of the migration path is where Setup's judgement lives, on top of the det
 
 - **Confirm privacy before the first commit.** `init` defaults to `private` (tracks the project's MEMORY / SESSION / BACKLOG, auto-memory, and WDDOCS docs) and prints the mode it used. If this is a public repo, run `node AIDOCS/tools/engine.mjs privacy --set public` before any capture commit, so the project's own knowledge is gated local and only the framework ships. An AI-agent install that ran `init` without a privacy choice should ask the user once, here, before committing.
 - **Mode auto-detects.** No flag. Migration biases safe (archive first, nothing deleted).
-- **Two-part capture.** The 1:1 scavenge (`migrate-import`) grabs the archived depth verbatim into staging, then the writer skills (`-SessionUpdate` / `-MemoryUpdate`) verify what landed and fill the gaps. Both go through validate then commit, so nothing reaches a file unchecked.
+- **Two-part capture.** The 1:1 scavenge (`migrate-import`) grabs the archived depth verbatim into staging, then the writer skills (`-UpdateSession` / `-UpdateMemory`) verify what landed and fill the gaps. Both go through validate then commit, so nothing reaches a file unchecked.
 - **Two lanes, one archive.** The deterministic backstop (`migrate-archive`) covers the known shape and is re-runnable, the AI sweep covers the rest, and the sweep can route anything into the same `SETUP_ARCHIVE` or fall back to the backstop when judgement is uncertain.
 - **Migration captures, never distills.** It sets the reconcile gate (which holds auto-prune, so the capture stays additive) and stops. Distillation is the `-Update` reconcile pass, which curates under cap and clears the gate.
 - **The install log is the mechanical record.** The archive / import / relay / restore commands append what they did and where content went to `INSTALL/INSTALL.log`. Read it to confirm what moved where before judging content. It rides in `INSTALL/`, so `graduate` removes it with the rest.
 - **The archive is the recovery net**, kept until the user deletes it. Existing archived data is never overwritten - both archiving lanes (`migrate-archive` and `verdict`) keep the first copy, and `init` never writes into archive folders. Pruned history (`*_ARCHIVE.md`) and content from a prior migration survive a re-run intact.
+- **Custom skills surface their names.** Project-custom skill bodies that predate the action-first naming convention get a rename candidate surfaced before capture (`SKILL_<TARGET>-UPDATE.md` -> `SKILL_UPDATE-<TARGET>.md` and parallel flag flip). The user approves or modifies, Setup never forces the rename. With no legacy customs, the check is silent.
 
 ## Deferred (land when their engine does)
 

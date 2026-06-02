@@ -63,6 +63,10 @@ foreach ($marker in @(".claude/skills/321", "AIDOCS", "AGENTS.md", "CLAUDE.md", 
   if (Test-Path (Join-Path $Target $marker)) { $existing = $true; break }
 }
 
+# Distinguish an existing 321 install (registry present) from a generic existing project,
+# so the install can point users at the lighter -UpdateSync path for an engine-only refresh.
+$existing321 = Test-Path (Join-Path $Target "AIDOCS/_index.json")
+
 # Engine source: the repo this script ships in if it carries the engine,
 # otherwise a shallow clone of Repo into a temp dir we remove afterward.
 $cloneTmp = $null
@@ -84,6 +88,13 @@ Write-Host "  Target: $Target"
 Write-Host "  Name:   $Name"
 Write-Host ""
 
+if ($existing321) {
+  Write-Host "Note: an existing 321 install was detected at $Target." -ForegroundColor Yellow
+  Write-Host "  For an engine-only refresh, /321 -UpdateSync (from the project) is the lighter path."
+  Write-Host "  Continuing with the full install - it is write-if-missing, your data files are preserved."
+  Write-Host ""
+}
+
 Write-Host "Scaffolding..."
 $initArgs = @((Join-Path $engine "AIDOCS/tools/engine.mjs"), "init", $Target, "--name", $Name)
 if ($Privacy) { $initArgs += @("--privacy", $Privacy) }
@@ -97,6 +108,10 @@ if ($cloneTmp) { Remove-Item -Recurse -Force $cloneTmp }
 Push-Location $Target
 $failed = $null
 try {
+  # Record the install source as engine.upstream so a later /321 -UpdateSync knows where to
+  # pull from. Only sets when empty - a user-customized upstream (a fork URL) survives.
+  & node -e 'const f=process.argv[1],r=process.argv[2],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));if(j.engine && !j.engine.upstream){j.engine.upstream=r;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");console.log("Set engine.upstream to "+r)}' "AIDOCS/_index.json" $Repo
+
   Write-Host ""; Write-Host "Registering skills..."
   & node "AIDOCS/tools/engine.mjs" sync
   if ($LASTEXITCODE -ne 0) { throw "sync failed" }

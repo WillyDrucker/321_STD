@@ -12,8 +12,8 @@ const MAIN_OPS = ["lifo_insert", "overwrite_section"];   // carry a section - EX
 
 // Returns a list of human-readable errors (empty when well-formed). When `skill`
 // is given, enforces the domain firewall: every action must target a file the
-// skill owns, i.e. whose key is prefixed with the skill domain (sessionupdate.* /
-// memoryupdate.*). The domain-owned key names are the firewall.
+// skill owns, i.e. whose key is prefixed with the skill domain (updatesession.* /
+// updatememory.*). The domain-owned key names are the firewall.
 export function validateStaging(index, staging, skill) {
   const errors = [];
   if (!staging || !Array.isArray(staging.actions)) return ["staging must have an actions array"];

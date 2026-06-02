@@ -39,6 +39,15 @@ The same command serves a fresh or an existing project, and it is non-destructiv
 
 `init` writes scaffold files only if missing - the engine and these runbooks always refresh, but data files (AGENTS, `_index.json`, MEMORY / SESSION / BACKLOG and the rest) are never clobbered. A direct `init ... --force` rewrites the scaffold anyway (a recovery flag the install scripts do not expose). Each mechanical step records to `INSTALL/INSTALL.log` (what ran, what moved where), an onboarding audit trail that `graduate` removes with `INSTALL/`.
 
+## Install vs update (the AI-side choice)
+
+An AI assistant landed at a 321 project should distinguish two lifecycle paths and pick the lighter one when it applies:
+
+- **Install** (this runbook + `setup.md`) - laying the structure on a fresh or pre-321 target, or migrating a stale legacy install. Heavyweight: archives, reinstalls, restores, captures, reconciles. The right path when the project has no `_index.json`, when the data docs are stale or malformed, or when the user explicitly asked to (re)install.
+- **Update** (`/321 -UpdateSync`) - refreshing the engine code, skill bodies, router, and manifest-driven structural changes from `engine.upstream`. Lightweight: touches engine-class paths only, leaves project data alone, runs in seconds. The right path when the registry is healthy and the project just needs the latest engine.
+
+The install scripts (`install.sh`, `install.ps1`) print a notice when they detect an existing 321 install (registry present), pointing at `/321 -UpdateSync` as the lighter alternative, and continue with the full install if the user proceeds. An AI invoked into an existing-and-healthy 321 project should prefer `-UpdateSync` over re-running install, unless the user explicitly asked for a reinstall or migration.
+
 ## Manual / recovery drive
 
 If the scripts cannot run, or you are recovering, run the engine steps directly from a target that already has the engine:
