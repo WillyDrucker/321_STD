@@ -1,17 +1,16 @@
 ---
 name: update
-description: The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates.
+description: The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates. The engine self-update path lives in /321 -SYNC, separate from this skill.
 ---
 
 # /321 -Update
 
-**Purpose:** Refresh the project's whole memory surface in one pass - SESSION (the event backbone) then MEMORY plus BACKLOG (the durable distillation). This is the flag to run at a checkpoint. It is a thin orchestrator: it invokes the two lane skills and relays their summaries, holding no logic of its own. The `-Sync` mode is the separate engine-self-update path.
+**Purpose:** Refresh the project's whole memory surface in one pass - SESSION (the event backbone) then MEMORY plus BACKLOG (the durable distillation). This is the flag to run at a checkpoint. It is a thin orchestrator: it invokes the two lane skills and relays their summaries, holding no logic of its own. The engine self-update path lives in `/321 -SYNC`, separate from this skill.
 
 ## Modes
 
 - **default** - the two-lane memory chain.
 - **reconciliation** - gate-triggered, not a flag. When the post-migration `reconcile_pending` gate is set, the default invocation runs the reconciliation pass instead of the chain.
-- **-Sync** - update the engine itself from upstream, project data untouched.
 
 ## Routing (decide first, run silently)
 
@@ -120,43 +119,13 @@ After this the project carries no onboarding machinery. The `<PROJECT>_SETUP_ARC
 
 Each lane stages and commits independently through the validate -> commit pipeline. `-Update` writes nothing itself.
 
-## -Sync (engine self-update)
-
-Keep the project's engine current with its upstream. This refreshes engine code, skills, and the router, never project data. Distinct from the `sync` engine command, which only rebuilds dispatch.
-
-1. **Read the pointer.** Read `engine.version` and `engine.upstream` from `_index.json`. If `upstream` is empty, report "no upstream configured, nothing to sync" and stop. A project sets `upstream` to the repo it pulls its engine from.
-
-2. **Fetch.**
-   ```bash
-   node AIDOCS/tools/engine.mjs fetch-engine --repo <engine.upstream>
-   ```
-   This lands the upstream engine in `INSTALL/engine`. Offline means a non-zero exit - report it and stop. The local engine keeps working.
-
-3. **Compare.** Read `engine.version` from the fetched `INSTALL/engine/AIDOCS/_index.json`. Same as the local version means already current - clean up and stop. Newer means continue.
-
-4. **Refresh engine-class files.** Copy from `INSTALL/engine` into the project, overwriting only the engine-class paths:
-   - `AIDOCS/tools/` - the engine. `staging/` and `state.json` are gitignored and absent from a cloned source, so the project's own staging and watermarks survive.
-   - `AIDOCS/SKILL/` - the skill bodies.
-   - `.claude/skills/321/SKILL.md` - the router.
-
-   Do NOT copy the data files (`<PROJECT>_*.md`), `_index.json`, `automemory/`, or `WDDOCS/` - those belong to the project. A graduated project (the `graduated` flag in `_index.json`) keeps `-Setup` deregistered - do not re-add its body. Then set `engine.version` in `_index.json` to the fetched version.
-
-5. **Verify and clean up.**
-   ```bash
-   node AIDOCS/tools/engine.mjs sync
-   node AIDOCS/tools/engine.mjs doctor
-   ```
-   Re-register skills, confirm the surface is clean, then remove `INSTALL/`.
-
 ## Rules
 
 - **Route silently, graduated skips the gate.** A `graduated: true` project (the steady state) goes straight to the default chain - no gate read, no mention of reconciliation. Only a pre-graduation project reads `reconcile_pending`: set is the reconciliation pass (direct-edit distillation, clear the gate, then graduate), off is the normal chain. The routing is never narrated either way.
 - **Thin orchestrator (default).** No staging, no ops here - the lanes own their writes.
 - **Order is fixed.** SESSION first (events), then MEMORY (the state events imply), so the memory lane distills against a fresh backbone.
 - **Stop on a failed lane.** A failed SESSION commit halts the chain before MEMORY runs.
-- **-Sync touches only the engine.** Engine code, skills, and router refresh, never project data. Offline or no upstream is a clean no-op.
-- **Upstream owns the version.** The project pulls, it does not invent.
 
 ## Deferred (land when their engine does)
 
-The `-FULL` mode pass-through (flowing to each lane on a routine run) is not yet built - it arrives with the update modes. The reconciliation pass above distills the core lanes (SESSION / MEMORY / BACKLOG and their EXTENDED), merges auto-memory, reconciles the config docs (DEV-AUDIT / AUTO-PUSH / CHANGELOG), and classifies the archived AGENTS / CLAUDE. The skills lane (a project's own `/321` skill bodies) lands with `import-skills`. For `-Sync`, customization preservation (keeping a project's edited skill body across a refresh) and a real version-compare plus upgrade-migration path land with the customizations manifest and a published upstream.
+The `-FULL` mode pass-through (flowing to each lane on a routine run) is not yet built - it arrives with the update modes. The reconciliation pass above distills the core lanes (SESSION / MEMORY / BACKLOG and their EXTENDED), merges auto-memory, reconciles the config docs (DEV-AUDIT / AUTO-PUSH / CHANGELOG), and classifies the archived AGENTS / CLAUDE. The skills lane (a project's own `/321` skill bodies) lands with `import-skills`.

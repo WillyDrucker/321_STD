@@ -37,9 +37,11 @@ Runs in the current directory and names the project after the folder. Override t
 - **`/321 -Setup`** - onboard a project: fresh fill or migration. Deregistered once the project graduates to steady state.
 - **`/321 -SessionUpdate`** - refresh SESSION (Current State plus the LIFO event log).
 - **`/321 -MemoryUpdate`** - distill durable observations into MEMORY (LIFO plus the Big 6) and manage BACKLOG.
-- **`/321 -Update`** - the daily driver: chain SessionUpdate then MemoryUpdate in one pass. `-Update -Sync` instead refreshes the engine itself from upstream, leaving project data untouched.
+- **`/321 -Update`** - the daily driver: chain SessionUpdate then MemoryUpdate in one pass.
+- **`/321 -SYNC`** - refresh the project's engine code from `engine.upstream`. Project data (memory / session / backlog / registry / auto-memory / WDDOCS) is never touched. Offline or no-upstream is a clean no-op.
 - **`/321 -DevAudit`** - code-standards audit against your project's DEV-AUDIT. `-FULL` audits and refactors.
 - **`/321 -AutoPush`** - release pipeline: capture, commit, and push to the anchored remote, with the project's release steps sourced from AUTO-PUSH.
+- **`/321 -Compact`** - emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation.
 
 ## Documentation
 

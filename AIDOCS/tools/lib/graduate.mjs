@@ -1,6 +1,6 @@
 // graduate.mjs - tear down the onboarding surface once a project is steady:
 // deregister -Setup (drop its body + dispatch entry), remove INSTALL/, and mark
-// the project graduated so a later -Update -Sync does not re-add -Setup. The
+// the project graduated so a later -SYNC does not re-add -Setup. The
 // onboarding lib modules init laid stay in place, inert without INSTALL/ and the
 // -Setup skill. Gated on reconcile not pending - no graduation before distillation.
 

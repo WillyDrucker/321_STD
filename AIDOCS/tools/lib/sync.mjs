@@ -15,11 +15,14 @@ function flagFromFilename(file) {
   return { flag: `-${camel}`, key: camel.toLowerCase() };
 }
 
-function frontmatterDescription(content) {
+// Pull one named frontmatter field, with quote-stripping for `flag: "-SYNC"`-style values.
+// Empty string when the block or field is missing, so a skill without an override just
+// falls through to the filename-derived default.
+function frontmatterField(content, field) {
   const block = content.match(/^---\n([\s\S]*?)\n---/);
   if (!block) return "";
-  const line = block[1].match(/^description:\s*(.+)$/m);
-  return line ? line[1].trim() : "";
+  const line = block[1].match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
+  return line ? line[1].trim().replace(/^["']|["']$/g, "") : "";
 }
 
 export function cmdSync(index, args) {
@@ -29,8 +32,13 @@ export function cmdSync(index, args) {
   const dispatch = {};
   if (existsSync(dir)) {
     for (const file of readdirSync(dir).filter((f) => /^SKILL_.+\.md$/.test(f)).sort()) {
-      const { flag, key } = flagFromFilename(file);
-      const desc = frontmatterDescription(readFileSync(join(dir, file), "utf8"));
+      const { flag: derivedFlag, key } = flagFromFilename(file);
+      const fm = readFileSync(join(dir, file), "utf8");
+      // The skill body may pin an explicit display flag in frontmatter (e.g. flag: "-SYNC")
+      // when the filename-derived camelCase form needs a casing override. The dispatch
+      // key stays lowercased so the router still matches case-insensitively either way.
+      const flag = frontmatterField(fm, "flag") || derivedFlag;
+      const desc = frontmatterField(fm, "description");
       dispatch[key] = { flag, body: `${bodiesRel.replace(/\/$/, "")}/${file}`, description: desc };
     }
   }

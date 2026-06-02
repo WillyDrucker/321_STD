@@ -61,7 +61,7 @@
     "path": ""
   },
   "engine": {
-    "version": "0.1.0",
+    "version": "0.1.1",
     "upstream": ""
   },
   "skills": {
@@ -97,10 +97,15 @@
         "body": "./AIDOCS/SKILL/SKILL_SETUP.md",
         "description": "Make a project usable. Auto-detects fresh-install vs migration. Fresh fills the Big 6 from code signals through the normal skills. Migration archives existing content, reinstalls the canonical structure, captures it back, and sets the reconcile gate for -Update. Deregistered at graduation."
       },
+      "sync": {
+        "flag": "-SYNC",
+        "body": "./AIDOCS/SKILL/SKILL_SYNC.md",
+        "description": "Refresh the project's engine code, skill bodies, and router from its configured upstream. Reads engine.upstream, fetches, compares versions, copies the engine-class paths when newer, bumps the local engine.version, then rebuilds dispatch and runs doctor. Project data (memory, session, backlog, registry, auto-memory, WDDOCS) is never touched. Offline or no upstream is a clean no-op."
+      },
       "update": {
         "flag": "-Update",
         "body": "./AIDOCS/SKILL/SKILL_UPDATE.md",
-        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. The -Sync mode instead refreshes the engine itself from upstream, leaving project data untouched. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates."
+        "description": "The daily driver. Chains -SessionUpdate then -MemoryUpdate in one pass so SESSION and MEMORY both refresh from this conversation. A thin orchestrator on a routine run - each lane owns its own logic and its own staging commit. When the post-migration reconcile gate is set, the default run instead distills the raw capture into steady state and graduates. The engine self-update path lives in /321 -SYNC, separate from this skill."
       }
     }
   }

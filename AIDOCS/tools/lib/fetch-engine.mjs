@@ -18,7 +18,7 @@ export async function cmdFetchEngine(args) {
   const repo = flag(args, "--repo");
   const ref = flag(args, "--ref") || "main";
   const dest = installEngineDir();
-  // graduate removes INSTALL/ entirely, so a post-graduation -Update -Sync has no
+  // graduate removes INSTALL/ entirely, so a post-graduation -SYNC has no
   // parent for INSTALL/engine. Recreate it (no-op when INSTALL/ already exists).
   mkdirSync(dirname(dest), { recursive: true });
   if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });

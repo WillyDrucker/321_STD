@@ -347,7 +347,7 @@ node "$RENG" init "$FE" --name FetchGrad >/dev/null 2>&1
 rm -rf "$FE/INSTALL"
 mkdir -p "$BASE/fesrc"; printf 'x' > "$BASE/fesrc/marker.txt"
 node "$FE/AIDOCS/tools/engine.mjs" fetch-engine --from "$BASE/fesrc" >/dev/null 2>&1
-[ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -Sync)" || fail "fetch-engine did not recreate INSTALL/"
+[ -d "$FE/INSTALL/engine" ] && pass "fetch-engine recreated INSTALL/engine (post-graduation -SYNC)" || fail "fetch-engine did not recreate INSTALL/"
 
 echo "=== T22: auto-prune creates <doc>_ARCHIVE/ folder with a datestamped file on demand ==="
 PR="$BASE/prunetest"

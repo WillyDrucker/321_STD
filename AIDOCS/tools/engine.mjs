@@ -91,7 +91,7 @@ Commands:
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
             clears staging on success.
             --skill <sessionupdate | memoryupdate>
-  fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -Update -Sync / re-setup).
+  fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -SYNC / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.
   state     Print state.json, or flip the reconcile gate (the Setup -> Update handoff).
             [--set-reconcile | --clear-reconcile [--force]]. Clear refuses on reconcile
