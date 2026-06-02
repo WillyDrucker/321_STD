@@ -117,7 +117,13 @@ try {
   Write-Host ""; Write-Host "Health check..."
   & node "AIDOCS/tools/engine.mjs" doctor
   if ($LASTEXITCODE -ne 0) {
-    if ($existing) { Write-Host "doctor reports pre-migration issues - expected for an existing project, setup reconciles them." -ForegroundColor Yellow }
+    if ($existing) {
+      Write-Host "doctor reports pre-migration issues - expected for an existing project, setup reconciles them." -ForegroundColor Yellow
+      # Clear $LASTEXITCODE so the doctor warning does not leak out as the script's exit code
+      # on the success path (a downstream harness reading exit code would see 20 and treat the
+      # install as a failure even though the engine landed and setup will reconcile).
+      $global:LASTEXITCODE = 0
+    }
     else { throw "doctor failed" }
   }
   if (-not $existing -and -not (Test-Path ".git")) {
@@ -138,3 +144,7 @@ Write-Host ""
 Write-Host "Next: setup (fresh fill or migration) finishes onboarding and is part of the install."
 Write-Host "  An assistant driving this install continues into INSTALL/setup.md now."
 Write-Host "  Standalone: open the project and have your assistant run INSTALL/setup.md."
+# Explicit success exit so a downstream harness (powershell.exe -File install.ps1, or a CI
+# step reading $LASTEXITCODE) sees 0 unambiguously. Doctor's exit was already swallowed
+# above on the existing-project path.
+exit 0

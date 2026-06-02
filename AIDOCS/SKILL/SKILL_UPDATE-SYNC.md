@@ -13,9 +13,9 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
 2. **Fetch.**
    ```bash
-   node AIDOCS/tools/engine.mjs fetch-engine --repo <engine.upstream>
+   node AIDOCS/tools/engine.mjs fetch-engine
    ```
-   Lands the upstream engine in `INSTALL/engine`. A clone failure (offline, bad ref) is a non-zero exit. Report it and stop. The local engine keeps working.
+   Lands the upstream engine in `INSTALL/engine`. With no flag, `fetch-engine` defaults `--repo` from `engine.upstream` (the registry already knows it). Pass `--repo <url>` to override or `--from <dir>` for a local checkout. A clone failure (offline, bad ref) is a non-zero exit. Report it and stop. The local engine keeps working.
 
 3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json`. Same as the local version with an empty manifest delta means already current. Clean up `INSTALL/` and stop. Anything else continues.
 

@@ -95,6 +95,21 @@ export function cmdMigrateArchive(args) {
   const skillDst = join(archive, "AIDOCS", "SKILL");
   if (existsSync(skillSrc) && !existsSync(skillDst)) { cpSync(skillSrc, skillDst, { recursive: true }); skillSnapshot = true; }
 
+  // Legacy AIDOCS/SKILLS/ (plural) is the pre-engine name for what is now AIDOCS/SKILL/
+  // (singular). A project that predates the rename carries the plural dir, and migrate
+  // must sweep it - otherwise the reinstall lays canonical SKILL/ alongside the stale
+  // SKILLS/, doctor warns, and the AI has to improvise. Rename to SKILLS_legacy/ inside
+  // the archive so it sits distinct from the canonical SKILL/ snapshot above.
+  let legacySkillsMoved = false;
+  const legacySkillsSrc = join(root, "AIDOCS", "SKILLS");
+  const legacySkillsDst = join(archive, "AIDOCS", "SKILLS_legacy");
+  if (existsSync(legacySkillsSrc) && !existsSync(legacySkillsDst)) {
+    mkdirSync(dirname(legacySkillsDst), { recursive: true });
+    renameSync(legacySkillsSrc, legacySkillsDst);
+    legacySkillsMoved = true;
+    moved++;
+  }
+
   // Snapshot the external Claude memory (the runtime source of truth) into the archive so
   // the reconcile merge can weigh the project's real rules + profile. Copy, not move - it
   // is Claude Code's live global state: read it, never delete it.
@@ -104,7 +119,7 @@ export function cmdMigrateArchive(args) {
     if (!existsSync(dst)) { cpSync(externalDir, dst, { recursive: true }); externalSnapshot = true; }
   }
 
-  const tail = `${skillSnapshot ? " + snapshotted AIDOCS/SKILL" : ""}${externalSnapshot ? " + captured external memory" : ""}`;
+  const tail = `${skillSnapshot ? " + snapshotted AIDOCS/SKILL" : ""}${legacySkillsMoved ? " + swept legacy AIDOCS/SKILLS plural" : ""}${externalSnapshot ? " + captured external memory" : ""}`;
   console.log(`migrate-archive: moved ${moved} path(s)${tail} into ${archive} (move, not delete - the recovery net).`);
   if (gitignoreRelaid) console.log("migrate-archive: re-laid a canonical .gitignore at the project root (closes the no-ignore window before reinstall).");
   installLog(root, `migrate-archive: moved ${moved} path(s)${tail} into AIDOCS/${name}_SETUP_ARCHIVE${gitignoreRelaid ? ", re-laid root .gitignore" : ""}.`);

@@ -914,6 +914,37 @@ node "$CLGENG" fetch-engine --from "$CLSRC" >/dev/null 2>&1
 node "$CLGENG" upgrade --dry-run >/dev/null 2>&1
 [ -d "$CLG/INSTALL/engine" ] && pass "dry-run upgrade does NOT clean up INSTALL/engine" || fail "dry-run upgrade wrongly cleaned up INSTALL/engine"
 
+echo "=== T48: fetch-engine defaults --repo from engine.upstream when no flag given ==="
+FE="$BASE/fetchdefault"
+node "$RENG" init "$FE" --name FeProj --upstream "https://example.com/fedefault.git" >/dev/null 2>&1
+FEENG="$FE/AIDOCS/tools/engine.mjs"
+# No --repo, no --from: should pick up engine.upstream from the registry and report it.
+# The clone itself will fail (bogus URL), but the default-resolution log line and the
+# clone-failure exit (21) prove the default path fired.
+FEOUT="$(node "$FEENG" fetch-engine 2>&1)"; FECC=$?
+echo "$FEOUT" | grep -q "defaulting --repo to engine.upstream (https://example.com/fedefault.git)" && pass "fetch-engine logs the defaulted --repo from engine.upstream" || fail "fetch-engine did not log the defaulted --repo"
+[ "$FECC" = "21" ] && pass "fetch-engine still exits 21 on clone failure after defaulting" || fail "fetch-engine exit code after default-clone unexpected ($FECC)"
+# Empty engine.upstream + no flag: the missing-args error still fires (no default available).
+FEE="$BASE/fetchdefaultempty"
+node "$RENG" init "$FEE" --name FeeProj >/dev/null 2>&1
+FEEOUT="$(node "$FEE/AIDOCS/tools/engine.mjs" fetch-engine 2>&1)"; FEECC=$?
+[ "$FEECC" = "5" ] && pass "fetch-engine still errors when no upstream is recorded and no flag given" || fail "fetch-engine wrongly succeeded with empty registry and no flag (exit $FEECC)"
+echo "$FEEOUT" | grep -q "needs --from <dir> or --repo <url>" && pass "fetch-engine empty-registry error message preserved" || fail "fetch-engine missing-args message changed"
+
+echo "=== T49: migrate-archive sweeps legacy AIDOCS/SKILLS/ (plural) into the archive ==="
+LS="$BASE/legacyskills"
+node "$RENG" init "$LS" --name LsProj >/dev/null 2>&1
+LSENG="$LS/AIDOCS/tools/engine.mjs"
+# Lay the legacy plural directory the pre-engine 321 shape carried.
+mkdir -p "$LS/AIDOCS/SKILLS"
+printf 'legacy plural skill body\n' > "$LS/AIDOCS/SKILLS/SKILL_LEGACY.md"
+node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1
+[ ! -d "$LS/AIDOCS/SKILLS" ] && pass "migrate-archive swept the legacy AIDOCS/SKILLS/ out of the project tree" || fail "legacy AIDOCS/SKILLS/ left in the project tree"
+[ -d "$LS/AIDOCS/LsProj_SETUP_ARCHIVE/AIDOCS/SKILLS_legacy" ] && pass "legacy SKILLS landed in the archive as SKILLS_legacy/" || fail "legacy SKILLS not in SKILLS_legacy/"
+[ -f "$LS/AIDOCS/LsProj_SETUP_ARCHIVE/AIDOCS/SKILLS_legacy/SKILL_LEGACY.md" ] && pass "legacy SKILLS contents preserved in the archive" || fail "legacy SKILLS contents lost"
+# Idempotent re-run: second invocation must not error even though there is nothing left to move.
+node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1 && pass "migrate-archive re-run is idempotent (legacy SKILLS already moved)" || fail "migrate-archive re-run failed"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED

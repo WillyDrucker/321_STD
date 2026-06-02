@@ -89,7 +89,7 @@ The target holds content worth preserving. Land the canonical structure, then la
    Validate first (read-only, rejects unknown vocab before any file moves), then apply - the AI-judged paths move or copy into the same `SETUP_ARCHIVE`, or stay in place.
 4. **Reinstall the canonical structure (A).** Lay fresh scaffolds over the now-empty shape, keeping the engine in place and re-laying the canonical auto-memory. `init` refuses to scaffold over its own source, so the reinstall runs from a fetched engine, not the project's own copy:
    ```bash
-   node AIDOCS/tools/engine.mjs fetch-engine --repo <engine-upstream>   # or --from <local 321 checkout>
+   node AIDOCS/tools/engine.mjs fetch-engine   # defaults --repo from engine.upstream, or pass --from <local 321 checkout>
    node INSTALL/engine/AIDOCS/tools/engine.mjs init . --name <PROJECT>
    ```
    The fetched engine's `init` is write-if-missing for the data files, so it relays the archived-away docs as fresh scaffolds, lays the canonical auto-memory back, and leaves the engine in place.
@@ -98,7 +98,7 @@ The target holds content worth preserving. Land the canonical structure, then la
    ```bash
    node AIDOCS/tools/engine.mjs help
    ```
-   Confirm the Commands list carries `migrate-archive`, `migrate-restore`, `migrate-import`, `verdict`, `state`, `scrub`, and `graduate`. If any is missing, the fetched engine was stale - STOP, re-fetch a current engine (`fetch-engine --repo <upstream>` or re-run install), re-run the `init` above, then re-verify before continuing.
+   Confirm the Commands list carries `migrate-archive`, `migrate-restore`, `migrate-import`, `verdict`, `state`, `scrub`, and `graduate`. If any is missing, the fetched engine was stale - STOP, re-fetch a current engine (`fetch-engine` defaults from the registry, or re-run install), re-run the `init` above, then re-verify before continuing.
 
    **Legacy custom skill names (B - AI judgement, optional).** Project-custom bodies (any `SKILL_*.md` not in the canonical inventory of 8: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`) survived the reinstall in `AIDOCS/SKILL/`. The naming convention is action-first (`SKILL_UPDATE-SCRAPER.md`, flag `-UpdateScraper`). If a custom body uses the older target-first shape - filename ending in `-UPDATE.md` / `-BACKUP.md` / `-RESTORE.md` with the verb second, or a frontmatter `flag:` styled `-<Target>Update` - surface the candidate rename before capture (`SKILL_SCRAPER-UPDATE.md` -> `SKILL_UPDATE-SCRAPER.md`, flag `-ScraperUpdate` -> `-UpdateScraper`, key `scraperupdate` -> `updatescraper`). The user approves or modifies. On approval, rename the body (filesystem rename plus the frontmatter `name:` field) and run `node AIDOCS/tools/engine.mjs sync` so dispatch picks up the new key. With no legacy customs present (the common case), this finishes silently.
 5. **Restore the project's own content (A - deterministic).**

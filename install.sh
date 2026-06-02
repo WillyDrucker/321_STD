@@ -127,3 +127,6 @@ echo ""
 echo "Next: setup (fresh fill or migration) finishes onboarding and is part of the install."
 echo "  An assistant driving this install continues into INSTALL/setup.md now."
 echo "  Standalone: open the project and have your assistant run INSTALL/setup.md."
+# Explicit success exit so a downstream harness sees 0. Doctor's exit was already
+# consumed by the `if ! ... doctor` guard above on the existing-project path.
+exit 0
