@@ -38,7 +38,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the surface is clean. Read the doctor output. Real findings on project content (banned prose, oversized buckets) are pre-existing project debt for `-Update` / `scrub --fix` to handle, not sync failures.
 
-6. **Bump and clean.** `upgrade` already bumped `engine.version` to the fetched version. Remove `INSTALL/`. A graduated project (the `graduated` flag in `_index.json`) keeps `-Setup` deregistered. If `SKILL_SETUP.md` reappeared in the copy, delete it.
+6. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 
 7. **Report.** Summarize: operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note (post-graduation cleanup, customized sections that were skipped) bubbles up to the user.
 

@@ -96,7 +96,10 @@ if ($existing321) {
 }
 
 Write-Host "Scaffolding..."
-$initArgs = @((Join-Path $engine "AIDOCS/tools/engine.mjs"), "init", $Target, "--name", $Name)
+# Pass --upstream so init records the install source into engine.upstream (write-if-empty)
+# in one pass. A user-customized upstream (a fork URL) survives because init only writes
+# when the current value is empty.
+$initArgs = @((Join-Path $engine "AIDOCS/tools/engine.mjs"), "init", $Target, "--name", $Name, "--upstream", $Repo)
 if ($Privacy) { $initArgs += @("--privacy", $Privacy) }
 & node @initArgs
 if ($LASTEXITCODE -ne 0) {
@@ -108,10 +111,6 @@ if ($cloneTmp) { Remove-Item -Recurse -Force $cloneTmp }
 Push-Location $Target
 $failed = $null
 try {
-  # Record the install source as engine.upstream so a later /321 -UpdateSync knows where to
-  # pull from. Only sets when empty - a user-customized upstream (a fork URL) survives.
-  & node -e 'const f=process.argv[1],r=process.argv[2],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));if(j.engine && !j.engine.upstream){j.engine.upstream=r;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");console.log("Set engine.upstream to "+r)}' "AIDOCS/_index.json" $Repo
-
   Write-Host ""; Write-Host "Registering skills..."
   & node "AIDOCS/tools/engine.mjs" sync
   if ($LASTEXITCODE -ne 0) { throw "sync failed" }

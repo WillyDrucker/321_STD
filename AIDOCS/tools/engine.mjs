@@ -128,7 +128,10 @@ Commands:
   init      Lay the project skeleton into a target, substituting the name. --privacy
             sets the tracking mode (private default, public gates the project's own
             knowledge local). A reinstall recalls the mode from the registry / archive.
-            <target-dir> --name <PROJECT> [--privacy <public | private>] [--force]
+            --upstream records the install source into engine.upstream (write-if-empty,
+            so a user-customized fork URL survives a reinstall).
+            <target-dir> --name <PROJECT> [--privacy <public | private>]
+              [--upstream <url>] [--force]
             (--force rewrites the scaffold; refused on an existing 321 project)
   help      Print this message.
 `);

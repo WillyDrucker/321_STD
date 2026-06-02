@@ -827,6 +827,72 @@ PCOUT="$(node "$PCENG" upgrade 2>&1)"; PCCC=$?
 [ "$PCCC" = "20" ] && pass "file_add_template rejects ../ escape with exit 20" || fail "file_add_template accepted escape (exit $PCCC)"
 [ ! -f "$BASE/escape.md" ] && pass "no file written outside the project root" || fail "escape.md written outside the project root"
 
+echo "=== T47: init --upstream records engine.upstream (write-if-empty, preserves user fork URL on reinstall) ==="
+UP="$BASE/initupstream"
+node "$RENG" init "$UP" --name UpInit --upstream "https://example.com/fork.git" >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://example.com/fork.git" ? 0 : 1)' "$UP/AIDOCS/_index.json" && pass "init --upstream recorded the URL into engine.upstream" || fail "init --upstream did not record the URL"
+# Reinstall (write-if-missing init): the recorded upstream should survive a different --upstream flag.
+node "$RENG" init "$UP" --name UpInit --upstream "https://other.example.com/elsewhere.git" >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://example.com/fork.git" ? 0 : 1)' "$UP/AIDOCS/_index.json" && pass "reinstall preserves user-customized engine.upstream (write-if-empty contract)" || fail "reinstall overwrote engine.upstream"
+# init without --upstream on a fresh target leaves engine.upstream empty (the source dogfood state).
+UPN="$BASE/initnoupstream"
+node "$RENG" init "$UPN" --name UpNoInit >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "" ? 0 : 1)' "$UPN/AIDOCS/_index.json" && pass "init without --upstream leaves engine.upstream empty (no surprise)" || fail "init without --upstream wrote a value to engine.upstream"
+# STD321_UPSTREAM env var also works (the env-fallback path).
+UPE="$BASE/initenvupstream"
+STD321_UPSTREAM="https://env.example.com/fork.git" node "$RENG" init "$UPE" --name UpEnvInit >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://env.example.com/fork.git" ? 0 : 1)' "$UPE/AIDOCS/_index.json" && pass "STD321_UPSTREAM env var records engine.upstream when --upstream absent" || fail "STD321_UPSTREAM env var did not record engine.upstream"
+# Migration reinstall: original install recorded an upstream, then migrate-archive moves
+# _index.json into SETUP_ARCHIVE, then init re-runs without --upstream. The recall path
+# must pull the original upstream from the archive so it is not lost.
+UPM="$BASE/initupstreamrecall"
+node "$RENG" init "$UPM" --name UpRecall --upstream "https://recall.example.com/origin.git" >/dev/null 2>&1
+# Simulate migrate-archive moving _index.json into the archive.
+mkdir -p "$UPM/AIDOCS/UpRecall_SETUP_ARCHIVE/AIDOCS"
+mv "$UPM/AIDOCS/_index.json" "$UPM/AIDOCS/UpRecall_SETUP_ARCHIVE/AIDOCS/_index.json"
+# Reinstall (no --upstream this time) - recall must pull from the archive.
+node "$RENG" init "$UPM" --name UpRecall >/dev/null 2>&1
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).engine.upstream === "https://recall.example.com/origin.git" ? 0 : 1)' "$UPM/AIDOCS/_index.json" && pass "migration reinstall recalls engine.upstream from SETUP_ARCHIVE (no loss)" || fail "migration reinstall lost engine.upstream"
+
+echo "=== T46: upgrade cleans up INSTALL/engine after success; removes INSTALL/ if it becomes empty ==="
+CL="$BASE/cleanup"
+node "$RENG" init "$CL" --name ClProj >/dev/null 2>&1
+CLENG="$CL/AIDOCS/tools/engine.mjs"
+CLSRC="$BASE/cleanupsrc"
+mkdir -p "$CLSRC/AIDOCS" "$CLSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$CLSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$CLSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$CLSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$CLSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$CLSRC/.claude/skills/321/SKILL.md"
+printf '{ "operations": [] }\n' > "$CLSRC/AIDOCS/MANIFEST.json"
+# Mid-migration case: INSTALL/ has runbooks + INSTALL.log, cleanup should leave them.
+[ -f "$CL/INSTALL/install.md" ] && pass "fresh init lays INSTALL/install.md (pre-upgrade state)" || fail "no INSTALL/install.md after init"
+node "$CLENG" fetch-engine --from "$CLSRC" >/dev/null 2>&1
+[ -d "$CL/INSTALL/engine" ] && pass "fetch-engine created INSTALL/engine" || fail "fetch-engine did not create INSTALL/engine"
+node "$CLENG" upgrade >/dev/null 2>&1
+[ ! -d "$CL/INSTALL/engine" ] && pass "upgrade removed INSTALL/engine after success (mid-migration)" || fail "upgrade left INSTALL/engine behind"
+[ -d "$CL/INSTALL" ] && pass "upgrade kept INSTALL/ because runbooks still present (mid-migration)" || fail "upgrade removed INSTALL/ even though runbooks were present"
+[ -f "$CL/INSTALL/install.md" ] && pass "INSTALL/install.md preserved through upgrade cleanup" || fail "INSTALL/install.md was wrongly removed"
+# Graduated case: graduate removes INSTALL/. fetch-engine recreates it. upgrade should
+# remove INSTALL/engine and then INSTALL/ since it became empty again.
+CLG="$BASE/cleanupgrad"
+node "$RENG" init "$CLG" --name ClGradProj >/dev/null 2>&1
+CLGENG="$CLG/AIDOCS/tools/engine.mjs"
+# Force graduation. graduate refuses while reconcile_pending is set, but a fresh init
+# has no gate, so this runs clean.
+node "$CLGENG" graduate >/dev/null 2>&1
+[ ! -d "$CLG/INSTALL" ] && pass "graduate removed INSTALL/ entirely (baseline for the graduated case)" || fail "graduate did not remove INSTALL/"
+node "$CLGENG" fetch-engine --from "$CLSRC" >/dev/null 2>&1
+[ -d "$CLG/INSTALL/engine" ] && pass "post-graduate fetch-engine recreated INSTALL/engine" || fail "post-graduate fetch-engine did not recreate INSTALL/engine"
+node "$CLGENG" upgrade >/dev/null 2>&1
+[ ! -d "$CLG/INSTALL/engine" ] && pass "graduated upgrade removed INSTALL/engine" || fail "graduated upgrade left INSTALL/engine behind"
+[ ! -d "$CLG/INSTALL" ] && pass "graduated upgrade removed empty INSTALL/ (no relics)" || fail "graduated upgrade left an empty INSTALL/ behind"
+# Dry-run case: cleanup must not fire (pretends the writes did not happen).
+node "$CLGENG" fetch-engine --from "$CLSRC" >/dev/null 2>&1
+node "$CLGENG" upgrade --dry-run >/dev/null 2>&1
+[ -d "$CLG/INSTALL/engine" ] && pass "dry-run upgrade does NOT clean up INSTALL/engine" || fail "dry-run upgrade wrongly cleaned up INSTALL/engine"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED

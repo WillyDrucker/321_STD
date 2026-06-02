@@ -91,17 +91,16 @@ if [ "$existing321" = true ]; then
 fi
 
 echo "Scaffolding..."
+# Pass --upstream so init records the install source into engine.upstream (write-if-empty)
+# in one pass, no post-init shell rewrite. A user-customized upstream (a fork URL) survives
+# because init only writes when the current value is empty.
 if [ -n "$PRIVACY" ]; then
-  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME" --privacy "$PRIVACY"
+  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME" --privacy "$PRIVACY" --upstream "$REPO"
 else
-  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME"
+  node "$ENGINE/AIDOCS/tools/engine.mjs" init "$TARGET" --name "$NAME" --upstream "$REPO"
 fi
 
 cd "$TARGET"
-
-# Record the install source as engine.upstream so a later /321 -UpdateSync knows where to
-# pull from. Only sets when empty - a user-customized upstream (a fork URL) survives.
-node -e 'const f=process.argv[1],r=process.argv[2],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));if(j.engine && !j.engine.upstream){j.engine.upstream=r;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");console.log("Set engine.upstream to "+r)}' AIDOCS/_index.json "$REPO"
 
 echo ""
 echo "Registering skills..."
