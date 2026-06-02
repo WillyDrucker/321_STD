@@ -54,6 +54,23 @@ The `flag:` override is rarely needed and rarely correct. Once a project commits
 
 When `-Setup` runs on a project with archived legacy skill bodies (a project that predates the action-first convention), it scans each archived body's frontmatter for older target-first names (e.g., `-MemoryUpdate`, `-ScraperUpdate`) and proposes the action-first form (`-UpdateMemory`, `-UpdateScraper`). The user approves or modifies. Setup surfaces the candidate, it does not force the rename.
 
+### Legacy to canonical mapping
+
+Pre-engine 321 projects shipped target-first skill bodies under `AIDOCS/SKILLS/` (plural). The reconcile pass's skill-body fold reads the archived bodies (under `<PROJECT>_SETUP_ARCHIVE/AIDOCS/SKILLS_legacy/`) and reasons about each in terms of the canonical body it folds into. This table is the explicit pre-engine to canonical map. Extend at each rename so the next migration's AI does not re-derive it from rename history.
+
+| Legacy body (archived) | Canonical body (current) |
+|---|---|
+| `SKILLS_SESSION-UPDATE.md` | `SKILL_UPDATE-SESSION.md` |
+| `SKILLS_MEMORY-UPDATE.md` | `SKILL_UPDATE-MEMORY.md` |
+| `SKILLS_DEV-STANDARDS.md` | `SKILL_DEV-AUDIT.md` |
+| `SKILLS_AUTO-PUSH.md` | `SKILL_AUTO-PUSH.md` |
+| `SKILLS_SETUP.md` | `SKILL_SETUP.md` |
+| `SKILLS_SYNC.md` | `SKILL_UPDATE-SYNC.md` |
+| `SKILLS_UPDATE.md` | `SKILL_UPDATE.md` |
+| `SKILLS_COMPACT.md` | `SKILL_COMPACT.md` |
+
+A legacy body the table does not cover is a project-custom skill the user named themselves. Fold its content the same way (data into the right `<PROJECT>_*.md`, never back into a canonical body) and add an entry to the table if the project keeps the skill.
+
 ## Pattern 1: Thin body, fat data file (registered)
 
 When a skill's substance is too large for the body and lives near the code it documents, register a data file in `_index.json` under `paths.files` with a dotted key `<skillname>.<role>` and point the skill body at it. The body becomes a thin loader: load the registered file, run what it says.

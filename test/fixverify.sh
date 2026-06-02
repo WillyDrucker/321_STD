@@ -945,6 +945,63 @@ node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1
 # Idempotent re-run: second invocation must not error even though there is nothing left to move.
 node "$LSENG" migrate-archive --name LsProj >/dev/null 2>&1 && pass "migrate-archive re-run is idempotent (legacy SKILLS already moved)" || fail "migrate-archive re-run failed"
 
+echo "=== T50: migrate-import --audit surfaces fuzzy candidates for entries not found verbatim ==="
+FZ="$BASE/fuzzy"
+node "$RENG" init "$FZ" --name FzProj >/dev/null 2>&1
+FZENG="$FZ/AIDOCS/tools/engine.mjs"
+mkdir -p "$FZ/AIDOCS/FzProj_SETUP_ARCHIVE/AIDOCS"
+# Archived EXTENDED carries four entries: one trimmed in distillation (fuzzy candidate),
+# one merged into Big-6 (no candidate), one deliberately dropped (no candidate), one
+# survives verbatim.
+cat > "$FZ/AIDOCS/FzProj_SETUP_ARCHIVE/AIDOCS/FzProj_SESSION_EXTENDED.md" <<'EOF'
+# FzProj SESSION (depth)
+
+## Recent
+
+### 16 architectural patterns preserved from pre-rename APD CLAUDE SESSION HANDOFF
+
+Detail body for the patterns entry that the reconcile pass plans to fold under a shorter heading.
+
+### Vanilla JS plus native ES modules plus no build
+
+Detail body for the stack entry that the reconcile pass plans to merge into a Big-6 Stack section.
+
+### Old session entry that was deliberately dropped
+
+Detail body for the dropped entry. The reconcile pass intentionally removes it because it is resolved.
+
+### Exact match entry that survived verbatim
+
+Detail body for the entry whose heading survives unchanged after distillation.
+EOF
+# Distilled EXTENDED keeps a trimmed version of the first heading plus the verbatim survivor.
+EXT_REL=$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.files["updatesession.session_extended"])' "$FZ/AIDOCS/_index.json")
+EXT_PATH="$FZ/${EXT_REL#./}"
+mkdir -p "$(dirname "$EXT_PATH")"
+cat > "$EXT_PATH" <<'EOF'
+# FzProj SESSION (depth)
+
+## What goes in
+
+LIFO depth, ten lines each.
+
+## LIFO
+
+### 16 architectural patterns
+
+Trimmed body for the surviving entry.
+
+### Exact match entry that survived verbatim
+
+Body for the verbatim survivor entry.
+EOF
+# Run the audit. First archive heading fuzzy-matches the trimmed survivor, second and
+# third have no candidate, fourth survives verbatim.
+FZOUT="$(node "$FZENG" migrate-import --from "AIDOCS/FzProj_SETUP_ARCHIVE/AIDOCS/FzProj_SESSION_EXTENDED.md" --skill updatesession --audit 2>&1)"
+echo "$FZOUT" | grep -q "1 survive verbatim, 3 not found" && pass "audit reports the expected surviving / not-found counts" || fail "audit counts wrong: $FZOUT"
+echo "$FZOUT" | grep -q "possible match: 16-architectural-patterns" && pass "fuzzy match surfaces the trimmed-headline candidate" || fail "fuzzy match did not surface the trimmed-headline candidate"
+echo "$FZOUT" | grep -q "Old session entry that was deliberately dropped" && pass "deliberately dropped entry still appears in the not-found list" || fail "deliberately dropped entry missing from not-found list"
+
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit $FAILED
