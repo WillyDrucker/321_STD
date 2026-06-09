@@ -24,8 +24,9 @@ import { cmdSync } from "./lib/sync.mjs";
 import { cmdUpgrade } from "./lib/upgrade.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
+import { cmdWatermark } from "./lib/watermark.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -67,6 +68,7 @@ async function main() {
     case "merge-status": cmdMergeStatus(index); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
+    case "watermark": cmdWatermark(index, args); break;
     case "migrate-import": await cmdMigrateImport(index, args); break;
     case "graduate": cmdGraduate(index, args); break;
   }
@@ -103,8 +105,13 @@ Commands:
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
-            clears staging on success.
+            records this run's bullet fingerprints, clears staging on success.
             --skill <updatesession | updatememory>
+  watermark Print the skill's watermark (last_committed_at + last_captured slugs).
+            Read-only lookup over state.json. The lean -Update path scopes the AI to
+            "conversation since the watermark"; the fingerprints answer "did I
+            capture this arc?" without re-reading SESSION / MEMORY.
+            [--skill <updatesession | updatememory>] (omit for both)
   fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -UpdateSync / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.
   state     Print state.json, or flip the reconcile gate (the Setup -> Update handoff).

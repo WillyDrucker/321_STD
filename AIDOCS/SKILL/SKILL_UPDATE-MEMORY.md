@@ -34,9 +34,15 @@ Always run `/321 -UpdateSession` first, so SESSION is current before this skill 
 
 **Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), skip Step 1 - Setup's SESSION capture already ran this pass. `migrate-import` has already scavenged the archived MEMORY_EXTENDED depth 1:1, so do not re-derive those entries - fill the Big 6 from the code scan plus the archive (the initial project check), and add durable observations the import did not carry. Leave BACKLOG alone here: `migrate-restore` already carried it in and the reconciliation pass sweeps it. Capture additively, the reconciliation pass distills later.
 
-## Step 2: Gather context
+## Step 2: Gather context (watermark scopes the read)
 
-SESSION (just refreshed) plus the conversation plus the codebase are the source of truth. MEMORY is the write target and dedupe reference. Re-read if not in context: `<PROJECT>_MEMORY.md`, `<PROJECT>_BACKLOG.md`, the watermark `updatememory.last_committed_at`. For Big-6 gap-fill, also read `package.json`, `_index.json`, framework / deploy configs, and the top-level layout.
+SESSION (just refreshed) plus the conversation plus the codebase are the source of truth. MEMORY is the write target and the dedupe reference. **The watermark is your starting point. Do NOT re-read the conversation prefix before it unless `-FULL` was passed.**
+
+- `<PROJECT>_MEMORY.md`, `<PROJECT>_BACKLOG.md` (the live files, the dedupe references)
+- `node AIDOCS/tools/engine.mjs watermark --skill updatememory` (prints `last_committed_at` plus the slugs of the last run's captured bullets, on demand)
+- For Big-6 gap-fill: `package.json`, `_index.json`, framework / deploy configs, and the top-level layout.
+
+The watermark answers "what did I capture last time?" The live MEMORY.md and BACKLOG.md show the captured observations as content. Both let you skip work the previous pass already did.
 
 ## Step 3: Route each finding
 
@@ -61,50 +67,40 @@ For the two script-readable sections, start from the deterministic draft: `node 
 
 ## Step 5: Stage
 
-Write `AIDOCS/tools/staging/updatememory.json`. Never edit MEMORY / BACKLOG directly. The domain firewall lets this skill touch only `updatememory.*` files.
+Write `AIDOCS/tools/staging/updatememory.json`. The staging contract (action shapes, LIFO ordering, `[+]` paired bullets, `slugify`, body cap, `LOAD_BEARING`) lives in `AIDOCS/tools/PATTERN-STAGING.md`. Read it once per session if you do not already have it in context.
 
-```json
-{
-  "actions": [
-    { "op": "overwrite_section", "file": "updatememory.memory", "section": "Stack", "body": "<2-4 lines>" },
-    { "op": "lifo_insert", "file": "updatememory.memory", "section": "LIFO", "bullet": "<durable observation>" },
-    { "op": "lifo_insert", "file": "updatememory.memory", "section": "LIFO", "bullet": "<observation that earns depth>", "extended_anchor": "<slug-of-the-bullet>" },
-    { "op": "add", "file": "updatememory.memory_extended", "anchor": "<slug-of-the-bullet>", "heading": "<observation that earns depth>", "body_md": "<the why, the rationale, what was non-obvious>" },
-    { "op": "lifo_insert", "file": "updatememory.backlog", "section": "Ideas", "bullet": "**<title>.** <desc> _(source: user)_" }
-  ]
-}
-```
+The skill-specific notes:
 
-**LIFO ordering rule.** Each `lifo_insert` PREPENDS, so the LAST insert in `actions` ends up on top. **List this run's durable observations oldest-first** in the actions array so the newest one lands on top of LIFO.
+- **Domain firewall.** This skill writes only to `updatememory.memory`, `updatememory.memory_extended`, and `updatememory.backlog`.
+- **Big-6.** Use `overwrite_section` on the Big-6 section name. The `Stack` and `Pipeline` drafts from `bigsix --suggest` go in here as refined prose.
+- **LIFO observations.** Use `lifo_insert` on section `LIFO`. List the run's durable observations oldest-first in `actions` so the newest one lands on top.
+- **BACKLOG.** Use `lifo_insert` on `updatememory.backlog`, section `Features` or `Ideas`. Same oldest-first rule.
+- **Earned depth.** Pair a bullet with an `add` on `updatememory.memory_extended` when it needs more than a line or two of rationale.
 
-**`slugify` for `[+]` anchors.** The validator pairs a `[+]` bullet with its extended sub-section by comparing `slugify(bullet)` to `slugify(heading)`. `slugify` lowercases, strips every character except `[a-z0-9\s-]`, trims, and collapses whitespace runs to single hyphens. **Keep `[+]` bullets short and punctuation-light** - put the rationale in `body_md` instead.
-
-**Extended detail (the `[+]` pair).** When a durable observation needs more than a line or two of rationale, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatememory.memory_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
-
-**Body length (the maximum, not the target).** Aim for **3-6 non-blank lines of body prose** for a normal entry. The hard ceiling is **10 lines for a critical entry** that genuinely earns the depth. These are caps, not targets - if you can summarize the why in 3 lines, do that. Doctor's sub-section budget check warns at >10 body lines. A genuinely load-bearing entry (a catalog, an exception list, content where compression would lose the point) marks itself with `<!-- LOAD_BEARING -->` anywhere in the body to opt out of the cap forever. Use the marker rarely - it is for content that cannot summarize, not for narrative you do not feel like trimming.
-
-## Step 6: Commit (validate is optional)
+## Step 6: Commit
 
 ```bash
 node AIDOCS/tools/engine.mjs commit --skill updatememory
 ```
 
-`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional - skip it on a confident draft. Use `validate --skill updatememory` only while iterating on a draft you expect to fail. The two-phase commit then persists, stamps the watermark, and clears staging.
+`commit` validates, simulates, persists, stamps the watermark (timestamp + this run's bullet fingerprints), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
 
 ## Lean execution path (one pass, no extra machinery)
 
-1. Skim the conversation tail since the watermark. Read only this skill body plus the live `<PROJECT>_MEMORY.md` and `<PROJECT>_BACKLOG.md` (plus the SESSION freshly written by Step 1). **Do NOT read MEMORY_EXTENDED unless an op is `drop` / `replace` against an existing sub-section** - an `add` needs no prior read.
-2. Author the staging JSON directly with the file writer at `AIDOCS/tools/staging/updatememory.json`. Do not build a generator script to emit it - the staging file IS the artifact.
-3. `commit` once. Skip standalone `validate` - `commit` re-validates and simulates and fails safe.
-4. Target: read 3 files (plus the SESSION 1 file -UpdateSession already touched), write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
+1. Skim the conversation tail since the watermark. Do **not** re-read the prefix. Read this skill body plus the live `<PROJECT>_MEMORY.md` and `<PROJECT>_BACKLOG.md` (the SESSION freshly written by Step 1 is already in context). The PATTERN-STAGING reference loads on demand if you need the staging contract.
+2. **Do NOT read MEMORY_EXTENDED unless an op is `drop` / `replace` against an existing sub-section.** An `add` needs no prior read.
+3. Author the staging JSON directly at `AIDOCS/tools/staging/updatememory.json`. The staging file IS the artifact.
+4. `commit` once. Skip standalone `validate`. Target: read 3 files (plus the SESSION 1 file -UpdateSession already touched), write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
 
 ## -FULL mode
 
-`-UpdateMemory -FULL` rebuilds MEMORY from the full conversation plus codebase plus SESSION rather than appending the incremental tail. Re-walk every Big-6 section against current evidence (re-derive filled ones, do not trust the prior prose), and re-walk LIFO from durable observations across the whole arc. Use when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation.
+`-UpdateMemory -FULL` widens the read past the watermark and re-derives populated Big-6 sections, but **uses the existing MEMORY.md bullets and Big-6 prose as a starting reference, not a discard.** Most observations are already captured. Walk the codebase plus conversation plus SESSION against the existing bullets and look for: gaps (an observation that did not land), drift (a bullet or Big-6 line whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
 
-The lean default appends from the conversation tail since the last watermark and only fills empty Big-6 sections. `-FULL` ignores the watermark and re-derives populated sections too.
+- Re-walk every Big-6 section against current evidence. The lean default only fills placeholders. `-FULL` may `overwrite_section` a populated one when the prose has drifted.
+- Add missing LIFO observations. Correct drift with `replace` (by anchor) rather than re-writing the whole LIFO.
+- For over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
-**Re-summarize over-cap EXTENDED entries.** When `-FULL` re-walks an existing `[+]` entry whose EXTENDED body exceeds the cap (>6 normal lines, >10 critical), re-derive the entry under cap and `replace` its sub-section (by anchor) - do not let pre-existing bloat carry through. Doctor's sub-section budget warns at >10 body lines, and the warning is the trigger to summarize on the next pass. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
+Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation. The lean default appends from the conversation tail and only fills empty Big-6 sections.
 
 ## Rules
 

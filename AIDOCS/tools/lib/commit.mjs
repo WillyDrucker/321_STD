@@ -6,12 +6,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { flag } from "./args.mjs";
+import { slugify } from "./markdown.mjs";
 import { lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
 import { applyExtendedAction, findOrphanBullets } from "./mutatorsExtended.mjs";
 import { resolveFile } from "./paths.mjs";
 import { autoPrune } from "./prune.mjs";
 import { clearStaging, loadStaging, loadState, reconcilePending, saveState, SKILLS } from "./state.mjs";
 import { validateStaging } from "./validate.mjs";
+
+// Fingerprint count kept tight: the AI uses it to answer "did I capture this
+// arc?" - a handful of recent slugs is enough, more would just bloat state.json.
+const FINGERPRINT_LIMIT = 8;
 
 const EXTENDED_OPS = ["add", "drop", "replace"];
 
@@ -69,10 +74,21 @@ export function cmdCommit(index, args) {
     process.exit(17);
   }
 
-  // Phase 2: persist, stamp the watermark, clear staging.
+  // Phase 2: persist, stamp the watermark, record this run's bullet fingerprints,
+  // clear staging. Fingerprints are the slugs of this run's lifo_insert bullets,
+  // capped at FINGERPRINT_LIMIT (newest-first). The AI reads them via `watermark`
+  // to answer "what did I just capture?" without re-reading SESSION / MEMORY.
   for (const [key, content] of Object.entries(edited)) writeFileSync(resolveFile(index, key), content, "utf8");
   const state = loadState();
-  state[skill] = { runs: (state[skill]?.runs || 0) + 1, last_committed_at: new Date().toISOString() };
+  const captured = [];
+  for (const a of staging.actions) if (a.op === "lifo_insert") captured.push(slugify(a.bullet));
+  const prior = Array.isArray(state[skill]?.last_captured) ? state[skill].last_captured : [];
+  const merged = [...captured.reverse(), ...prior].slice(0, FINGERPRINT_LIMIT);
+  state[skill] = {
+    runs: (state[skill]?.runs || 0) + 1,
+    last_committed_at: new Date().toISOString(),
+    last_captured: merged,
+  };
   saveState(state);
   clearStaging(skill);
   console.log(`commit: ${skill} applied ${staging.actions.length} action(s) to ${Object.keys(edited).length} file(s).`);

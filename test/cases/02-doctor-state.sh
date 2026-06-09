@@ -165,3 +165,62 @@ node "$DCENG" doctor >/dev/null 2>&1; DC2=$?
 echo "Some current state; with a semicolon." >> "$DC/AIDOCS/DcProj_MEMORY.md"
 node "$DCENG" doctor >/dev/null 2>&1; DC3=$?
 [ "$DC3" = "20" ] && pass "doctor still errors on MEMORY semicolon during reconcile (only historical files downgrade)" || fail "doctor wrongly downgraded MEMORY semicolon (exit $DC3)"
+
+echo "=== T68: PATTERN-STAGING.md ships in a fresh init (engine-class refresh on -UpdateSync) ==="
+# Trim of the duplicated staging contract out of the two update skill bodies. The shared
+# reference lives in AIDOCS/tools/ so the routine -Update path does not re-read it.
+PS="$BASE/patternstaging"
+node "$RENG" init "$PS" --name PsProj >/dev/null 2>&1
+[ -f "$PS/AIDOCS/tools/PATTERN-STAGING.md" ] && pass "PATTERN-STAGING.md present after init (engine-class file copies in)" || fail "PATTERN-STAGING.md missing after init"
+grep -q '^# Staging contract' "$PS/AIDOCS/tools/PATTERN-STAGING.md" && pass "PATTERN-STAGING.md has the canonical H1" || fail "PATTERN-STAGING.md wrong H1"
+# The update skill bodies should now point at it rather than duplicate the contract.
+grep -q 'PATTERN-STAGING.md' "$PS/AIDOCS/SKILL/SKILL_UPDATE-SESSION.md" && pass "SKILL_UPDATE-SESSION.md references PATTERN-STAGING.md" || fail "SKILL_UPDATE-SESSION.md missing reference"
+grep -q 'PATTERN-STAGING.md' "$PS/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" && pass "SKILL_UPDATE-MEMORY.md references PATTERN-STAGING.md" || fail "SKILL_UPDATE-MEMORY.md missing reference"
+
+echo "=== T69: watermark command surfaces last_committed_at + last_captured (AI's where-did-I-leave-off lookup) ==="
+WM="$BASE/watermark"
+node "$RENG" init "$WM" --name WmProj >/dev/null 2>&1
+WMENG="$WM/AIDOCS/tools/engine.mjs"
+# Before any commit: both lanes report 'never committed'
+WMOUT0="$(node "$WMENG" watermark 2>&1)"
+echo "$WMOUT0" | grep -q "updatesession: never committed" && pass "watermark reports never-committed for updatesession on fresh init" || fail "watermark did not report never-committed (output: $WMOUT0)"
+echo "$WMOUT0" | grep -q "updatememory: never committed" && pass "watermark reports never-committed for updatememory on fresh init" || fail "watermark did not report never-committed for memory"
+# Stage and commit a lifo_insert; watermark should now print the timestamp + the slug
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"First watermark fingerprint"}]}\n' > "$WM/AIDOCS/tools/staging/updatesession.json"
+node "$WMENG" commit --skill updatesession >/dev/null 2>&1
+WMOUT1="$(node "$WMENG" watermark --skill updatesession 2>&1)"
+echo "$WMOUT1" | grep -q "last_committed_at:" && pass "watermark prints last_committed_at after a commit" || fail "watermark missing last_committed_at (output: $WMOUT1)"
+echo "$WMOUT1" | grep -q "first-watermark-fingerprint" && pass "watermark surfaces the slug of the committed lifo bullet" || fail "watermark missing the bullet slug (output: $WMOUT1)"
+# --skill filter restricts output
+echo "$WMOUT1" | grep -q "updatememory:" && fail "watermark --skill updatesession leaked updatememory output" || pass "watermark --skill restricts output to the named lane"
+# Bad --skill rejects
+node "$WMENG" watermark --skill bogus >/dev/null 2>&1; WMBAD=$?
+[ "$WMBAD" = "11" ] && pass "watermark rejects bad --skill with exit 11" || fail "watermark bad-skill exit was $WMBAD (expected 11)"
+
+echo "=== T70: commit stamps last_captured (newest first), older fingerprints survive a second run ==="
+FP="$BASE/fingerprints"
+node "$RENG" init "$FP" --name FpProj >/dev/null 2>&1
+FPENG="$FP/AIDOCS/tools/engine.mjs"
+# First commit lays one slug
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Alpha entry"}]}\n' > "$FP/AIDOCS/tools/staging/updatesession.json"
+node "$FPENG" commit --skill updatesession >/dev/null 2>&1
+node "$FPENG" state 2>&1 | grep -q '"alpha-entry"' && pass "first commit records the slug in last_captured" || fail "alpha-entry slug missing from state after first commit"
+# Second commit (different bullet) - newer slug ends up first, older one survives
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Beta event"}]}\n' > "$FP/AIDOCS/tools/staging/updatesession.json"
+node "$FPENG" commit --skill updatesession >/dev/null 2>&1
+FP_STATE="$(node "$FPENG" state 2>&1)"
+# Newer slug ordered before the older one
+NEWPOS=$(echo "$FP_STATE" | grep -n 'beta-event' | head -1 | cut -d: -f1)
+OLDPOS=$(echo "$FP_STATE" | grep -n 'alpha-entry' | head -1 | cut -d: -f1)
+[ -n "$NEWPOS" ] && [ -n "$OLDPOS" ] && [ "$NEWPOS" -lt "$OLDPOS" ] && pass "second commit prepends the new slug (newest first), older slug survives" || fail "fingerprint ordering wrong (alpha at $OLDPOS, beta at $NEWPOS)"
+
+echo "=== T71: state --clear-reconcile preserves last_captured across the gate flip ==="
+CR="$BASE/clearreconcile"
+node "$RENG" init "$CR" --name CrProj >/dev/null 2>&1
+CRENG="$CR/AIDOCS/tools/engine.mjs"
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Reconcile survivor"}]}\n' > "$CR/AIDOCS/tools/staging/updatesession.json"
+node "$CRENG" commit --skill updatesession >/dev/null 2>&1
+node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "slug stamped before reconcile gate flip" || fail "slug missing pre-reconcile (commit did not stamp)"
+node "$CRENG" state --set-reconcile >/dev/null 2>&1
+node "$CRENG" state --clear-reconcile >/dev/null 2>&1
+node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "last_captured survives state --clear-reconcile normalize" || fail "last_captured wiped by clear-reconcile (regression on the AI's lookup)"

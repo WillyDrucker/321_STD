@@ -94,10 +94,16 @@ export function cmdState(_index, args) {
     // Clearing the gate ends the reconciliation pass, whose direct-edit reshape bypasses
     // commit's watermark stamp. Stamp both lanes current, and reduce to the canonical
     // shape so a legacy migration's pre-rebuild watermark keys (session_update /
-    // memory_update) do not linger beside the new ones.
+    // memory_update) do not linger beside the new ones. Preserve last_captured if a
+    // commit had stamped fingerprints before the reconcile pass, so the AI's "did I
+    // capture this arc?" lookup survives the gate flip.
     const now = new Date().toISOString();
     const normalized = { reconcile_pending: false };
-    for (const skill of SKILLS) normalized[skill] = { runs: state[skill]?.runs || 0, last_committed_at: now };
+    for (const skill of SKILLS) {
+      const entry = { runs: state[skill]?.runs || 0, last_committed_at: now };
+      if (Array.isArray(state[skill]?.last_captured)) entry.last_captured = state[skill].last_captured;
+      normalized[skill] = entry;
+    }
     saveState(normalized);
     console.log("state: reconcile_pending = false. Lanes stamped current.");
     return;

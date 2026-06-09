@@ -49,13 +49,15 @@ SESSION captures events as they happen. MEMORY captures the timeless state event
 - **Current State** - operational snapshot, overwritten each pass. Branch, deploy / gate status, active focus, stack, local dev. Flat bullets or short prose.
 - **LIFO** - running history of project-significant events, newest first.
 
-## Step 0: Gather context
+## Step 0: Gather context (watermark scopes the read)
 
-The conversation is the source of truth. SESSION.md is a write target, not a source. Re-read if not already in context:
+The conversation is the source of truth. SESSION.md is a write target and the dedupe reference. **The watermark is your starting point. Do NOT re-read the conversation prefix before it unless `-FULL` was passed.**
 
-- `AIDOCS/<PROJECT>_SESSION.md`
+- `AIDOCS/<PROJECT>_SESSION.md` (the live file, the dedupe reference)
 - Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`
-- The skill's watermark in `state.json` (`updatesession.last_committed_at`) marks the last refresh.
+- `node AIDOCS/tools/engine.mjs watermark --skill updatesession` (prints `last_committed_at` plus the slugs of the last run's captured bullets, on demand)
+
+The watermark answers "what did I capture last time?" The live SESSION.md shows the captured arcs as content. Both let you skip events the previous pass already logged.
 
 ## Step 1: Allocate each finding
 
@@ -69,51 +71,39 @@ The conversation is the source of truth. SESSION.md is a write target, not a sou
 
 ## Step 2: Stage
 
-Write `AIDOCS/tools/staging/updatesession.json`. Never edit SESSION directly. Actions use the project's domain-owned file keys:
+Write `AIDOCS/tools/staging/updatesession.json`. The staging contract (action shapes, LIFO ordering, `[+]` paired bullets, `slugify`, body cap, `LOAD_BEARING`) lives in `AIDOCS/tools/PATTERN-STAGING.md`. Read it once per session if you do not already have it in context.
 
-```json
-{
-  "actions": [
-    { "op": "overwrite_section", "file": "updatesession.session", "section": "Current State", "body": "<operational snapshot>" },
-    { "op": "lifo_insert", "file": "updatesession.session", "section": "LIFO", "bullet": "<one project-significant event>" },
-    { "op": "lifo_insert", "file": "updatesession.session", "section": "LIFO", "bullet": "<event that earns depth>", "extended_anchor": "<slug-of-the-bullet>" },
-    { "op": "add", "file": "updatesession.session_extended", "anchor": "<slug-of-the-bullet>", "heading": "<event that earns depth>", "body_md": "<why / how / what surprised us>" }
-  ]
-}
-```
+The skill-specific notes:
 
-**LIFO ordering rule.** Each `lifo_insert` PREPENDS to the section, so the LAST insert in `actions` ends up on top. **List this run's events oldest-first** in the actions array so the newest one (last in list) lands on top of LIFO. `overwrite_section` replaces the whole Current State body.
+- **Domain firewall.** This skill writes only to `updatesession.session` and `updatesession.session_extended`.
+- **Current State.** Use `overwrite_section` on `Current State`. Put it FIRST in `actions` so the engine demotes the prior snapshot's bullets to the top of LIFO and stamps the `**Last State:**` marker before this run's new events land above it. Never write the marker yourself.
+- **LIFO events.** Use `lifo_insert` on section `LIFO`. List the run's events oldest-first in `actions` so the newest one lands on top.
+- **Earned depth.** Pair a bullet with an `add` on `updatesession.session_extended` when it needs more than a line or two. Keep bullets short and punctuation-light (the `slugify` rule).
 
-**`slugify` for `[+]` anchors.** The validator pairs a `[+]` bullet with its extended sub-section by comparing `slugify(bullet)` to `slugify(heading)`. `slugify` lowercases, strips every character except `[a-z0-9\s-]`, trims, and collapses whitespace runs to single hyphens. Existing hyphens survive. So a punctuation-heavy bullet ("Decision: pick X (over Y)") slugifies to "decision-pick-x-over-y". **Keep `[+]` bullets short and punctuation-light** - put the detail in `body_md` instead.
-
-**Extended detail (the `[+]` pair).** When a bullet needs more than a line or two of narrative, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatesession.session_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
-
-**Body length (the maximum, not the target).** Aim for **3-6 non-blank lines of body prose** for a normal entry. The hard ceiling is **10 lines for a critical entry** that genuinely earns the depth. These are caps, not targets - if you can summarize the why in 3 lines, do that. Doctor's sub-section budget check warns at >10 body lines. A genuinely load-bearing entry (a catalog, an exception list, content where compression would lose the point) marks itself with `<!-- LOAD_BEARING -->` anywhere in the body to opt out of the cap forever. Use the marker rarely - it is for content that cannot summarize, not for narrative you do not feel like trimming.
-
-**Last State (engine-written).** On an `overwrite_section` of Current State, the engine demotes the prior snapshot's bullets to the top of LIFO and marks the first `**Last State:**` (stripping any prior marker, so exactly one exists). Put the Current State overwrite first in `actions` so this run's new LIFO events land above the marker. Never write the marker yourself.
-
-## Step 3: Commit (validate is optional)
+## Step 3: Commit
 
 ```bash
 node AIDOCS/tools/engine.mjs commit --skill updatesession
 ```
 
-`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional - skip it on a confident draft. Use `validate --skill updatesession` only while iterating on a draft you expect to fail. The two-phase commit then persists, stamps the watermark, and clears staging. Relay the summary.
+`commit` validates, simulates, persists, stamps the watermark (timestamp + this run's bullet fingerprints), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
 
 ## Lean execution path (one pass, no extra machinery)
 
-1. Skim the conversation tail since the watermark. Read only this skill body plus the live `<PROJECT>_SESSION.md`. **Do NOT read SESSION_EXTENDED unless an op is `drop` / `replace` against an existing sub-section** - an `add` needs no prior read.
-2. Author the staging JSON directly with the file writer at `AIDOCS/tools/staging/updatesession.json`. Do not build a generator script to emit it - the staging file IS the artifact.
-3. `commit` once. Skip standalone `validate` - `commit` re-validates and simulates and fails safe.
-4. Target: read 2 files, write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
+1. Skim the conversation tail since the watermark. Do **not** re-read the prefix. Read this skill body plus the live `<PROJECT>_SESSION.md`. The PATTERN-STAGING reference loads on demand if you need the staging contract.
+2. **Do NOT read SESSION_EXTENDED unless an op is `drop` / `replace` against an existing sub-section.** An `add` carries the heading, anchor, and body, so it needs no prior read.
+3. Author the staging JSON directly at `AIDOCS/tools/staging/updatesession.json`. The staging file IS the artifact.
+4. `commit` once. Skip standalone `validate`. Target: read 2 files, write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
 
 ## -FULL mode
 
-`-UpdateSession -FULL` rebuilds SESSION from the full conversation rather than the incremental tail. Re-derive Current State from current operational reality, do not trust the prior snapshot, and re-walk LIFO from significant events rather than appending. Use when SESSION has drifted (a long pause, a context switch, an interrupted prior pass).
+`-UpdateSession -FULL` widens the read past the watermark, but **uses the existing SESSION.md bullets as a starting reference, not a discard.** Most arcs are already captured. Walk the conversation against the existing bullets and look for: gaps (an arc that did not land), drift (a bullet whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
 
-The lean default appends from the conversation tail since the last watermark. `-FULL` ignores the watermark and re-derives from the whole conversation.
+- Re-derive Current State from current operational reality, the prior snapshot is suspect under `-FULL`.
+- Add missing arcs. Correct drift with `replace` (by anchor) rather than re-writing the whole LIFO.
+- For over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
-**Re-summarize over-cap EXTENDED entries.** When `-FULL` re-walks an existing `[+]` entry whose EXTENDED body exceeds the cap (>6 normal lines, >10 critical), re-derive the entry under cap and `replace` its sub-section (by anchor) - do not let pre-existing bloat carry through. Doctor's sub-section budget warns at >10 body lines, and the warning is the trigger to summarize on the next pass. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
+Use `-FULL` when SESSION has drifted (a long pause, a context switch, an interrupted prior pass). The lean default appends from the conversation tail and trusts the prior snapshot.
 
 ## Rules
 
