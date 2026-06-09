@@ -69,11 +69,11 @@ node AIDOCS/tools/engine.mjs commit --skill updatememory
 
 ## What the watermark gives you
 
-`AIDOCS/tools/state.json` carries `<skill>.last_committed_at` (the timestamp of the last commit) and `<skill>.last_captured` (the slugs of this run's `lifo_insert` bullets). `engine.mjs watermark --skill <name>` prints both on demand.
+`AIDOCS/tools/state.json` carries `<skill>.last_committed_at` (the timestamp of the last commit) and `<skill>.recent_captured` (a rolling window of the slugs of recent `lifo_insert` bullets, newest first, up to 8 entries). `engine.mjs watermark --skill <name>` prints both on demand.
 
 Use them this way:
 
 - The timestamp scopes the routine refresh to "conversation tail since the watermark."
-- The fingerprints answer "what did I just capture?" without re-reading SESSION / MEMORY. They are most useful after a pruning run or when SESSION / MEMORY itself has been archived.
+- The fingerprints answer "did I capture this arc in the last few runs?" without re-reading SESSION / MEMORY. The rolling window accumulates across runs, so an arc captured two passes ago is still visible. Most useful after a pruning run or when SESSION / MEMORY itself has been archived.
 
 The watermark is a script-internal marker. It is never written into SESSION / MEMORY content.

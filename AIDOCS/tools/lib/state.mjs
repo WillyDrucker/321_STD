@@ -94,14 +94,16 @@ export function cmdState(_index, args) {
     // Clearing the gate ends the reconciliation pass, whose direct-edit reshape bypasses
     // commit's watermark stamp. Stamp both lanes current, and reduce to the canonical
     // shape so a legacy migration's pre-rebuild watermark keys (session_update /
-    // memory_update) do not linger beside the new ones. Preserve last_captured if a
+    // memory_update) do not linger beside the new ones. Preserve recent_captured if a
     // commit had stamped fingerprints before the reconcile pass, so the AI's "did I
-    // capture this arc?" lookup survives the gate flip.
+    // capture this arc?" lookup survives the gate flip. Fall back to the legacy
+    // last_captured key for state.json laid by 0.1.9 / 0.1.10 commits.
     const now = new Date().toISOString();
     const normalized = { reconcile_pending: false };
     for (const skill of SKILLS) {
       const entry = { runs: state[skill]?.runs || 0, last_committed_at: now };
-      if (Array.isArray(state[skill]?.last_captured)) entry.last_captured = state[skill].last_captured;
+      const recent = state[skill]?.recent_captured ?? state[skill]?.last_captured;
+      if (Array.isArray(recent)) entry.recent_captured = recent;
       normalized[skill] = entry;
     }
     saveState(normalized);

@@ -177,7 +177,7 @@ grep -q '^# Staging contract' "$PS/AIDOCS/tools/PATTERN-STAGING.md" && pass "PAT
 grep -q 'PATTERN-STAGING.md' "$PS/AIDOCS/SKILL/SKILL_UPDATE-SESSION.md" && pass "SKILL_UPDATE-SESSION.md references PATTERN-STAGING.md" || fail "SKILL_UPDATE-SESSION.md missing reference"
 grep -q 'PATTERN-STAGING.md' "$PS/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" && pass "SKILL_UPDATE-MEMORY.md references PATTERN-STAGING.md" || fail "SKILL_UPDATE-MEMORY.md missing reference"
 
-echo "=== T69: watermark command surfaces last_committed_at + last_captured (AI's where-did-I-leave-off lookup) ==="
+echo "=== T69: watermark command surfaces last_committed_at + recent_captured (AI's where-did-I-leave-off lookup) ==="
 WM="$BASE/watermark"
 node "$RENG" init "$WM" --name WmProj >/dev/null 2>&1
 WMENG="$WM/AIDOCS/tools/engine.mjs"
@@ -197,14 +197,15 @@ echo "$WMOUT1" | grep -q "updatememory:" && fail "watermark --skill updatesessio
 node "$WMENG" watermark --skill bogus >/dev/null 2>&1; WMBAD=$?
 [ "$WMBAD" = "11" ] && pass "watermark rejects bad --skill with exit 11" || fail "watermark bad-skill exit was $WMBAD (expected 11)"
 
-echo "=== T70: commit stamps last_captured (newest first), older fingerprints survive a second run ==="
+echo "=== T70: commit stamps recent_captured (newest first, rolling window), older fingerprints survive a second run ==="
 FP="$BASE/fingerprints"
 node "$RENG" init "$FP" --name FpProj >/dev/null 2>&1
 FPENG="$FP/AIDOCS/tools/engine.mjs"
 # First commit lays one slug
 printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Alpha entry"}]}\n' > "$FP/AIDOCS/tools/staging/updatesession.json"
 node "$FPENG" commit --skill updatesession >/dev/null 2>&1
-node "$FPENG" state 2>&1 | grep -q '"alpha-entry"' && pass "first commit records the slug in last_captured" || fail "alpha-entry slug missing from state after first commit"
+node "$FPENG" state 2>&1 | grep -q '"alpha-entry"' && pass "first commit records the slug in recent_captured" || fail "alpha-entry slug missing from state after first commit"
+node "$FPENG" state 2>&1 | grep -q '"recent_captured"' && pass "first commit writes the canonical recent_captured key (not the legacy last_captured)" || fail "state.json missing recent_captured key after first commit"
 # Second commit (different bullet) - newer slug ends up first, older one survives
 printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Beta event"}]}\n' > "$FP/AIDOCS/tools/staging/updatesession.json"
 node "$FPENG" commit --skill updatesession >/dev/null 2>&1
@@ -214,7 +215,7 @@ NEWPOS=$(echo "$FP_STATE" | grep -n 'beta-event' | head -1 | cut -d: -f1)
 OLDPOS=$(echo "$FP_STATE" | grep -n 'alpha-entry' | head -1 | cut -d: -f1)
 [ -n "$NEWPOS" ] && [ -n "$OLDPOS" ] && [ "$NEWPOS" -lt "$OLDPOS" ] && pass "second commit prepends the new slug (newest first), older slug survives" || fail "fingerprint ordering wrong (alpha at $OLDPOS, beta at $NEWPOS)"
 
-echo "=== T71: state --clear-reconcile preserves last_captured across the gate flip ==="
+echo "=== T71: state --clear-reconcile preserves recent_captured across the gate flip ==="
 CR="$BASE/clearreconcile"
 node "$RENG" init "$CR" --name CrProj >/dev/null 2>&1
 CRENG="$CR/AIDOCS/tools/engine.mjs"
@@ -223,4 +224,4 @@ node "$CRENG" commit --skill updatesession >/dev/null 2>&1
 node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "slug stamped before reconcile gate flip" || fail "slug missing pre-reconcile (commit did not stamp)"
 node "$CRENG" state --set-reconcile >/dev/null 2>&1
 node "$CRENG" state --clear-reconcile >/dev/null 2>&1
-node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "last_captured survives state --clear-reconcile normalize" || fail "last_captured wiped by clear-reconcile (regression on the AI's lookup)"
+node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "recent_captured survives state --clear-reconcile normalize" || fail "recent_captured wiped by clear-reconcile (regression on the AI's lookup)"

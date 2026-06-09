@@ -14,8 +14,8 @@ import { autoPrune } from "./prune.mjs";
 import { clearStaging, loadStaging, loadState, reconcilePending, saveState, SKILLS } from "./state.mjs";
 import { validateStaging } from "./validate.mjs";
 
-// Fingerprint count kept tight: the AI uses it to answer "did I capture this
-// arc?" - a handful of recent slugs is enough, more would just bloat state.json.
+// recent_captured rolling-window size. The AI uses it to answer "did I capture
+// this arc?" - a handful of recent slugs is enough, more would just bloat state.json.
 const FINGERPRINT_LIMIT = 8;
 
 const EXTENDED_OPS = ["add", "drop", "replace"];
@@ -75,19 +75,23 @@ export function cmdCommit(index, args) {
   }
 
   // Phase 2: persist, stamp the watermark, record this run's bullet fingerprints,
-  // clear staging. Fingerprints are the slugs of this run's lifo_insert bullets,
-  // capped at FINGERPRINT_LIMIT (newest-first). The AI reads them via `watermark`
-  // to answer "what did I just capture?" without re-reading SESSION / MEMORY.
+  // clear staging. recent_captured is a rolling window of the last FINGERPRINT_LIMIT
+  // lifo_insert slugs across recent commits (newest first). The AI reads them via
+  // `watermark` to answer "did I capture this arc?" without re-reading SESSION /
+  // MEMORY. Legacy state.json files from 0.1.9 / 0.1.10 carried the same data under
+  // `last_captured`; the read falls back to it during the transition window.
   for (const [key, content] of Object.entries(edited)) writeFileSync(resolveFile(index, key), content, "utf8");
   const state = loadState();
   const captured = [];
   for (const a of staging.actions) if (a.op === "lifo_insert") captured.push(slugify(a.bullet));
-  const prior = Array.isArray(state[skill]?.last_captured) ? state[skill].last_captured : [];
+  const prior = Array.isArray(state[skill]?.recent_captured) ? state[skill].recent_captured
+    : Array.isArray(state[skill]?.last_captured) ? state[skill].last_captured
+    : [];
   const merged = [...captured.reverse(), ...prior].slice(0, FINGERPRINT_LIMIT);
   state[skill] = {
     runs: (state[skill]?.runs || 0) + 1,
     last_committed_at: new Date().toISOString(),
-    last_captured: merged,
+    recent_captured: merged,
   };
   saveState(state);
   clearStaging(skill);

@@ -114,10 +114,12 @@ Commands:
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
             records this run's bullet fingerprints, clears staging on success.
             --skill <updatesession | updatememory>
-  watermark Print the skill's watermark (last_committed_at + last_captured slugs).
-            Read-only lookup over state.json. The lean -Update path scopes the AI to
-            "conversation since the watermark"; the fingerprints answer "did I
-            capture this arc?" without re-reading SESSION / MEMORY.
+  watermark Print the skill's watermark: last_committed_at plus recent_captured (a
+            rolling window of the last ~8 lifo_insert slugs, newest first, accumulated
+            across recent commits). Read-only lookup over state.json. The lean -Update
+            path scopes the AI to "conversation since the watermark". The fingerprints
+            answer "did I capture this arc in the last few runs?" without re-reading
+            SESSION / MEMORY.
             [--skill <updatesession | updatememory>] (omit for both)
   fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -UpdateSync / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.
