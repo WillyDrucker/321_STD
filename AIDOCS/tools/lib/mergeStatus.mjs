@@ -1,16 +1,10 @@
 // mergeStatus.mjs - the merge punch list for customizations[] against the fetched
-// upstream tree at INSTALL/engine. Read-only by default: classifies each entry as
-// identical (upstream matches local, safe to drop), diverged (local + upstream both
-// changed, needs AI merge), or upstream-absent (the upstream tree lacks the file -
-// either a file_delete op landed for it or it was a project-custom file mistakenly
-// listed). The AI walks this output during -UpdateSync to decide drop / merge /
-// delete per entry, so customizations[] self-cleans as upstream catches up to local
-// intent without the user editing _index.json by hand.
-//
-// --auto-drop-clean adds a mechanical sweep: identical and upstream-absent entries
-// drop from customizations[] in one pass (no AI judgment required - the file either
-// matches upstream verbatim or has no upstream counterpart). Diverged entries are
-// left for the AI to merge. This is the script half of -UpdateSync -FULL.
+// upstream tree at INSTALL/engine. Five classes per entry: identical, diverged,
+// both_absent (no file either side), local_absent (file only upstream), and
+// upstream_absent (file only in project). --auto-drop-clean mechanically drops
+// identical and both_absent (no file at risk); local_absent and upstream_absent
+// stay for AI judgment because dropping the customization would let the next
+// upgrade re-install or delete a file the user intentionally diverged from.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,22 +15,19 @@ function classify(index) {
   const root = repoRoot();
   const source = installEngineDir();
   const customizations = index.customizations || [];
-  const identical = [], diverged = [], absent = [];
+  const identical = [], diverged = [], bothAbsent = [], localAbsent = [], upstreamAbsent = [];
   for (const rel of customizations) {
     const projectPath = join(root, rel);
     const upstreamPath = join(source, rel);
-    if (!existsSync(projectPath) || !existsSync(upstreamPath)) {
-      // Either side missing: no merge target. Both sub-cases (file_delete already
-      // landed, or project-custom file mistakenly listed) drop the customizations[]
-      // entry. Per-file disposition stays the AI's call - this command only edits
-      // the registry list.
-      absent.push(rel);
-      continue;
-    }
+    const projectExists = existsSync(projectPath);
+    const upstreamExists = existsSync(upstreamPath);
+    if (!projectExists && !upstreamExists) { bothAbsent.push(rel); continue; }
+    if (!projectExists) { localAbsent.push(rel); continue; }
+    if (!upstreamExists) { upstreamAbsent.push(rel); continue; }
     if (readFileSync(projectPath, "utf8") === readFileSync(upstreamPath, "utf8")) identical.push(rel);
     else diverged.push(rel);
   }
-  return { identical, diverged, absent, source, total: customizations.length };
+  return { identical, diverged, bothAbsent, localAbsent, upstreamAbsent, source, total: customizations.length };
 }
 
 function plural(n, one, many) { return n === 1 ? one : many; }
@@ -53,7 +44,7 @@ export function cmdMergeStatus(index, args = []) {
   }
 
   const result = classify(index);
-  const { identical, diverged, absent, total } = result;
+  const { identical, diverged, bothAbsent, localAbsent, upstreamAbsent, total } = result;
   const autoDrop = args.includes("--auto-drop-clean");
 
   console.log(`merge-status: ${total} customizations[] ${plural(total, "entry", "entries")} against ${result.source}`);
@@ -65,20 +56,29 @@ export function cmdMergeStatus(index, args = []) {
     console.log(`  diverged (${diverged.length}) - needs AI merge (preserve local intent + fold in upstream changes), then drop the entry if the merge result equals upstream:`);
     for (const r of diverged) console.log(`    - ${r}`);
   }
-  if (absent.length > 0) {
-    console.log(`  upstream-absent (${absent.length}) - the upstream tree lacks the file:`);
-    for (const r of absent) console.log(`    - ${r}`);
-    console.log("    Check MANIFEST.json for a file_delete op covering each path. If covered: judge whether the local file is still useful (keep + customizations[] entry, or delete + drop entry). If not covered: this is a project-custom file mistakenly listed - drop the entry (project-custom files survive by absence).");
+  if (bothAbsent.length > 0) {
+    console.log(`  both-absent (${bothAbsent.length}) - no file in project or upstream, customization is a dead reference, safe to drop:`);
+    for (const r of bothAbsent) console.log(`    - ${r}`);
+  }
+  if (localAbsent.length > 0) {
+    console.log(`  local-absent (${localAbsent.length}) - upstream has the file, project does not. Dropping the customization would let the next upgrade restore it from upstream. Keep the entry if the local deletion was intentional, drop it if the file should come back:`);
+    for (const r of localAbsent) console.log(`    - ${r}`);
+  }
+  if (upstreamAbsent.length > 0) {
+    console.log(`  upstream-absent (${upstreamAbsent.length}) - project has the file, upstream does not. Check MANIFEST.json for a file_delete op covering each path. If covered: dropping the customization would let the next upgrade delete the local file - judge whether the local content is still worth keeping. If not covered: the file is a project-custom skill or doc mistakenly listed - drop the entry (project-custom files survive by absence):`);
+    for (const r of upstreamAbsent) console.log(`    - ${r}`);
   }
 
   if (!autoDrop) return;
 
-  // Mechanical sweep: identical + upstream-absent drop without AI judgment. The
-  // file either matches upstream verbatim or has no upstream counterpart, so the
-  // customizations[] entry carries no information either way.
-  const drops = new Set([...identical, ...absent]);
+  // Mechanical sweep: identical and both_absent drop without AI judgment. Identical
+  // matches upstream verbatim, both_absent leaves no file on either side. The other
+  // three classes (local_absent, upstream_absent, diverged) all require AI judgment
+  // because dropping the customization would let the next upgrade restore or delete
+  // a file the user has a position on, or write over a meaningful local edit.
+  const drops = new Set([...identical, ...bothAbsent]);
   if (drops.size === 0) {
-    console.log("merge-status --auto-drop-clean: no clean entries to drop (all remaining are diverged).");
+    console.log("merge-status --auto-drop-clean: no clean entries to drop (all remaining need AI judgment: diverged, local-absent, or upstream-absent).");
     return;
   }
   const kept = (index.customizations || []).filter((rel) => !drops.has(rel));
@@ -86,6 +86,7 @@ export function cmdMergeStatus(index, args = []) {
   writeFileSync(indexPath(), `${JSON.stringify(updated, null, 2)}\n`, "utf8");
   console.log(`merge-status --auto-drop-clean: dropped ${drops.size} ${plural(drops.size, "entry", "entries")} from customizations[]:`);
   for (const r of identical) console.log(`    - ${r} (identical to upstream)`);
-  for (const r of absent) console.log(`    - ${r} (upstream-absent)`);
-  if (diverged.length > 0) console.log(`merge-status --auto-drop-clean: ${diverged.length} diverged ${plural(diverged.length, "entry", "entries")} left for AI merge.`);
+  for (const r of bothAbsent) console.log(`    - ${r} (both-absent)`);
+  const remaining = diverged.length + localAbsent.length + upstreamAbsent.length;
+  if (remaining > 0) console.log(`merge-status --auto-drop-clean: ${remaining} ${plural(remaining, "entry", "entries")} left for AI judgment (${diverged.length} diverged, ${localAbsent.length} local-absent, ${upstreamAbsent.length} upstream-absent).`);
 }

@@ -273,10 +273,12 @@ node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFile
 EMPTY="$(node "$MSENG" merge-status 2>&1)"
 echo "$EMPTY" | grep -q "nothing to merge" && pass "merge-status no-ops cleanly on empty customizations[]" || fail "merge-status did not report nothing-to-merge"
 
-echo "=== T72: merge-status --auto-drop-clean trims identical + upstream-absent, leaves diverged for AI merge ==="
-# The mechanical sweep half of -UpdateSync -FULL. Identical and upstream-absent
-# entries drop without AI judgment (file matches upstream verbatim, or has no
-# upstream counterpart). Diverged entries survive for the AI to merge.
+echo "=== T72: merge-status --auto-drop-clean trims identical only, leaves diverged + upstream-absent for AI judgment (safety: dropping upstream-absent could let upgrade delete a customized file) ==="
+# The mechanical sweep half of -UpdateSync -FULL. Only identical and both-absent
+# drop without AI judgment (file matches upstream verbatim, or no file on either
+# side). Diverged, local-absent, and upstream-absent survive the sweep because
+# dropping the customization there would let the next upgrade restore, delete, or
+# overwrite a file the user has a position on.
 AD="$BASE/auto-drop"
 node "$RENG" init "$AD" --name AdProj >/dev/null 2>&1
 ADENG="$AD/AIDOCS/tools/engine.mjs"
@@ -294,13 +296,14 @@ printf 'project-only canonical edit\n' > "$AD/AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.
 node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_UPDATE-SESSION.md","AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md","AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$AD/AIDOCS/_index.json"
 node "$ADENG" fetch-engine --from "$ADSRC" >/dev/null 2>&1
 ADOUT="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
-echo "$ADOUT" | grep -q "dropped 2 entries" && pass "auto-drop-clean reports the two clean drops (identical + upstream-absent)" || fail "auto-drop-clean did not report 2 drops (output: $ADOUT)"
+echo "$ADOUT" | grep -q "dropped 1 entry" && pass "auto-drop-clean reports the one clean drop (identical only - upstream-absent now retained for AI judgment)" || fail "auto-drop-clean did not report 1 drop (output: $ADOUT)"
 echo "$ADOUT" | grep -q "identical to upstream" && pass "auto-drop-clean labels the identical drop" || fail "no identical-to-upstream label"
-echo "$ADOUT" | grep -q "upstream-absent" && pass "auto-drop-clean labels the upstream-absent drop" || fail "no upstream-absent label"
-echo "$ADOUT" | grep -q "1 diverged entry left for AI merge" && pass "auto-drop-clean reports the diverged remainder for AI" || fail "no diverged-remainder summary"
-# _index.json now has only the diverged entry
-ADREMAIN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).customizations.join(","))' "$AD/AIDOCS/_index.json")"
-[ "$ADREMAIN" = "AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" ] && pass "_index.json customizations[] curated down to only the diverged entry" || fail "customizations[] left as: $ADREMAIN"
+echo "$ADOUT" | grep -q "2 entries left for AI judgment" && pass "auto-drop-clean reports the two-entry remainder grouped by class" || fail "no AI-judgment remainder summary"
+echo "$ADOUT" | grep -q "1 diverged" && pass "auto-drop-clean reports the diverged remainder count" || fail "no diverged count in summary"
+echo "$ADOUT" | grep -q "1 upstream-absent" && pass "auto-drop-clean reports the upstream-absent remainder count" || fail "no upstream-absent count in summary"
+# _index.json keeps both diverged AND upstream-absent (safety: upstream-absent no longer auto-drops)
+ADREMAIN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).customizations.sort().join(","))' "$AD/AIDOCS/_index.json")"
+[ "$ADREMAIN" = "AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md,AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" ] && pass "_index.json customizations[] retained both judgment-required entries (diverged + upstream-absent)" || fail "customizations[] left as: $ADREMAIN"
 # Re-fetch (engine cleanup) for idempotency check
 node "$ADENG" fetch-engine --from "$ADSRC" >/dev/null 2>&1
 ADRERUN="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
@@ -309,3 +312,34 @@ echo "$ADRERUN" | grep -q "no clean entries to drop" && pass "auto-drop-clean id
 node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$AD/AIDOCS/_index.json"
 ADEMPTY="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
 echo "$ADEMPTY" | grep -q "nothing to merge" && pass "auto-drop-clean honors the empty-customizations short-circuit" || fail "auto-drop-clean did not short-circuit on empty array"
+
+echo "=== T73: merge-status --auto-drop-clean five-class safety (both-absent drops, local-absent survives) ==="
+# The safety check for the two new classes split out of the old "absent" bucket.
+# both-absent: customization is a dead reference, auto-drop is safe.
+# local-absent: upstream has the file, project does not. Dropping the customization
+# would let the next upgrade restore the file. Survives auto-drop for AI judgment.
+SC="$BASE/safety-classes"
+node "$RENG" init "$SC" --name ScProj >/dev/null 2>&1
+SCENG="$SC/AIDOCS/tools/engine.mjs"
+SCSRC="$BASE/safety-classes-src"
+mkdir -p "$SCSRC/AIDOCS" "$SCSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$SCSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$SCSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$SCSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$SCSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$SCSRC/.claude/skills/321/SKILL.md"
+printf '{ "operations": [] }\n' > "$SCSRC/AIDOCS/MANIFEST.json"
+# both-absent: no file in project, no file in upstream (the source repo never had it either)
+# local-absent: upstream has the file, project deleted it
+rm "$SC/AIDOCS/SKILL/SKILL_DEV-AUDIT.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_BOTH-ABSENT.md","AIDOCS/SKILL/SKILL_DEV-AUDIT.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SC/AIDOCS/_index.json"
+node "$SCENG" fetch-engine --from "$SCSRC" >/dev/null 2>&1
+SCSTATUS="$(node "$SCENG" merge-status 2>&1)"
+echo "$SCSTATUS" | grep -q "both-absent (1)" && pass "merge-status surfaces the both-absent class for SKILL_BOTH-ABSENT.md" || fail "no both-absent class in read-only output"
+echo "$SCSTATUS" | grep -q "local-absent (1)" && pass "merge-status surfaces the local-absent class for SKILL_DEV-AUDIT.md" || fail "no local-absent class in read-only output"
+SCOUT="$(node "$SCENG" merge-status --auto-drop-clean 2>&1)"
+echo "$SCOUT" | grep -q "dropped 1 entry" && pass "auto-drop-clean drops both-absent without AI judgment" || fail "auto-drop-clean did not drop both-absent (output: $SCOUT)"
+echo "$SCOUT" | grep -q "both-absent" && pass "auto-drop-clean labels the both-absent drop" || fail "no both-absent label"
+# local-absent must survive: dropping would let upgrade copy the file back
+SCREMAIN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).customizations.join(","))' "$SC/AIDOCS/_index.json")"
+[ "$SCREMAIN" = "AIDOCS/SKILL/SKILL_DEV-AUDIT.md" ] && pass "local-absent customization survived auto-drop-clean (safety: upgrade would restore the file otherwise)" || fail "local-absent class wrongly dropped (customizations[] left as: $SCREMAIN)"

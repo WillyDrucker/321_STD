@@ -11,7 +11,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { flag } from "./args.mjs";
 import { installEngineDir, repoRoot } from "./paths.mjs";
 
-const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules"]);
+// test/ is excluded because no engine command reads it (the regression suite runs
+// from the source repo via $RENG, not from a fetched copy). Including it would
+// transit ~1.5MB into INSTALL/engine just to have cleanup delete it.
+const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules", "test"]);
 
 export async function cmdFetchEngine(args) {
   const from = flag(args, "--from");

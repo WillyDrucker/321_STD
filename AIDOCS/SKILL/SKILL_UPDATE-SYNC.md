@@ -27,11 +27,13 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```bash
    node AIDOCS/tools/engine.mjs merge-status
    ```
-   The output groups each `customizations[]` entry by status. Walk it:
+   The output groups each `customizations[]` entry into one of five classes. Walk each:
 
    - **identical** - upstream content matches the project file. Drop the entry from `customizations[]`. The customization is no longer load-bearing.
    - **diverged** - both sides changed. Read the project file and `INSTALL/engine/<same path>`, author a merged version that preserves the local intent (the reason it was customized) AND folds in the upstream changes (new sections, tightened wording, structural fixes). Write the merged content to the project file. If the merged result happens to equal upstream, drop the entry. Otherwise keep it.
-   - **upstream-absent** - the upstream tree lacks the file. Check the upstream `INSTALL/engine/AIDOCS/MANIFEST.json` for a `file_delete` op covering the path. If covered: judge whether the local file is still useful (keep it AND the entry, or delete it AND drop the entry). If not covered: the file is a project-custom skill or doc mistakenly listed - drop the entry, project-custom files survive by absence.
+   - **both-absent** - neither side has the file. The customization is a dead reference. Drop the entry.
+   - **local-absent** - upstream has the file, project does not. Dropping the customization would let the next upgrade restore the file from upstream. Judge whether the local deletion was intentional: keep the entry if so (the deletion is a customization), drop the entry if the file should come back.
+   - **upstream-absent** - the project has the file, upstream does not. Check the upstream `INSTALL/engine/AIDOCS/MANIFEST.json` for a `file_delete` op covering the path. If covered: dropping the customization would let the next upgrade delete the local file - judge whether the local content is still worth keeping (keep it AND the entry, or delete it AND drop the entry). If not covered: the file is a project-custom skill or doc mistakenly listed - drop the entry, project-custom files survive by absence.
 
    After the merge pass, write the trimmed `customizations[]` back to `_index.json`. Continue to step 5.
 
@@ -39,7 +41,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```bash
    node AIDOCS/tools/engine.mjs merge-status --auto-drop-clean
    ```
-   This drops the identical and upstream-absent entries from `customizations[]` without AI judgment (the file either matches upstream verbatim or has no upstream counterpart to merge against). Only diverged entries survive the sweep. Walk those per the **diverged** rule above (read both versions, author the merge, write it to the project file, drop the entry if the merge equals upstream). The `--auto-drop-clean` flag is idempotent and read-only when no clean entries exist. On a project with no customizations or only diverged ones, it prints a no-op message and continues.
+   This drops the **identical** and **both-absent** entries from `customizations[]` without AI judgment (the file matches upstream verbatim, or no file exists on either side). The other three classes (**diverged**, **local-absent**, **upstream-absent**) survive the sweep because dropping the customization there would let the next upgrade restore, delete, or overwrite a file the user has a position on. Walk the survivors per the per-class rules above. The `--auto-drop-clean` flag is idempotent and read-only when no clean entries exist. On a project with no customizations or only judgment-required classes, it prints a no-op message and continues.
 
 5. **Apply the upgrade.** Preview first when uncertain:
    ```bash

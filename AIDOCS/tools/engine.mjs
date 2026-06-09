@@ -99,12 +99,15 @@ Commands:
             engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending
             is set ([--force] overrides). [--dry-run]
   merge-status  Print the merge punch list for customizations[] against the fetched
-            upstream tree (identical / diverged / upstream-absent). Read-only by
-            default; the AI walks the output during -UpdateSync to drop / merge /
-            delete per entry, so customizations[] self-cleans as upstream catches up.
-            --auto-drop-clean mechanically drops identical + upstream-absent entries
-            from customizations[] (no AI judgment), leaving only diverged entries for
-            the AI to merge (the script half of -UpdateSync -FULL). Requires fetch-engine.
+            upstream tree, one of five classes per entry: identical, diverged,
+            both-absent, local-absent, upstream-absent. Read-only by default; the AI
+            walks the output during -UpdateSync to drop / merge / delete per entry,
+            so customizations[] self-cleans as upstream catches up. --auto-drop-clean
+            mechanically drops identical + both-absent entries (no AI judgment), and
+            leaves diverged / local-absent / upstream-absent for AI judgment because
+            dropping there would let the next upgrade restore / delete / overwrite a
+            file the user has a position on. This is the script half of -UpdateSync
+            -FULL. Requires fetch-engine.
             [--auto-drop-clean]
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
