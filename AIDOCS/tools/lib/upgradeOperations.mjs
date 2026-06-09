@@ -65,7 +65,7 @@ function applySkillDelete(op, index, _source, root, dryRun) {
   const relPath = `AIDOCS/SKILL/${op.file}`;
   const customizations = new Set(index.customizations || []);
   if (customizations.has(relPath)) {
-    return { applied: false, note: `${op.file} skipped (customizations[]) - remove from customizations[] to apply` };
+    return { applied: false, deferred: true, note: `${op.file} deferred (customizations[]) - remove from customizations[] to apply` };
   }
   const target = join(root, "AIDOCS", "SKILL", op.file);
   if (!existsSync(target)) return { applied: false, note: `${op.file} already absent` };
@@ -84,7 +84,7 @@ function applySkillRename(op, index, _source, root, dryRun) {
   const oldRel = `AIDOCS/SKILL/${op.from}`;
   const customizations = new Set(index.customizations || []);
   if (customizations.has(oldRel)) {
-    return { applied: false, note: `${op.from} skipped (customizations[]) - remove from customizations[] to apply (new ${op.to} still arrives via copy)` };
+    return { applied: false, deferred: true, note: `${op.from} deferred (customizations[]) - remove from customizations[] to apply (new ${op.to} still arrives via copy)` };
   }
   const oldTarget = join(root, "AIDOCS", "SKILL", op.from);
   if (!existsSync(oldTarget)) {
@@ -144,12 +144,12 @@ function applyFileAddTemplate(op, index, _source, root, dryRun) {
 function applyFileDelete(op, index, _source, root, dryRun) {
   // Honor customizations[] - a path the user has deliberately edited may not be ours
   // to delete. The reversal pattern is documented (user removes the path from
-  // customizations[], then re-runs -UpdateSync), but until they do, the op skips
-  // cleanly. Without this, an upstream cleanup op could blow away a project's local
-  // work in the same file the customizations[] entry was meant to preserve.
+  // customizations[], then re-runs -UpdateSync). The deferred flag keeps the op out
+  // of operations_applied[] so the re-run actually sees it in missing[] (without
+  // deferred, the skip would journal as applied and the re-run would never retry).
   const customizations = new Set(index.customizations || []);
   if (customizations.has(op.file)) {
-    return { applied: false, note: `${op.file} skipped (customizations[]) - remove from customizations[] to apply` };
+    return { applied: false, deferred: true, note: `${op.file} deferred (customizations[]) - remove from customizations[] to apply` };
   }
   const target = resolveContained("file_delete", root, op.file);
   if (!existsSync(target)) return { applied: false, note: `${op.file} already absent` };
@@ -203,7 +203,7 @@ function applySectionTextDiff(op, index, _source, root, dryRun) {
   const target = resolveContained("section_text_diff", root, op.file);
   if (!existsSync(target)) return { applied: false, note: `${op.file} absent, project may need init` };
   if ((index.customizations || []).includes(op.file)) {
-    return { applied: false, note: `${op.file} in customizations[], section preserved` };
+    return { applied: false, deferred: true, note: `${op.file} deferred (customizations[]) - section preserved, remove from customizations[] to apply` };
   }
   const content = readFileSync(target, "utf8");
   let updated;

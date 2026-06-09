@@ -94,8 +94,12 @@ export function cmdUpgrade(index, args) {
 
   // Apply ops. A handler that throws is collected but does not break the loop, so the
   // operator sees every failure at once. We abort before the copy step on any failure.
+  // A handler that returns deferred=true (the customizations[] guard on destructive ops)
+  // is NOT journaled - it stays in missing[] so the user can drop the customization and
+  // re-run to actually apply it. Without this, the skip would record as applied and the
+  // re-run would never retry.
   const opNotes = [];
-  const counts = { applied: 0, noop: 0, opSkipped: 0, failed: 0 };
+  const counts = { applied: 0, noop: 0, deferred: 0, opSkipped: 0, failed: 0 };
   for (const op of missing) {
     const handler = HANDLERS[op.type];
     if (!handler) {
@@ -105,9 +109,12 @@ export function cmdUpgrade(index, args) {
     }
     try {
       const result = handler(op, index, source, root, dryRun);
-      opNotes.push(`${result.applied ? "APPLY" : "NO-OP"} ${op.name}: ${result.note}`);
-      if (result.applied) counts.applied++; else counts.noop++;
-      if (!dryRun) index.engine.operations_applied.push(op.name);
+      const label = result.applied ? "APPLY" : result.deferred ? "DEFER" : "NO-OP";
+      opNotes.push(`${label} ${op.name}: ${result.note}`);
+      if (result.applied) counts.applied++;
+      else if (result.deferred) counts.deferred++;
+      else counts.noop++;
+      if (!dryRun && !result.deferred) index.engine.operations_applied.push(op.name);
     } catch (e) {
       opNotes.push(`FAIL ${op.name}: ${e.message}`);
       counts.failed++;
@@ -146,7 +153,7 @@ export function cmdUpgrade(index, args) {
   }
 
   const tag = dryRun ? " (dry-run)" : "";
-  console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
+  console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.deferred} deferred, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
   console.log(`copy${tag}: ${copyReport.copied} file(s) copied, ${copyReport.skipped} skipped`);
   for (const n of opNotes) console.log(`  ${n}`);
   for (const s of copyReport.skipList) console.log(`  SKIP ${s} (customizations[])`);

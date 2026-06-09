@@ -386,12 +386,12 @@ FDCOUT="$(node "$FDCENG" upgrade 2>&1)"; FDCCC=$?
 [ "$FDCCC" = "0" ] && pass "upgrade exits 0 when file_delete hits a customized path" || fail "upgrade failed (exit $FDCCC): $FDCOUT"
 [ -f "$FDC/AIDOCS/tools/staging/SCHEMA.json" ] && pass "customized file PRESERVED across the file_delete op" || fail "customized file was deleted despite customizations[]"
 grep -q 'project-local customized content' "$FDC/AIDOCS/tools/staging/SCHEMA.json" 2>/dev/null && pass "customized file content intact (not overwritten)" || fail "customized file content lost"
-echo "$FDCOUT" | grep -q "skipped (customizations" && pass "upgrade report names the skip reason (customizations[])" || fail "no customizations skip note in output"
+echo "$FDCOUT" | grep -q "deferred (customizations" && pass "upgrade report names the deferral reason (customizations[])" || fail "no customizations deferral note in output"
 # Reversal: user removes the entry from customizations[], re-runs, file is deleted
-node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];j.engine.operations_applied=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FDC/AIDOCS/_index.json"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FDC/AIDOCS/_index.json"
 node "$FDCENG" fetch-engine --from "$FDCSRC" >/dev/null 2>&1
 node "$FDCENG" upgrade >/dev/null 2>&1
-[ ! -f "$FDC/AIDOCS/tools/staging/SCHEMA.json" ] && pass "after removing from customizations[], file_delete applies (reversal path)" || fail "file_delete did not apply after customizations[] cleared"
+[ ! -f "$FDC/AIDOCS/tools/staging/SCHEMA.json" ] && pass "after removing from customizations[], file_delete applies (reversal path - no manual journal reset needed)" || fail "file_delete did not apply after customizations[] cleared"
 
 echo "=== T65: skill_delete also honors customizations[] (consistency with file_delete) ==="
 # Same blast-radius concern: blindly deleting a customized skill body would lose work.
@@ -422,4 +422,44 @@ SDCOUT="$(node "$SDCENG" upgrade 2>&1)"; SDCCC=$?
 [ "$SDCCC" = "0" ] && pass "upgrade exits 0 when skill_delete hits a customized body" || fail "upgrade failed (exit $SDCCC): $SDCOUT"
 [ -f "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md" ] && pass "customized skill body PRESERVED across skill_delete op" || fail "customized skill body was deleted despite customizations[]"
 grep -q 'LOCAL_CUSTOM_BODY_MARKER' "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md" 2>/dev/null && pass "customized skill body content intact" || fail "customized skill body content lost"
-echo "$SDCOUT" | grep -q "skipped (customizations" && pass "upgrade report names the skip reason (skill_delete + customizations[])" || fail "no customizations skip note for skill_delete"
+echo "$SDCOUT" | grep -q "deferred (customizations" && pass "upgrade report names the deferral reason (skill_delete + customizations[])" || fail "no customizations deferral note for skill_delete"
+
+echo "=== T74: customization-deferred ops stay out of operations_applied[] so the reversal path actually retries ==="
+# The fix for the Codex finding: previously a customization-skipped op was journaled
+# as applied, so removing the entry from customizations[] and re-running would still
+# see the op in operations_applied[] and skip it as already-done. The deferred flag
+# keeps the op name out of the journal so the re-run finds it in missing[] and applies.
+DEF="$BASE/deferred-journal"
+node "$RENG" init "$DEF" --name DefProj >/dev/null 2>&1
+DEFENG="$DEF/AIDOCS/tools/engine.mjs"
+mkdir -p "$DEF/AIDOCS/tools/staging"
+printf 'project-local content\n' > "$DEF/AIDOCS/tools/staging/SCHEMA.json"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/tools/staging/SCHEMA.json"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$DEF/AIDOCS/_index.json"
+DEFSRC="$BASE/deferred-journal-src"
+mkdir -p "$DEFSRC/AIDOCS" "$DEFSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$DEFSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$DEFSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$DEFSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$DEFSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$DEFSRC/.claude/skills/321/SKILL.md"
+cat > "$DEFSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "delete_deferred_schema", "type": "file_delete", "file": "AIDOCS/tools/staging/SCHEMA.json" }
+  ]
+}
+EOF
+node "$DEFENG" fetch-engine --from "$DEFSRC" >/dev/null 2>&1
+DEFOUT1="$(node "$DEFENG" upgrade 2>&1)"
+echo "$DEFOUT1" | grep -q "1 deferred" && pass "first upgrade reports 1 deferred in the counts line" || fail "no deferred count in summary (output: $DEFOUT1)"
+echo "$DEFOUT1" | grep -q "^  DEFER delete_deferred_schema" && pass "first upgrade tags the op DEFER (not APPLY / NO-OP)" || fail "no DEFER tag for the customization-deferred op"
+# Verify the op is NOT in operations_applied[] (the actual fix)
+DEFAPPLIED1="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((j.engine?.operations_applied||[]).join(","))' "$DEF/AIDOCS/_index.json")"
+echo "$DEFAPPLIED1" | grep -qv "delete_deferred_schema" && pass "deferred op stays OUT of operations_applied[] (fix: no longer journaled as done)" || fail "deferred op was journaled despite the fix (operations_applied: $DEFAPPLIED1)"
+# Reversal: drop customization, re-run, op should now find the file and apply WITHOUT manually clearing operations_applied[]
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$DEF/AIDOCS/_index.json"
+node "$DEFENG" fetch-engine --from "$DEFSRC" >/dev/null 2>&1
+DEFOUT2="$(node "$DEFENG" upgrade 2>&1)"
+[ ! -f "$DEF/AIDOCS/tools/staging/SCHEMA.json" ] && pass "after removing customization, the deferred op retries and applies on the next run (no manual journal reset)" || fail "deferred op did not retry after customization removal"
+DEFAPPLIED2="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((j.engine?.operations_applied||[]).join(","))' "$DEF/AIDOCS/_index.json")"
+echo "$DEFAPPLIED2" | grep -q "delete_deferred_schema" && pass "op IS journaled into operations_applied[] after the successful retry" || fail "op missing from operations_applied[] after successful apply"
