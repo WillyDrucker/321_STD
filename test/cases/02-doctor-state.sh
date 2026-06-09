@@ -109,6 +109,23 @@ DOUT="$(node "$SBENG" doctor 2>&1)"
 echo "$DOUT" | grep -q "Sub-section budget" && pass "doctor reports the Sub-section budget category" || fail "no Sub-section budget category in doctor output"
 echo "$DOUT" | grep -qi "Big Entry" && pass "doctor names the offending sub-section" || fail "offending sub-section not named in advisory"
 echo "$DOUT" | grep -q "advisory warning" && pass "sub-section budget is advisory tier (not reconcile)" || fail "sub-section budget not advisory"
+# Body-line counting (the user-facing metric is non-blank body lines, not heading + blanks + body)
+echo "$DOUT" | grep -q "body has 15 lines" && pass "doctor reports body-line count (15), not total-line count" || fail "doctor not using body-line count in message"
+
+echo "=== T66: <!-- LOAD_BEARING --> marker exempts a sub-section from the body cap (GLP321-web finding) ==="
+LB="$BASE/loadbearing"
+node "$RENG" init "$LB" --name LbProj >/dev/null 2>&1
+LBENG="$LB/AIDOCS/tools/engine.mjs"
+# Lay TWO over-cap sub-sections: one with the marker, one without. Doctor should warn
+# only on the unmarked entry; the marker entry rides forever per the documented exemption.
+{ printf '# LbProj - MEMORY (Extended)\n\n**Purpose:** load-bearing exemption test.\n\n## LIFO\n\n### Marked Catalog\n<!-- LOAD_BEARING -->\n'; for n in $(seq 1 15); do printf -- 'catalog row %s\n' "$n"; done; printf '\n### Unmarked Bloat\n'; for n in $(seq 1 15); do printf -- 'narrative line %s\n' "$n"; done; } > "$LB/AIDOCS/LbProj_MEMORY_EXTENDED.md"
+LBOUT="$(node "$LBENG" doctor 2>&1)"
+echo "$LBOUT" | grep -qi "Unmarked Bloat" && pass "doctor still warns on the unmarked over-cap entry" || fail "doctor missed the unmarked over-cap entry"
+echo "$LBOUT" | grep -qi "Marked Catalog" && fail "doctor wrongly warned on the LOAD_BEARING-marked entry" || pass "LOAD_BEARING marker exempts the entry from the cap (no warning)"
+# The marker can appear anywhere in the body, not just on the first line
+{ printf '# LbProj - MEMORY (Extended)\n\n**Purpose:** load-bearing mid-body test.\n\n## LIFO\n\n### Mid Marker Entry\n'; for n in $(seq 1 7); do printf -- 'narrative line %s\n' "$n"; done; printf '<!-- LOAD_BEARING -->\n'; for n in $(seq 8 15); do printf -- 'narrative line %s\n' "$n"; done; } > "$LB/AIDOCS/LbProj_MEMORY_EXTENDED.md"
+LBOUT2="$(node "$LBENG" doctor 2>&1)"
+echo "$LBOUT2" | grep -qi "Mid Marker Entry" && fail "doctor wrongly warned when marker appears mid-body" || pass "LOAD_BEARING marker works anywhere in the body"
 
 echo "=== T35: doctor flags malformed engine.operations_applied (non-array) ==="
 BD="$BASE/baddoctor"

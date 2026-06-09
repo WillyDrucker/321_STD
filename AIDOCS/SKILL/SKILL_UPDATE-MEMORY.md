@@ -81,6 +81,8 @@ Write `AIDOCS/tools/staging/updatememory.json`. Never edit MEMORY / BACKLOG dire
 
 **Extended detail (the `[+]` pair).** When a durable observation needs more than a line or two of rationale, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatememory.memory_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
+**Body length (the maximum, not the target).** Aim for **3-6 non-blank lines of body prose** for a normal entry. The hard ceiling is **10 lines for a critical entry** that genuinely earns the depth. These are caps, not targets - if you can summarize the why in 3 lines, do that. Doctor's sub-section budget check warns at >10 body lines. A genuinely load-bearing entry (a catalog, an exception list, content where compression would lose the point) marks itself with `<!-- LOAD_BEARING -->` anywhere in the body to opt out of the cap forever. Use the marker rarely - it is for content that cannot summarize, not for narrative you do not feel like trimming.
+
 ## Step 6: Commit (validate is optional)
 
 ```bash
@@ -101,6 +103,8 @@ node AIDOCS/tools/engine.mjs commit --skill updatememory
 `-UpdateMemory -FULL` rebuilds MEMORY from the full conversation plus codebase plus SESSION rather than appending the incremental tail. Re-walk every Big-6 section against current evidence (re-derive filled ones, do not trust the prior prose), and re-walk LIFO from durable observations across the whole arc. Use when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation.
 
 The lean default appends from the conversation tail since the last watermark and only fills empty Big-6 sections. `-FULL` ignores the watermark and re-derives populated sections too.
+
+**Re-summarize over-cap EXTENDED entries.** When `-FULL` re-walks an existing `[+]` entry whose EXTENDED body exceeds the cap (>6 normal lines, >10 critical), re-derive the entry under cap and `replace` its sub-section (by anchor) - do not let pre-existing bloat carry through. Doctor's sub-section budget warns at >10 body lines, and the warning is the trigger to summarize on the next pass. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
 ## Rules
 

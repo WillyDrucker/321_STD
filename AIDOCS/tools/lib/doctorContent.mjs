@@ -85,10 +85,18 @@ function checkProse(index) {
   return out;
 }
 
-// EXTENDED sub-sections target 6 lines, soft cap 10. A long sub-section bloats EXTENDED
+// EXTENDED sub-section bodies: target 6 lines for a normal entry, soft cap 10 for one
+// that genuinely earns the depth. "Body lines" means non-blank lines between the ###
+// heading and the next heading (or EOF) - the heading and the blank separators do not
+// count, so the cap measures actual content. A long sub-section bloats EXTENDED
 // independent of the main LIFO bullet count, so it is the structural lever to keep
 // EXTENDED and main autoprune timing in sync. Advisory-tier - the AI summarizes
 // oversized entries on the next pass, the rule does not gate steady-state runs.
+//
+// An entry that names itself `<!-- LOAD_BEARING -->` (a catalog, an exception list, any
+// content where compression would lose the point) opts out of the cap forever. The
+// marker can appear anywhere in the sub-section body. UPDATE-RECONCILE.md documents
+// this exemption, and this is the code that honors it.
 function checkSubsectionBudget(index) {
   const TARGET = 6, SOFT_CAP = 10;
   const issues = [];
@@ -100,8 +108,17 @@ function checkSubsectionBudget(index) {
     let subStart = -1, subTitle = "";
     const finalize = (endIdx) => {
       if (subStart === -1) return;
-      const subLen = endIdx - subStart;
-      if (subLen > SOFT_CAP) issues.push(`${key}: "${subTitle}" runs ${subLen} lines (target ${TARGET}, soft cap ${SOFT_CAP} - summarize)`);
+      let bodyLines = 0;
+      let loadBearing = false;
+      for (let j = subStart + 1; j < endIdx; j++) {
+        const line = lines[j];
+        if (line.includes("<!-- LOAD_BEARING -->")) loadBearing = true;
+        if (line.trim() !== "") bodyLines++;
+      }
+      if (loadBearing) return;
+      if (bodyLines > SOFT_CAP) {
+        issues.push(`${key}: "${subTitle}" body has ${bodyLines} lines (target ${TARGET}, soft cap ${SOFT_CAP} - summarize, or mark <!-- LOAD_BEARING --> if the content is the point)`);
+      }
     };
     for (let i = 0; i < lines.length; i++) {
       if (/^###\s+/.test(lines[i])) {

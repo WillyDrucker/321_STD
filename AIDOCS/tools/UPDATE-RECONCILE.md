@@ -43,7 +43,7 @@ Treat the canonical scan of the project as the source of truth and the captured 
 - **Refresh SESSION Current State.** The capture wrote it before this pass, so it still describes the project as awaiting reconcile (the gate, the "run `/321 -Update`" note). Rewrite it to the reconciled, steady reality - the project is migrated and about to graduate, not parked at the gate.
 - **Capture this session's own events too.** The first reconcile after install is also the first time the install + setup + reconcile session's own events can land in LIFO. Add them at the top of each lane the same way a routine `-Update` would, above the migration content that sorts to the bottom. The pass is both a distillation of the captured archive and a normal capture of the conversation that ran it.
 
-Distill both EXTENDED lanes evenly - `SESSION_EXTENDED` carries the same over-split as `MEMORY_EXTENDED`, so give it the same sweep. Hold entries to about ten lines unless one is genuinely important, and give a `MEMORY_EXTENDED` entry a `Decision:` line where there is a resolution.
+Distill both EXTENDED lanes evenly - `SESSION_EXTENDED` carries the same over-split as `MEMORY_EXTENDED`, so give it the same sweep. **Body length cap: target 3-6 non-blank body lines per entry (normal), soft cap 10 (critical that earns the depth).** Doctor warns at >10 body lines per entry, and a genuinely load-bearing entry (a catalog, an exception list) marks itself `<!-- LOAD_BEARING -->` to opt out of the cap forever. Give a `MEMORY_EXTENDED` entry a `Decision:` line where there is a resolution.
 
 ## Mechanism: direct curated edits, doctor as the gate
 

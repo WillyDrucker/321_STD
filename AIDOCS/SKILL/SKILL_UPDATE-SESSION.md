@@ -88,6 +88,8 @@ Write `AIDOCS/tools/staging/updatesession.json`. Never edit SESSION directly. Ac
 
 **Extended detail (the `[+]` pair).** When a bullet needs more than a line or two of narrative, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatesession.session_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
+**Body length (the maximum, not the target).** Aim for **3-6 non-blank lines of body prose** for a normal entry. The hard ceiling is **10 lines for a critical entry** that genuinely earns the depth. These are caps, not targets - if you can summarize the why in 3 lines, do that. Doctor's sub-section budget check warns at >10 body lines. A genuinely load-bearing entry (a catalog, an exception list, content where compression would lose the point) marks itself with `<!-- LOAD_BEARING -->` anywhere in the body to opt out of the cap forever. Use the marker rarely - it is for content that cannot summarize, not for narrative you do not feel like trimming.
+
 **Last State (engine-written).** On an `overwrite_section` of Current State, the engine demotes the prior snapshot's bullets to the top of LIFO and marks the first `**Last State:**` (stripping any prior marker, so exactly one exists). Put the Current State overwrite first in `actions` so this run's new LIFO events land above the marker. Never write the marker yourself.
 
 ## Step 3: Commit (validate is optional)
@@ -110,6 +112,8 @@ node AIDOCS/tools/engine.mjs commit --skill updatesession
 `-UpdateSession -FULL` rebuilds SESSION from the full conversation rather than the incremental tail. Re-derive Current State from current operational reality, do not trust the prior snapshot, and re-walk LIFO from significant events rather than appending. Use when SESSION has drifted (a long pause, a context switch, an interrupted prior pass).
 
 The lean default appends from the conversation tail since the last watermark. `-FULL` ignores the watermark and re-derives from the whole conversation.
+
+**Re-summarize over-cap EXTENDED entries.** When `-FULL` re-walks an existing `[+]` entry whose EXTENDED body exceeds the cap (>6 normal lines, >10 critical), re-derive the entry under cap and `replace` its sub-section (by anchor) - do not let pre-existing bloat carry through. Doctor's sub-section budget warns at >10 body lines, and the warning is the trigger to summarize on the next pass. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
 ## Rules
 
