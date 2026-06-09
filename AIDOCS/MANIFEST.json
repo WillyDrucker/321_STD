@@ -120,6 +120,76 @@
       "dictionary": "sizes",
       "from": "sessionupdate.session_extended",
       "to": "updatesession.session_extended"
+    },
+    {
+      "name": "delete_orphan_lib_commands_commit",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/commit.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_sync",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/sync.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_doctor",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/doctor.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_init",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/init.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_prune",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/prune.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_archive",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/archive.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_import_skills",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/import-skills.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_migrate_archive",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/migrate-archive.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_migrate_restore",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/migrate-restore.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_commands_migrate_import",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/commands/migrate-import.mjs"
+    },
+    {
+      "name": "delete_orphan_lib_validator",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/validator.mjs"
+    },
+    {
+      "name": "delete_stale_staging_schema",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/staging/SCHEMA.json"
+    },
+    {
+      "name": "delete_stale_staging_session_example",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/staging/session-update.example.json"
+    },
+    {
+      "name": "delete_stale_staging_memory_example",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/staging/memory-update.example.json"
     }
   ]
 }

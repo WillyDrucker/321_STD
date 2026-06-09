@@ -60,25 +60,38 @@ function requireSkillBasename(opName, field, value) {
   }
 }
 
-function applySkillDelete(op, _index, _source, root, dryRun) {
+function applySkillDelete(op, index, _source, root, dryRun) {
   requireSkillBasename("skill_delete", "file", op.file);
+  const relPath = `AIDOCS/SKILL/${op.file}`;
+  const customizations = new Set(index.customizations || []);
+  if (customizations.has(relPath)) {
+    return { applied: false, note: `${op.file} skipped (customizations[]) - remove from customizations[] to apply` };
+  }
   const target = join(root, "AIDOCS", "SKILL", op.file);
   if (!existsSync(target)) return { applied: false, note: `${op.file} already absent` };
   if (!dryRun) rmSync(target, { force: true });
-  return { applied: true, note: `removed AIDOCS/SKILL/${op.file}` };
+  return { applied: true, note: `removed ${relPath}` };
 }
 
-function applySkillRename(op, _index, _source, root, dryRun) {
+function applySkillRename(op, index, _source, root, dryRun) {
   // skill_rename is delete-old. The new body arrives via the engine-class copy step
   // (it is present in the source AIDOCS/SKILL/ tree). The op only needs the old name.
+  // customizations[] on the OLD path skips the delete (the user's local edits stay).
+  // The new body still lands via the copy step, so two bodies coexist until the user
+  // removes the customizations[] entry and re-runs -UpdateSync.
   requireSkillBasename("skill_rename", "from", op.from);
   requireSkillBasename("skill_rename", "to", op.to);
+  const oldRel = `AIDOCS/SKILL/${op.from}`;
+  const customizations = new Set(index.customizations || []);
+  if (customizations.has(oldRel)) {
+    return { applied: false, note: `${op.from} skipped (customizations[]) - remove from customizations[] to apply (new ${op.to} still arrives via copy)` };
+  }
   const oldTarget = join(root, "AIDOCS", "SKILL", op.from);
   if (!existsSync(oldTarget)) {
     return { applied: false, note: `${op.from} already absent (new ${op.to} arrives via copy)` };
   }
   if (!dryRun) rmSync(oldTarget, { force: true });
-  return { applied: true, note: `removed AIDOCS/SKILL/${op.from} (new ${op.to} arrives via copy)` };
+  return { applied: true, note: `removed ${oldRel} (new ${op.to} arrives via copy)` };
 }
 
 function applyRegistryExtend(op, index, _source, _root, dryRun) {
@@ -128,7 +141,16 @@ function applyFileAddTemplate(op, index, _source, root, dryRun) {
 // in the project unless this op fires (the same shape as skill_delete, but for
 // any project-relative path). Containment-checked so a manifest typo cannot
 // reach outside the project root. Idempotent: an already-absent file is a no-op.
-function applyFileDelete(op, _index, _source, root, dryRun) {
+function applyFileDelete(op, index, _source, root, dryRun) {
+  // Honor customizations[] - a path the user has deliberately edited may not be ours
+  // to delete. The reversal pattern is documented (user removes the path from
+  // customizations[], then re-runs -UpdateSync), but until they do, the op skips
+  // cleanly. Without this, an upstream cleanup op could blow away a project's local
+  // work in the same file the customizations[] entry was meant to preserve.
+  const customizations = new Set(index.customizations || []);
+  if (customizations.has(op.file)) {
+    return { applied: false, note: `${op.file} skipped (customizations[]) - remove from customizations[] to apply` };
+  }
   const target = resolveContained("file_delete", root, op.file);
   if (!existsSync(target)) return { applied: false, note: `${op.file} already absent` };
   if (!dryRun) rmSync(target, { force: true });

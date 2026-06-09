@@ -75,16 +75,26 @@ Write `AIDOCS/tools/staging/updatememory.json`. Never edit MEMORY / BACKLOG dire
 }
 ```
 
+**LIFO ordering rule.** Each `lifo_insert` PREPENDS, so the LAST insert in `actions` ends up on top. **List this run's durable observations oldest-first** in the actions array so the newest one lands on top of LIFO.
+
+**`slugify` for `[+]` anchors.** The validator pairs a `[+]` bullet with its extended sub-section by comparing `slugify(bullet)` to `slugify(heading)`. `slugify` lowercases, strips every character except `[a-z0-9\s-]`, trims, and collapses whitespace runs to single hyphens. **Keep `[+]` bullets short and punctuation-light** - put the rationale in `body_md` instead.
+
 **Extended detail (the `[+]` pair).** When a durable observation needs more than a line or two of rationale, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatememory.memory_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
-## Step 6: Validate + commit
+## Step 6: Commit (validate is optional)
 
 ```bash
-node AIDOCS/tools/engine.mjs validate --skill updatememory
-node AIDOCS/tools/engine.mjs commit   --skill updatememory
+node AIDOCS/tools/engine.mjs commit --skill updatememory
 ```
 
-Two-phase: simulate, abort before any write on failure, then persist, stamp the watermark, clear staging.
+`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional - skip it on a confident draft. Use `validate --skill updatememory` only while iterating on a draft you expect to fail. The two-phase commit then persists, stamps the watermark, and clears staging.
+
+## Lean execution path (one pass, no extra machinery)
+
+1. Skim the conversation tail since the watermark. Read only this skill body plus the live `<PROJECT>_MEMORY.md` and `<PROJECT>_BACKLOG.md` (plus the SESSION freshly written by Step 1). **Do NOT read MEMORY_EXTENDED unless an op is `drop` / `replace` against an existing sub-section** - an `add` needs no prior read.
+2. Author the staging JSON directly with the file writer at `AIDOCS/tools/staging/updatememory.json`. Do not build a generator script to emit it - the staging file IS the artifact.
+3. `commit` once. Skip standalone `validate` - `commit` re-validates and simulates and fails safe.
+4. Target: read 3 files (plus the SESSION 1 file -UpdateSession already touched), write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
 
 ## -FULL mode
 

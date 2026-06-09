@@ -353,3 +353,73 @@ EOF
 node "$SEENG_44" fetch-engine --from "$SESRC" >/dev/null 2>&1
 SE3OUT="$(node "$SEENG_44" upgrade 2>&1)"; SE3CC=$?
 [ "$SE3CC" = "20" ] && pass "skill_delete rejects non-SKILL_*.md basename" || fail "skill_delete accepted non-SKILL basename (exit $SE3CC)"
+
+echo "=== T64: file_delete skips a path listed in customizations[] (GLP321-web finding) ==="
+# An upstream cleanup op should not blow away a project's local work in a file the
+# customizations[] entry was meant to preserve. The op no-ops with a clear note; user
+# removes the path from customizations[] to apply.
+FDC="$BASE/filedelete-customize"
+node "$RENG" init "$FDC" --name FdcProj >/dev/null 2>&1
+FDCENG="$FDC/AIDOCS/tools/engine.mjs"
+# Plant a project-customized file the user wants to keep
+mkdir -p "$FDC/AIDOCS/tools/staging"
+printf 'project-local customized content\n' > "$FDC/AIDOCS/tools/staging/SCHEMA.json"
+# Register it in customizations[]
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/tools/staging/SCHEMA.json"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FDC/AIDOCS/_index.json"
+# Source manifest: file_delete the same path
+FDCSRC="$BASE/filedelete-customize-src"
+mkdir -p "$FDCSRC/AIDOCS" "$FDCSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$FDCSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$FDCSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$FDCSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$FDCSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$FDCSRC/.claude/skills/321/SKILL.md"
+cat > "$FDCSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "delete_customized_schema", "type": "file_delete", "file": "AIDOCS/tools/staging/SCHEMA.json" }
+  ]
+}
+EOF
+node "$FDCENG" fetch-engine --from "$FDCSRC" >/dev/null 2>&1
+FDCOUT="$(node "$FDCENG" upgrade 2>&1)"; FDCCC=$?
+[ "$FDCCC" = "0" ] && pass "upgrade exits 0 when file_delete hits a customized path" || fail "upgrade failed (exit $FDCCC): $FDCOUT"
+[ -f "$FDC/AIDOCS/tools/staging/SCHEMA.json" ] && pass "customized file PRESERVED across the file_delete op" || fail "customized file was deleted despite customizations[]"
+grep -q 'project-local customized content' "$FDC/AIDOCS/tools/staging/SCHEMA.json" 2>/dev/null && pass "customized file content intact (not overwritten)" || fail "customized file content lost"
+echo "$FDCOUT" | grep -q "skipped (customizations" && pass "upgrade report names the skip reason (customizations[])" || fail "no customizations skip note in output"
+# Reversal: user removes the entry from customizations[], re-runs, file is deleted
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];j.engine.operations_applied=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$FDC/AIDOCS/_index.json"
+node "$FDCENG" fetch-engine --from "$FDCSRC" >/dev/null 2>&1
+node "$FDCENG" upgrade >/dev/null 2>&1
+[ ! -f "$FDC/AIDOCS/tools/staging/SCHEMA.json" ] && pass "after removing from customizations[], file_delete applies (reversal path)" || fail "file_delete did not apply after customizations[] cleared"
+
+echo "=== T65: skill_delete also honors customizations[] (consistency with file_delete) ==="
+# Same blast-radius concern: blindly deleting a customized skill body would lose work.
+SDC="$BASE/skilldelete-customize"
+node "$RENG" init "$SDC" --name SdcProj >/dev/null 2>&1
+SDCENG="$SDC/AIDOCS/tools/engine.mjs"
+# Plant a project-customized skill body (a copy of a canonical with project edits)
+cp "$REAL/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md"
+printf '\nLOCAL_CUSTOM_BODY_MARKER\n' >> "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SDC/AIDOCS/_index.json"
+# Source manifest: skill_delete for that body
+SDCSRC="$BASE/skilldelete-customize-src"
+mkdir -p "$SDCSRC/AIDOCS" "$SDCSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$SDCSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$SDCSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$SDCSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$SDCSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$SDCSRC/.claude/skills/321/SKILL.md"
+cat > "$SDCSRC/AIDOCS/MANIFEST.json" <<'EOF'
+{
+  "operations": [
+    { "name": "delete_customized_skill", "type": "skill_delete", "file": "SKILL_LEGACY-CUSTOM.md" }
+  ]
+}
+EOF
+node "$SDCENG" fetch-engine --from "$SDCSRC" >/dev/null 2>&1
+SDCOUT="$(node "$SDCENG" upgrade 2>&1)"; SDCCC=$?
+[ "$SDCCC" = "0" ] && pass "upgrade exits 0 when skill_delete hits a customized body" || fail "upgrade failed (exit $SDCCC): $SDCOUT"
+[ -f "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md" ] && pass "customized skill body PRESERVED across skill_delete op" || fail "customized skill body was deleted despite customizations[]"
+grep -q 'LOCAL_CUSTOM_BODY_MARKER' "$SDC/AIDOCS/SKILL/SKILL_LEGACY-CUSTOM.md" 2>/dev/null && pass "customized skill body content intact" || fail "customized skill body content lost"
+echo "$SDCOUT" | grep -q "skipped (customizations" && pass "upgrade report names the skip reason (skill_delete + customizations[])" || fail "no customizations skip note for skill_delete"

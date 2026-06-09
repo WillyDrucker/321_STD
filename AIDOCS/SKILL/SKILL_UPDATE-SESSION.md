@@ -82,20 +82,28 @@ Write `AIDOCS/tools/staging/updatesession.json`. Never edit SESSION directly. Ac
 }
 ```
 
-One `lifo_insert` per event (newest lands on top). `overwrite_section` replaces the whole Current State body.
+**LIFO ordering rule.** Each `lifo_insert` PREPENDS to the section, so the LAST insert in `actions` ends up on top. **List this run's events oldest-first** in the actions array so the newest one (last in list) lands on top of LIFO. `overwrite_section` replaces the whole Current State body.
+
+**`slugify` for `[+]` anchors.** The validator pairs a `[+]` bullet with its extended sub-section by comparing `slugify(bullet)` to `slugify(heading)`. `slugify` lowercases, strips every character except `[a-z0-9\s-]`, trims, and collapses whitespace runs to single hyphens. Existing hyphens survive. So a punctuation-heavy bullet ("Decision: pick X (over Y)") slugifies to "decision-pick-x-over-y". **Keep `[+]` bullets short and punctuation-light** - put the detail in `body_md` instead.
 
 **Extended detail (the `[+]` pair).** When a bullet needs more than a line or two of narrative, pair it: set `extended_anchor` on the `lifo_insert` (the engine renders `- [+] <bullet>`, no link) and emit an `add` on `updatesession.session_extended` whose `heading` is the same bullet text. The `anchor` must equal `slugify` of both the bullet and the heading - that shared slug is how the engine pairs them. Use `drop` / `replace` (by anchor) to edit an existing sub-section. Keep `body_md` prose - no code fences (the validator rejects them, code lives in source). A `[+]` bullet with no matching sub-section fails commit (the orphan check), so always pair them.
 
 **Last State (engine-written).** On an `overwrite_section` of Current State, the engine demotes the prior snapshot's bullets to the top of LIFO and marks the first `**Last State:**` (stripping any prior marker, so exactly one exists). Put the Current State overwrite first in `actions` so this run's new LIFO events land above the marker. Never write the marker yourself.
 
-## Step 3: Validate + commit
+## Step 3: Commit (validate is optional)
 
 ```bash
-node AIDOCS/tools/engine.mjs validate --skill updatesession
-node AIDOCS/tools/engine.mjs commit   --skill updatesession
+node AIDOCS/tools/engine.mjs commit --skill updatesession
 ```
 
-Two-phase: commit simulates every op first and aborts before any write on failure, then persists, stamps the watermark, and clears staging. Relay the summary.
+`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional - skip it on a confident draft. Use `validate --skill updatesession` only while iterating on a draft you expect to fail. The two-phase commit then persists, stamps the watermark, and clears staging. Relay the summary.
+
+## Lean execution path (one pass, no extra machinery)
+
+1. Skim the conversation tail since the watermark. Read only this skill body plus the live `<PROJECT>_SESSION.md`. **Do NOT read SESSION_EXTENDED unless an op is `drop` / `replace` against an existing sub-section** - an `add` needs no prior read.
+2. Author the staging JSON directly with the file writer at `AIDOCS/tools/staging/updatesession.json`. Do not build a generator script to emit it - the staging file IS the artifact.
+3. `commit` once. Skip standalone `validate` - `commit` re-validates and simulates and fails safe.
+4. Target: read 2 files, write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
 
 ## -FULL mode
 
