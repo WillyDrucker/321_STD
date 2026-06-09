@@ -65,7 +65,7 @@ async function main() {
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
     case "upgrade":  cmdUpgrade(index, args); break;
-    case "merge-status": cmdMergeStatus(index); break;
+    case "merge-status": cmdMergeStatus(index, args); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "watermark": cmdWatermark(index, args); break;
@@ -99,9 +99,13 @@ Commands:
             engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending
             is set ([--force] overrides). [--dry-run]
   merge-status  Print the merge punch list for customizations[] against the fetched
-            upstream tree (identical / diverged / upstream-absent). Read-only; the AI
-            walks the output during -UpdateSync to drop / merge / delete per entry, so
-            customizations[] self-cleans as upstream catches up. Requires fetch-engine.
+            upstream tree (identical / diverged / upstream-absent). Read-only by
+            default; the AI walks the output during -UpdateSync to drop / merge /
+            delete per entry, so customizations[] self-cleans as upstream catches up.
+            --auto-drop-clean mechanically drops identical + upstream-absent entries
+            from customizations[] (no AI judgment), leaving only diverged entries for
+            the AI to merge (the script half of -UpdateSync -FULL). Requires fetch-engine.
+            [--auto-drop-clean]
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,

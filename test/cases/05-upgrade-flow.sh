@@ -272,3 +272,40 @@ echo "$MSOUT" | grep -q "Check MANIFEST.json" && pass "merge-status surfaces the
 node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$MS/AIDOCS/_index.json"
 EMPTY="$(node "$MSENG" merge-status 2>&1)"
 echo "$EMPTY" | grep -q "nothing to merge" && pass "merge-status no-ops cleanly on empty customizations[]" || fail "merge-status did not report nothing-to-merge"
+
+echo "=== T72: merge-status --auto-drop-clean trims identical + upstream-absent, leaves diverged for AI merge ==="
+# The mechanical sweep half of -UpdateSync -FULL. Identical and upstream-absent
+# entries drop without AI judgment (file matches upstream verbatim, or has no
+# upstream counterpart). Diverged entries survive for the AI to merge.
+AD="$BASE/auto-drop"
+node "$RENG" init "$AD" --name AdProj >/dev/null 2>&1
+ADENG="$AD/AIDOCS/tools/engine.mjs"
+ADSRC="$BASE/auto-drop-src"
+mkdir -p "$ADSRC/AIDOCS" "$ADSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$ADSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$ADSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$ADSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$ADSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$ADSRC/.claude/skills/321/SKILL.md"
+printf '{ "operations": [] }\n' > "$ADSRC/AIDOCS/MANIFEST.json"
+# Same shape as T67: identical / diverged / upstream-absent
+printf '\nDIVERGED_LOCAL_MARKER\n' >> "$AD/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md"
+printf 'project-only canonical edit\n' > "$AD/AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_UPDATE-SESSION.md","AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md","AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$AD/AIDOCS/_index.json"
+node "$ADENG" fetch-engine --from "$ADSRC" >/dev/null 2>&1
+ADOUT="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
+echo "$ADOUT" | grep -q "dropped 2 entries" && pass "auto-drop-clean reports the two clean drops (identical + upstream-absent)" || fail "auto-drop-clean did not report 2 drops (output: $ADOUT)"
+echo "$ADOUT" | grep -q "identical to upstream" && pass "auto-drop-clean labels the identical drop" || fail "no identical-to-upstream label"
+echo "$ADOUT" | grep -q "upstream-absent" && pass "auto-drop-clean labels the upstream-absent drop" || fail "no upstream-absent label"
+echo "$ADOUT" | grep -q "1 diverged entry left for AI merge" && pass "auto-drop-clean reports the diverged remainder for AI" || fail "no diverged-remainder summary"
+# _index.json now has only the diverged entry
+ADREMAIN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).customizations.join(","))' "$AD/AIDOCS/_index.json")"
+[ "$ADREMAIN" = "AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" ] && pass "_index.json customizations[] curated down to only the diverged entry" || fail "customizations[] left as: $ADREMAIN"
+# Re-fetch (engine cleanup) for idempotency check
+node "$ADENG" fetch-engine --from "$ADSRC" >/dev/null 2>&1
+ADRERUN="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
+echo "$ADRERUN" | grep -q "no clean entries to drop" && pass "auto-drop-clean idempotent: second pass reports no clean drops left" || fail "second auto-drop-clean pass did not no-op cleanly (output: $ADRERUN)"
+# Empty customizations[] short-circuits even with the flag
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$AD/AIDOCS/_index.json"
+ADEMPTY="$(node "$ADENG" merge-status --auto-drop-clean 2>&1)"
+echo "$ADEMPTY" | grep -q "nothing to merge" && pass "auto-drop-clean honors the empty-customizations short-circuit" || fail "auto-drop-clean did not short-circuit on empty array"

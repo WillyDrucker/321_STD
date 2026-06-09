@@ -35,6 +35,12 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
    After the merge pass, write the trimmed `customizations[]` back to `_index.json`. Continue to step 5.
 
+   **`-FULL` shortcut.** When invoked as `/321 -UpdateSync -FULL`, replace this step's read-only walk with a one-shot pass that runs the mechanical sweep first:
+   ```bash
+   node AIDOCS/tools/engine.mjs merge-status --auto-drop-clean
+   ```
+   This drops the identical and upstream-absent entries from `customizations[]` without AI judgment (the file either matches upstream verbatim or has no upstream counterpart to merge against). Only diverged entries survive the sweep. Walk those per the **diverged** rule above (read both versions, author the merge, write it to the project file, drop the entry if the merge equals upstream). The `--auto-drop-clean` flag is idempotent and read-only when no clean entries exist. On a project with no customizations or only diverged ones, it prints a no-op message and continues.
+
 5. **Apply the upgrade.** Preview first when uncertain:
    ```bash
    node AIDOCS/tools/engine.mjs upgrade --dry-run
