@@ -12,6 +12,7 @@ import { cmdDoctor } from "./lib/doctor.mjs";
 import { cmdFetchEngine } from "./lib/fetch-engine.mjs";
 import { cmdGraduate } from "./lib/graduate.mjs";
 import { cmdInit } from "./lib/init.mjs";
+import { cmdMergeStatus } from "./lib/mergeStatus.mjs";
 import { cmdMigrateArchive } from "./lib/migrate-archive.mjs";
 import { cmdMigrateImport } from "./lib/migrate-import.mjs";
 import { cmdMigrateRestore } from "./lib/migrate-restore.mjs";
@@ -24,7 +25,7 @@ import { cmdUpgrade } from "./lib/upgrade.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "validate", "commit", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -63,6 +64,7 @@ async function main() {
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
     case "upgrade":  cmdUpgrade(index, args); break;
+    case "merge-status": cmdMergeStatus(index); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "migrate-import": await cmdMigrateImport(index, args); break;
@@ -94,6 +96,10 @@ Commands:
             each missing op (idempotent), skips paths in customizations[], bumps
             engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending
             is set ([--force] overrides). [--dry-run]
+  merge-status  Print the merge punch list for customizations[] against the fetched
+            upstream tree (identical / diverged / upstream-absent). Read-only; the AI
+            walks the output during -UpdateSync to drop / merge / delete per entry, so
+            customizations[] self-cleans as upstream catches up. Requires fetch-engine.
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,

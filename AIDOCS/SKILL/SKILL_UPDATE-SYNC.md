@@ -21,7 +21,21 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
 3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json`. Same as the local version with an empty manifest delta means already current. Clean up `INSTALL/` and stop. Anything else continues.
 
-4. **Apply the upgrade.** Preview first when uncertain:
+4. **Merge `customizations[]` (AI-driven, before the script upgrade).** `customizations[]` is not an opt-out from upstream - it is a merge hint. The script-level skip in copy / `file_delete` / `skill_delete` / `skill_rename` / `section_text_diff` is the fallback for headless runs. With AI present (the normal `-UpdateSync` invocation), merge first so each listed file picks up upstream improvements without losing local intent, and the entry self-cleans when no longer load-bearing.
+
+   Get the punch list:
+   ```bash
+   node AIDOCS/tools/engine.mjs merge-status
+   ```
+   The output groups each `customizations[]` entry by status. Walk it:
+
+   - **identical** - upstream content matches the project file. Drop the entry from `customizations[]`. The customization is no longer load-bearing.
+   - **diverged** - both sides changed. Read the project file and `INSTALL/engine/<same path>`, author a merged version that preserves the local intent (the reason it was customized) AND folds in the upstream changes (new sections, tightened wording, structural fixes). Write the merged content to the project file. If the merged result happens to equal upstream, drop the entry. Otherwise keep it.
+   - **upstream-absent** - the upstream tree lacks the file. Check the upstream `INSTALL/engine/AIDOCS/MANIFEST.json` for a `file_delete` op covering the path. If covered: judge whether the local file is still useful (keep it AND the entry, or delete it AND drop the entry). If not covered: the file is a project-custom skill or doc mistakenly listed - drop the entry, project-custom files survive by absence.
+
+   After the merge pass, write the trimmed `customizations[]` back to `_index.json`. Continue to step 5.
+
+5. **Apply the upgrade.** Preview first when uncertain:
    ```bash
    node AIDOCS/tools/engine.mjs upgrade --dry-run
    ```
@@ -33,16 +47,16 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    Reads `INSTALL/engine/AIDOCS/MANIFEST.json`, diffs against the project's `engine.operations_applied[]`, runs each missing operation, copies the engine-class paths with customization preservation, and writes a summary. See Operations and Customizations below for the rules.
 
-5. **Rebuild dispatch and verify.**
+6. **Rebuild dispatch and verify.**
    ```bash
    node AIDOCS/tools/engine.mjs sync
    node AIDOCS/tools/engine.mjs doctor
    ```
    `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the structural surface is clean. Read the doctor output. **A clean upgrade can still exit non-zero from pre-existing project content** - banned prose in CHANGELOG history, semicolons in over-long EXTENDED entries, sub-section budget hints, oversized buckets. Those are project debt for `/321 -Update` / `scrub --fix` to handle, not sync failures. Report them as pre-existing, do not retry the upgrade.
 
-6. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
+7. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 
-7. **Report.** Summarize: operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note (post-graduation cleanup, customized sections that were skipped) bubbles up to the user.
+8. **Report.** Summarize: merges applied and entries dropped (from step 4), operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note bubbles up to the user.
 
 ## Operations
 
@@ -81,15 +95,17 @@ A graduated project keeps `-Setup` deregistered. If the copy lands `SKILL_SETUP.
 
 ## Customizations
 
-Three things keep project edits from being overwritten on `-UpdateSync`:
+`customizations[]` is a **merge hint**, not an opt-out. Each entry is a project-relative path with local edits worth preserving. The default `-UpdateSync` flow with AI present (step 4 above) merges each entry against upstream and self-cleans the array as upstream catches up. The script-level skip in `upgrade` (copy step + `section_text_diff` + `file_delete` + `skill_delete` + `skill_rename`) is the fallback for headless runs.
 
-- **Project-custom files survive by absence.** A skill body (or any file in an engine-class path) with no counterpart in the source tree is never touched, because the copy walks the source. Most project-specific skills live this way.
-- **`customizations[]` opts a canonical file out.** Each entry is a project-relative path the user has deliberately edited and wants preserved. The `upgrade` command skips listed paths in the copy step, skips `section_text_diff` operations whose `file` is listed, and skips `file_delete` operations whose `file` is listed (all three reporting the skip). Remove a path from `customizations[]` to rejoin the upstream refresh flow on the next `-UpdateSync`.
-- **`--dry-run` previews everything without writing.** Run `upgrade --dry-run` first if uncertain. Same operations, same counts, no disk changes.
+Three things keep project edits from being lost on `-UpdateSync`:
+
+- **Project-custom files survive by absence.** A skill body (or any file in an engine-class path) with no counterpart in the source tree is never touched, because the copy walks the source. Most project-specific skills live this way - they do NOT belong in `customizations[]`, the array is for edits to canonical files.
+- **AI-driven merge (the default).** Step 4 walks `customizations[]`, classifies each entry via `merge-status`, and either drops the entry (upstream caught up), merges (local + upstream → preserved local intent + new upstream content), or judges the upstream-absent case. Self-cleaning: the array shrinks as merges land and upstream catches up to local intent.
+- **Script fallback (no AI present).** `upgrade` skips every path in `customizations[]` (copy + delete + rename + section_text_diff). The local file is preserved verbatim, no merge happens, and the entry stays. Surface the skipped paths so the user knows to re-run with AI later, or drop entries by hand if upstream already caught up.
 
 A drift check that flags an edited canonical file the user forgot to list is Phase B work. Until it lands, a canonical file edited without listing it in `customizations[]` will be overwritten on the next `-UpdateSync`. List it first.
 
-For a one-time override on a single operation (apply it even though the file is customized), edit the file by hand and add the operation name to `operations_applied[]` manually.
+**`--dry-run` previews everything without writing.** Run `upgrade --dry-run` first if uncertain. Same operations, same counts, no disk changes. The merge step (4) is also safe to walk read-only: `merge-status` is read-only, and you can author the merge into a scratch file before deciding whether to commit.
 
 ## Rules
 

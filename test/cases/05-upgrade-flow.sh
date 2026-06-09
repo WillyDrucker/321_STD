@@ -231,3 +231,44 @@ grep -q "^/321 -Setup" "$GR/.claude/skills/321/SKILL.md" && pass "router carries
 node "$GRENG" graduate >/dev/null 2>&1
 # After graduate: router has no -Setup line (without any upgrade step)
 grep -q "^/321 -Setup" "$GR/.claude/skills/321/SKILL.md" && fail "router still carries -Setup line after graduate (the reconciler did not run)" || pass "graduate pruned the -Setup quick-ref line directly"
+
+echo "=== T67: merge-status classifies customizations[] entries against the fetched upstream (AI merge punch list) ==="
+# Three entries cover all three states. The script provides the punch list; the AI
+# walks it during -UpdateSync to drop / merge / delete per entry.
+MS="$BASE/merge-status"
+node "$RENG" init "$MS" --name MsProj >/dev/null 2>&1
+MSENG="$MS/AIDOCS/tools/engine.mjs"
+MSSRC="$BASE/merge-status-src"
+mkdir -p "$MSSRC/AIDOCS" "$MSSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$MSSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$MSSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$MSSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$MSSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$MSSRC/.claude/skills/321/SKILL.md"
+printf '{ "operations": [] }\n' > "$MSSRC/AIDOCS/MANIFEST.json"
+# Identical case: local matches upstream verbatim (no customization in practice).
+# Diverged case: local has an extra marker the upstream lacks.
+printf '\nDIVERGED_LOCAL_MARKER\n' >> "$MS/AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md"
+# Upstream-absent case: local has a file the upstream tree never shipped.
+printf 'project-only canonical edit\n' > "$MS/AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/SKILL/SKILL_UPDATE-SESSION.md","AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md","AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$MS/AIDOCS/_index.json"
+node "$MSENG" fetch-engine --from "$MSSRC" >/dev/null 2>&1
+# Refuses cleanly when fetch was not run
+MSOUT_NOFETCH="$(node "$RENG" merge-status --root "$BASE/merge-status-bare" 2>&1)" || true
+MSREFUSE="$(cd "$MS" && rm -rf INSTALL/engine && node "$MSENG" merge-status 2>&1)"; MSREFCC=$?
+echo "$MSREFUSE" | grep -q "no fetched engine" && pass "merge-status reports no fetched engine when INSTALL/engine missing" || fail "no missing-fetch message"
+[ "$MSREFCC" = "20" ] && pass "merge-status exits 20 when fetch is missing" || fail "merge-status exit code on missing fetch was $MSREFCC (expected 20)"
+# Re-fetch for the real run
+node "$MSENG" fetch-engine --from "$MSSRC" >/dev/null 2>&1
+MSOUT="$(node "$MSENG" merge-status 2>&1)"
+echo "$MSOUT" | grep -q "identical (1)" && pass "merge-status reports the identical case (SKILL_UPDATE-SESSION.md untouched locally)" || fail "merge-status missed the identical case (output: $MSOUT)"
+echo "$MSOUT" | grep -q "AIDOCS/SKILL/SKILL_UPDATE-SESSION.md" && pass "merge-status names the identical entry" || fail "merge-status did not name the identical entry"
+echo "$MSOUT" | grep -q "diverged (1)" && pass "merge-status reports the diverged case (local has the extra marker)" || fail "merge-status missed the diverged case"
+echo "$MSOUT" | grep -q "AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md" && pass "merge-status names the diverged entry" || fail "merge-status did not name the diverged entry"
+echo "$MSOUT" | grep -q "upstream-absent (1)" && pass "merge-status reports the upstream-absent case (local file with no upstream)" || fail "merge-status missed the upstream-absent case"
+echo "$MSOUT" | grep -q "AIDOCS/SKILL/SKILL_NEVER-UPSTREAM.md" && pass "merge-status names the upstream-absent entry" || fail "merge-status did not name the upstream-absent entry"
+echo "$MSOUT" | grep -q "Check MANIFEST.json" && pass "merge-status surfaces the upstream-absent decision-tree hint" || fail "no MANIFEST.json hint for upstream-absent"
+# Empty customizations[]: clean no-op
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$MS/AIDOCS/_index.json"
+EMPTY="$(node "$MSENG" merge-status 2>&1)"
+echo "$EMPTY" | grep -q "nothing to merge" && pass "merge-status no-ops cleanly on empty customizations[]" || fail "merge-status did not report nothing-to-merge"
