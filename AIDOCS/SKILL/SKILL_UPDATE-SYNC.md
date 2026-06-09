@@ -19,7 +19,11 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    Lands the upstream engine in `INSTALL/engine`. With no flag, `fetch-engine` defaults `--repo` from `engine.upstream` (the registry already knows it). Pass `--repo <url>` to override or `--from <dir>` for a local checkout. A clone failure (offline, bad ref) is a non-zero exit. Report it and stop. The local engine keeps working.
 
-3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json`. Same as the local version with an empty manifest delta means already current. Clean up `INSTALL/` and stop. Anything else continues.
+3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json` and diff the source manifest against `engine.operations_applied[]`. Three cases:
+
+   - **Default mode, same version + empty manifest delta:** the engine is already current. Clean up `INSTALL/engine/` and stop here. The lean routine sync does not re-walk maintenance steps when there is nothing to upgrade.
+   - **`-FULL` mode, same version + empty manifest delta:** the engine is current but `-FULL` is the comprehensive sweep, so fall through to step 4 (`merge-status --auto-drop-clean`) and step 5 (`orphans --auto-drop-safe`) to surface customization drift and stale files even when the engine itself has not changed. Steps 6-8 will no-op cleanly.
+   - **Any other state** (version changed, missing manifest ops, or both): continue to step 4 to run the full flow.
 
 4. **Merge `customizations[]` (AI-driven, before the script upgrade).** `customizations[]` is not an opt-out from upstream - it is a merge hint. The script-level skip in copy / `file_delete` / `skill_delete` / `skill_rename` / `section_text_diff` is the fallback for headless runs. With AI present (the normal `-UpdateSync` invocation), merge first so each listed file picks up upstream improvements without losing local intent, and the entry self-cleans when no longer load-bearing.
 

@@ -78,8 +78,8 @@ export function cmdCommit(index, args) {
   // clear staging. recent_captured is a rolling window of the last FINGERPRINT_LIMIT
   // lifo_insert slugs across recent commits (newest first). The AI reads them via
   // `watermark` to answer "did I capture this arc?" without re-reading SESSION /
-  // MEMORY. Legacy state.json files from 0.1.9 / 0.1.10 carried the same data under
-  // `last_captured`; the read falls back to it during the transition window.
+  // MEMORY. The read falls back to the legacy `last_captured` key so a state.json
+  // laid by an older engine migrates forward on the next commit.
   for (const [key, content] of Object.entries(edited)) writeFileSync(resolveFile(index, key), content, "utf8");
   const state = loadState();
   const captured = [];

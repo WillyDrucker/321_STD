@@ -39,10 +39,10 @@ Always run `/321 -UpdateSession` first, so SESSION is current before this skill 
 SESSION (just refreshed) plus the conversation plus the codebase are the source of truth. MEMORY is the write target and the dedupe reference. **The watermark is your starting point. Do NOT re-read the conversation prefix before it unless `-FULL` was passed.**
 
 - `<PROJECT>_MEMORY.md`, `<PROJECT>_BACKLOG.md` (the live files, the dedupe references)
-- `node AIDOCS/tools/engine.mjs watermark --skill updatememory` (prints `last_committed_at` plus the slugs of the last run's captured bullets, on demand)
+- `node AIDOCS/tools/engine.mjs watermark --skill updatememory` (prints `last_committed_at` plus `recent_captured`, a rolling window of the slugs from the last few commits, on demand)
 - For Big-6 gap-fill: `package.json`, `_index.json`, framework / deploy configs, and the top-level layout.
 
-The watermark answers "what did I capture last time?" The live MEMORY.md and BACKLOG.md show the captured observations as content. Both let you skip work the previous pass already did.
+The watermark answers "did I capture this arc in the last few runs?" The live MEMORY.md and BACKLOG.md show the captured observations as content. Both let you skip work the previous passes already did.
 
 ## Step 3: Route each finding
 

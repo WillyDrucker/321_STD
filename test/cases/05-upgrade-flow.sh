@@ -233,8 +233,10 @@ node "$GRENG" graduate >/dev/null 2>&1
 grep -q "^/321 -Setup" "$GR/.claude/skills/321/SKILL.md" && fail "router still carries -Setup line after graduate (the reconciler did not run)" || pass "graduate pruned the -Setup quick-ref line directly"
 
 echo "=== T67: merge-status classifies customizations[] entries against the fetched upstream (AI merge punch list) ==="
-# Three entries cover all three states. The script provides the punch list; the AI
-# walks it during -UpdateSync to drop / merge / delete per entry.
+# Three entries cover three representative classes of the five-class taxonomy
+# (identical, diverged, upstream-absent). T73 covers the other two (both-absent,
+# local-absent). The script provides the punch list, the AI walks it during
+# -UpdateSync to drop / merge / delete per entry.
 MS="$BASE/merge-status"
 node "$RENG" init "$MS" --name MsProj >/dev/null 2>&1
 MSENG="$MS/AIDOCS/tools/engine.mjs"

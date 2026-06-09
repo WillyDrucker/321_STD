@@ -116,8 +116,9 @@ Commands:
             Read-only by default. The AI walks the output during -UpdateSync to
             decide per file (project-custom keep vs abandoned canonical drop), so
             no critical file is deleted by accident. --auto-drop-safe mechanically
-            drops the safe class only (engine-only paths: AIDOCS/tools/lib +
-            AIDOCS/tools/*.md), leaving the two review classes for AI judgment.
+            drops the safe class only (engine-only paths: AIDOCS/tools/lib/ and
+            top-level AIDOCS/tools/*.md - engine.mjs is always present upstream so
+            it is excluded), leaving the two review classes for AI judgment.
             Honors customizations[]. Requires fetch-engine.
             [--auto-drop-safe]
   validate  Check a staging file's actions are well-formed. Read-only.

@@ -96,7 +96,7 @@ export function cmdState(_index, args) {
     // memory_update) do not linger beside the new ones. Preserve recent_captured if a
     // commit had stamped fingerprints before the reconcile pass, so the AI's "did I
     // capture this arc?" lookup survives the gate flip. Fall back to the legacy
-    // last_captured key for state.json laid by 0.1.9 / 0.1.10 commits.
+    // last_captured key so an older state.json still carries forward.
     const now = new Date().toISOString();
     const normalized = { reconcile_pending: false };
     for (const skill of SKILLS) {

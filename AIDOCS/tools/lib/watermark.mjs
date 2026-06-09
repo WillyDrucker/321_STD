@@ -20,7 +20,7 @@ export function cmdWatermark(_index, args) {
       console.log(`${name}: never committed.`);
       continue;
     }
-    // Fall back to the 0.1.9 / 0.1.10 last_captured key during the transition window.
+    // Fall back to the legacy last_captured key so an older state.json still reads.
     const captured = Array.isArray(entry.recent_captured) ? entry.recent_captured
       : Array.isArray(entry.last_captured) ? entry.last_captured
       : [];

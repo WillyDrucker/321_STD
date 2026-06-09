@@ -1,12 +1,9 @@
 // upgradeOperations.mjs - the named manifest operations the upgrade command
-// applies. Each handler takes (op, index, source, root, dryRun) and returns
-// { applied, note }. applied=false means the op was inapplicable (already
-// effective, or skipped by customizations) and the call was a clean no-op
-// (idempotent). dryRun=true means the handler computes its decision (existence
-// checks, customization gate, section lookup) but never writes to disk - the
-// caller still gets a faithful applied / note pair to report. The HANDLERS table
-// maps op.type to its handler so the driver dispatches uniformly. New op types
-// land in this file - the driver's loop does not need to change.
+// applies. Each handler returns { applied, deferred?, note }: applied=true did the
+// change, deferred=true is a customization-skip that stays in missing[] for the
+// next run, and applied=false (no deferred) is a clean no-op (idempotent: already-
+// effective). dryRun=true computes the decision without writing. HANDLERS maps
+// op.type to handler so the driver dispatches uniformly. New op types land here.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";

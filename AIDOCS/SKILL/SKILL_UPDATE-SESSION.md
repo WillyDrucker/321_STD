@@ -55,9 +55,9 @@ The conversation is the source of truth. SESSION.md is a write target and the de
 
 - `AIDOCS/<PROJECT>_SESSION.md` (the live file, the dedupe reference)
 - Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`
-- `node AIDOCS/tools/engine.mjs watermark --skill updatesession` (prints `last_committed_at` plus the slugs of the last run's captured bullets, on demand)
+- `node AIDOCS/tools/engine.mjs watermark --skill updatesession` (prints `last_committed_at` plus `recent_captured`, a rolling window of the slugs from the last few commits, on demand)
 
-The watermark answers "what did I capture last time?" The live SESSION.md shows the captured arcs as content. Both let you skip events the previous pass already logged.
+The watermark answers "did I capture this arc in the last few runs?" The live SESSION.md shows the captured arcs as content. Both let you skip events the previous passes already logged.
 
 ## Step 1: Allocate each finding
 
