@@ -408,3 +408,32 @@ node "$RENG" init "$CLEAN" --name CleanProj >/dev/null 2>&1
 node "$CLEAN/AIDOCS/tools/engine.mjs" fetch-engine --from "$ORPSRC" >/dev/null 2>&1
 ORPCLEAN="$(node "$CLEAN/AIDOCS/tools/engine.mjs" orphans 2>&1)"
 echo "$ORPCLEAN" | grep -q "nothing to clean" && pass "orphans reports nothing-to-clean on a freshly synced project" || fail "no nothing-to-clean message on clean project (output: $ORPCLEAN)"
+
+echo "=== T76: orphans seed-path regression - relocated project seed still compares against canonical upstream by basename ==="
+# Codex caught a bug in 0.1.12: listAutoMemoryFiles used the project's auto_memory.seed
+# for BOTH project and upstream scans. A project with a relocated seed would misclassify
+# every canonical rule as review-automemory (upstream scan would look in the wrong path
+# inside INSTALL/engine and find nothing). The 0.1.13 fix hardcodes the canonical seed
+# for the upstream scan and compares basenames so a relocated seed still recognizes
+# canonical rules. T76 verifies the fix end-to-end.
+SP="$BASE/seed-path"
+node "$RENG" init "$SP" --name SpProj >/dev/null 2>&1
+SPENG="$SP/AIDOCS/tools/engine.mjs"
+# Relocate the project seed to a non-canonical path. Move the existing rules into it.
+mkdir -p "$SP/AIDOCS/project-rules"
+cp "$SP/AIDOCS/automemory/"feedback_*.md "$SP/AIDOCS/project-rules/" 2>/dev/null
+cp "$SP/AIDOCS/automemory/user_name.md" "$SP/AIDOCS/project-rules/" 2>/dev/null
+# Update the registry to point auto_memory.seed at the relocated path
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory.seed="./AIDOCS/project-rules";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SP/AIDOCS/_index.json"
+# Plant a project-only rule in the relocated seed (this SHOULD show as review-automemory)
+printf '# Project rule\n' > "$SP/AIDOCS/project-rules/project_relocated_only.md"
+# Fetch upstream (the source has its canonical AIDOCS/automemory layout)
+node "$SPENG" fetch-engine --from "$ORPSRC" >/dev/null 2>&1
+SPOUT="$(node "$SPENG" orphans 2>&1)"
+# The canonical rules (feedback_*.md, user_name.md) MUST NOT show as orphans even though
+# they live at a non-canonical project path - the basename comparison handles this.
+echo "$SPOUT" | grep -q "feedback_naming.md" && fail "canonical feedback_naming.md misclassified as review-automemory (basename comparison broken)" || pass "canonical feedback_naming.md recognized despite relocated project seed"
+echo "$SPOUT" | grep -q "feedback_lean_docs.md" && fail "canonical feedback_lean_docs.md misclassified (basename comparison broken)" || pass "canonical feedback_lean_docs.md recognized despite relocated project seed"
+echo "$SPOUT" | grep -q "user_name.md" && fail "canonical user_name.md misclassified (basename comparison broken)" || pass "canonical user_name.md recognized despite relocated project seed"
+# The genuine project-only rule SHOULD show as review-automemory
+echo "$SPOUT" | grep -q "project_relocated_only.md" && pass "project-only rule at relocated seed correctly flagged as review-automemory" || fail "project-only rule not flagged (output: $SPOUT)"

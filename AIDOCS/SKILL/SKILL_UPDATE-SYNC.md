@@ -22,7 +22,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json` and diff the source manifest against `engine.operations_applied[]`. Three cases:
 
    - **Default mode, same version + empty manifest delta:** the engine is already current. Clean up `INSTALL/engine/` and stop here. The lean routine sync does not re-walk maintenance steps when there is nothing to upgrade.
-   - **`-FULL` mode, same version + empty manifest delta:** the engine is current but `-FULL` is the comprehensive sweep, so fall through to step 4 (`merge-status --auto-drop-clean`) and step 5 (`orphans --auto-drop-safe`) to surface customization drift and stale files even when the engine itself has not changed. Steps 6-8 will no-op cleanly.
+   - **`-FULL` mode, same version + empty manifest delta:** the engine is current but `-FULL` is the comprehensive sweep, so fall through to step 4 (`merge-status --auto-drop-clean`) and step 5 (`orphans --auto-drop-safe`) to surface customization drift and stale files even when the engine itself has not changed. Steps 6-8 still execute (snapshot, copy of identical engine-class files, registry rewrite, sync rebuild, doctor) but produce no real diff against the existing tree - the manifest delta is empty and the canonical content already matches upstream.
    - **Any other state** (version changed, missing manifest ops, or both): continue to step 4 to run the full flow.
 
 4. **Merge `customizations[]` (AI-driven, before the script upgrade).** `customizations[]` is not an opt-out from upstream - it is a merge hint. The script-level skip in copy / `file_delete` / `skill_delete` / `skill_rename` / `section_text_diff` is the fallback for headless runs. With AI present (the normal `-UpdateSync` invocation), merge first so each listed file picks up upstream improvements without losing local intent, and the entry self-cleans when no longer load-bearing.
@@ -55,9 +55,9 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    The output groups orphans into three classes:
 
-   - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md` + `engine.mjs`). No user file lives in these paths. Mechanically safe to drop. Honors `customizations[]`.
-   - **review-skill** - files in `AIDOCS/SKILL/` with no upstream counterpart. Either a project-custom skill (the project authored it, keep) or an abandoned canonical (upstream deleted the file but no `skill_delete` / `file_delete` op was added, drop). Decide per file. List in `customizations[]` if you want to preserve a project-custom skill through future syncs.
-   - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom feedback rule (keep + `customizations[]`).
+   - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md`). No user file lives in these paths (`engine.mjs` is always present upstream so it never appears here). Mechanically safe to drop. Honors `customizations[]`.
+   - **review-skill** - files in `AIDOCS/SKILL/` with no upstream counterpart. Either a project-custom skill (the project authored it, keep) or an abandoned canonical (upstream deleted the file but no `skill_delete` / `file_delete` op was added, drop). Decide per file. Project-custom skills do NOT belong in `customizations[]` - the array is for edits to canonical files. Project-custom files survive by absence in the copy step and will re-appear in this class on each sync as a reminder.
+   - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom feedback rule (keep). Auto-memory files are seeded write-if-missing by `init` and `automemory_add`, so project-custom rules survive without listing in `customizations[]`.
 
    After the review pass, drop or keep per entry. Continue to step 6.
 

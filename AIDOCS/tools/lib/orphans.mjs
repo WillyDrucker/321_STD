@@ -68,7 +68,7 @@ function classify(index) {
   const root = repoRoot();
   const source = installEngineDir();
   const customizations = new Set(index.customizations || []);
-  // Project may have a customized seed path (rare); upstream always uses the canonical.
+  // Project may have a customized seed path (rare). Upstream always uses the canonical.
   const projectSeed = (index.auto_memory?.seed || `./${CANONICAL_SEED}`).replace(/^\.\//, "");
   const projectEngine = listEngineOnlyFiles(root);
   const projectSkill = listSkillFiles(root);
@@ -122,11 +122,11 @@ export function cmdOrphans(index, args = []) {
 
   console.log(`orphans: ${total} ${plural(total, "file", "file(s)")} in project not present in upstream at ${result.source}`);
   if (safe.length > 0) {
-    console.log(`  safe (${safe.length}) - engine-only paths (AIDOCS/tools/lib/ + AIDOCS/tools/PATTERN-*.md + UPDATE-RECONCILE.md), mechanically safe to drop with --auto-drop-safe:`);
+    console.log(`  safe (${safe.length}) - engine-only paths (AIDOCS/tools/lib/ + top-level AIDOCS/tools/*.md), mechanically safe to drop with --auto-drop-safe:`);
     for (const r of safe) console.log(`    - ${r}`);
   }
   if (reviewSkill.length > 0) {
-    console.log(`  review-skill (${reviewSkill.length}) - in AIDOCS/SKILL/, decide per file. A project-custom skill body (the project authored it) keeps - these do NOT belong in customizations[] (the array is for edits to canonical files); project-custom files survive by absence in the copy step and will re-appear here each sync as a reminder. An abandoned canonical (deleted upstream without a file_delete / skill_delete op) drops:`);
+    console.log(`  review-skill (${reviewSkill.length}) - in AIDOCS/SKILL/, decide per file. A project-custom skill body (the project authored it) keeps - these do NOT belong in customizations[] (the array is for edits to canonical files). Project-custom files survive by absence in the copy step and will re-appear here each sync as a reminder. An abandoned canonical (deleted upstream without a file_delete / skill_delete op) drops:`);
     for (const r of reviewSkill) console.log(`    - ${r}`);
   }
   if (reviewAuto.length > 0) {
