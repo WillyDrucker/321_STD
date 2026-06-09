@@ -1,10 +1,9 @@
 // mergeStatus.mjs - the merge punch list for customizations[] against the fetched
-// upstream tree at INSTALL/engine. Five classes per entry: identical, diverged,
-// both_absent (no file either side), local_absent (file only upstream), and
-// upstream_absent (file only in project). --auto-drop-clean mechanically drops
-// identical and both_absent (no file at risk); local_absent and upstream_absent
-// stay for AI judgment because dropping the customization would let the next
-// upgrade re-install or delete a file the user intentionally diverged from.
+// upstream at INSTALL/engine. Classifies each entry as identical / diverged /
+// both_absent / local_absent / upstream_absent. --auto-drop-clean drops only the
+// two no-file-at-risk classes (identical, both_absent); the three judgment classes
+// stay for AI review because dropping would let upgrade restore, delete, or
+// overwrite a file the user has a position on.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
