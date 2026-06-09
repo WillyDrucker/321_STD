@@ -1,4 +1,5 @@
-// migrate-archive.mjs - the deterministic A backstop for migration: move a
+// migrateArchive.mjs - the deterministic A backstop for migration, backing the
+// `migrate-archive` CLI command: move a
 // project's existing 321-shape content aside into AIDOCS/<NAME>_SETUP_ARCHIVE/ so
 // init can lay a clean structure on top. Move, never delete - the archive is the
 // recovery net. Operates on the active root (--root). Known-shape paths only - the
@@ -7,7 +8,7 @@
 // moved, making re-runs safe. The one exception to move-only: it re-lays a canonical
 // .gitignore at root right after archiving the old one, so the project is never without
 // ignore rules during the reinstall (the old copy is preserved in the archive for the
-// migrate-restore union-merge).
+// migrateRestore union-merge).
 //
 // Two hardenings the archive owns on top of the moves:
 // 1. Pre-flight: detect tracked content deleted in the worktree but present in HEAD,
@@ -16,7 +17,7 @@
 // 2. Post-flight: write MANIFEST.json into the archive recording each moved path with
 //    its detected role (memory_extended, session_extended, dev_standards, root_doc,
 //    registry, automemory_seed, etc) and the old project-name prefix. The reconcile
-//    pass and migrate-import read it instead of re-deriving from filenames.
+//    pass and migrateImport read it instead of re-deriving from filenames.
 
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";

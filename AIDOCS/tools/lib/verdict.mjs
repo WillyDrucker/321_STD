@@ -121,7 +121,6 @@ function suggestEntries(root) {
   return out;
 }
 
-// verdict --suggest [--out <file>]     draft a candidate verdict from a heuristic scan.
 function suggestVerdict(args) {
   const root = repoRoot();
   // The draft lands under the project (default TEMP/). An explicit --out is contained
@@ -175,6 +174,7 @@ export function cmdVerdict(args) {
     if (e.action === "move") { renameSync(src, dst); counts.move++; }
     else { cpSync(src, dst, { recursive: true }); counts.copy++; }
   }
-  console.log(`verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.kept ? `, ${counts.kept} kept (already archived)` : ""}${counts.missing ? `, ${counts.missing} missing` : ""} -> ${archive} (move, not delete).`);
-  installLog(root, `verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.kept ? `, ${counts.kept} kept (already archived)` : ""}${counts.missing ? `, ${counts.missing} missing` : ""} into AIDOCS/${name}_SETUP_ARCHIVE.`);
+  const summary = `verdict: moved ${counts.move}, copied ${counts.copy}, left ${counts.leave}${counts.kept ? `, ${counts.kept} kept (already archived)` : ""}${counts.missing ? `, ${counts.missing} missing` : ""}`;
+  console.log(`${summary} -> ${archive} (move, not delete).`);
+  installLog(root, `${summary} into AIDOCS/${name}_SETUP_ARCHIVE.`);
 }

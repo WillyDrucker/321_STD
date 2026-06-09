@@ -40,9 +40,9 @@ export function authoredTargets(index) {
   if (existsSync(toolsDir)) {
     for (const f of readdirSync(toolsDir).filter((f) => /^(PATTERN-.+|UPDATE-RECONCILE)\.md$/.test(f))) set.add(join(toolsDir, f));
   }
-  // README (the public front door) is ours. WDDOCS is scanned separately at warning-
-  // tier (wddocsTargets) - it is user / working content (design, business, research),
-  // not our authored output, so banned prose there does not gate.
+  // README (the public front door) is ours. WDDOCS is deliberately NOT a target - it
+  // is user / working content (design, business, research), not our authored output,
+  // so its prose never gates.
   const readme = fromRoot("./README.md");
   if (existsSync(readme)) set.add(readme);
   // feedback_no_em_dashes.md is the one self-reference excluded: it documents the

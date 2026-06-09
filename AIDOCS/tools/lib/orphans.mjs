@@ -4,7 +4,7 @@
 // abandoned canonical, AI judges). --auto-drop-safe drops only the safe class.
 
 import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { installEngineDir, repoRoot } from "./paths.mjs";
 
@@ -70,35 +70,18 @@ function classify(index) {
   const customizations = new Set(index.customizations || []);
   // Project may have a customized seed path (rare). Upstream always uses the canonical.
   const projectSeed = (index.auto_memory?.seed || `./${CANONICAL_SEED}`).replace(/^\.\//, "");
-  const projectEngine = listEngineOnlyFiles(root);
-  const projectSkill = listSkillFiles(root);
-  const projectAuto = listAutoMemoryFiles(root, projectSeed);
-  const upstreamEngine = listEngineOnlyFiles(source);
-  const upstreamSkill = listSkillFiles(source);
-  const upstreamAuto = listAutoMemoryFiles(source, CANONICAL_SEED);
 
-  const safe = [];
-  for (const rel of projectEngine) {
-    if (upstreamEngine.has(rel)) continue;
-    if (customizations.has(rel)) continue;
-    safe.push(rel);
-  }
-  const reviewSkill = [];
-  for (const rel of projectSkill) {
-    if (upstreamSkill.has(rel)) continue;
-    if (customizations.has(rel)) continue;
-    reviewSkill.push(rel);
-  }
-  const reviewAuto = [];
-  // Compare on basename for review-automemory so a project's customized seed path
-  // does not cause spurious diffs against the canonical upstream layout.
-  const upstreamAutoBasenames = new Set([...upstreamAuto].map((rel) => rel.split("/").pop()));
-  for (const rel of projectAuto) {
-    const base = rel.split("/").pop();
-    if (upstreamAutoBasenames.has(base)) continue;
-    if (customizations.has(rel)) continue;
-    reviewAuto.push(rel);
-  }
+  // A project file is an orphan when its key is absent upstream and the path is not
+  // customization-guarded. The key defaults to the rel path; review-automemory keys on
+  // basename so a project's customized seed path does not cause spurious diffs against
+  // the canonical upstream layout.
+  const orphansIn = (project, upstreamKeys, keyOf = (rel) => rel) =>
+    [...project].filter((rel) => !upstreamKeys.has(keyOf(rel)) && !customizations.has(rel));
+
+  const safe = orphansIn(listEngineOnlyFiles(root), listEngineOnlyFiles(source));
+  const reviewSkill = orphansIn(listSkillFiles(root), listSkillFiles(source));
+  const upstreamAutoBasenames = new Set([...listAutoMemoryFiles(source, CANONICAL_SEED)].map((rel) => basename(rel)));
+  const reviewAuto = orphansIn(listAutoMemoryFiles(root, projectSeed), upstreamAutoBasenames, (rel) => basename(rel));
   return { safe, reviewSkill, reviewAuto, source };
 }
 
@@ -120,7 +103,7 @@ export function cmdOrphans(index, args = []) {
     return;
   }
 
-  console.log(`orphans: ${total} ${plural(total, "file", "file(s)")} in project not present in upstream at ${result.source}`);
+  console.log(`orphans: ${total} ${plural(total, "file", "files")} in project not present in upstream at ${result.source}`);
   if (safe.length > 0) {
     console.log(`  safe (${safe.length}) - engine-only paths (AIDOCS/tools/lib/ + top-level AIDOCS/tools/*.md), mechanically safe to drop with --auto-drop-safe:`);
     for (const r of safe) console.log(`    - ${r}`);

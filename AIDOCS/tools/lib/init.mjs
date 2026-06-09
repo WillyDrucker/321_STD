@@ -5,8 +5,7 @@
 // substituted to the target name - this is where the <PROJECT> prefix is finally
 // instantiated to a real name.
 
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { flag, validName } from "./args.mjs";
@@ -55,10 +54,10 @@ function recognizeTarget(target) {
 // The external memory path to seed and record (absolute): an explicit override wins, else
 // a reinstall's recorded path, else the derived default. Recording the resolved value (not
 // re-deriving) is what insulates a project from a Claude Code key-encoding change.
-async function resolveMemoryPath(args, target, name) {
+function resolveMemoryPath(args, target, name) {
   const explicit = flag(args, "--memory-path") || process.env.STD321_MEMORY_PATH;
   if (explicit) return resolve(process.cwd(), explicit);
-  const recalled = await recallMemoryPath(target, name);
+  const recalled = recallMemoryPath(target, name);
   return recalled ? fromHomeRef(recalled) : claudeMemoryDir(target);
 }
 
@@ -80,7 +79,7 @@ function seedExternalMemory(seedDir, externalAbs) {
   return n;
 }
 
-export async function cmdInit(args) {
+export function cmdInit(args) {
   const targetArg = args[0];
   if (!targetArg || targetArg.startsWith("--")) {
     console.error("init requires a target directory as the first argument. Usage: init <target-dir> --name <PROJECT>");
@@ -97,7 +96,7 @@ export async function cmdInit(args) {
   // Privacy mode gates what the project tracks (Tier B: memory, auto-memory, WDDOCS docs).
   // Explicit --privacy wins, else recall a reinstall's mode, else default private.
   let privacy = flag(args, "--privacy");
-  if (!privacy) privacy = await recallPrivacy(target, name);
+  if (!privacy) privacy = recallPrivacy(target, name);
   if (!PRIVACY_MODES.includes(privacy)) {
     console.error(`init: --privacy must be one of ${PRIVACY_MODES.join(" / ")} (got "${privacy}").`);
     process.exit(5);
@@ -120,18 +119,18 @@ export async function cmdInit(args) {
   const renaming = hasForeignDataDoc(join(target, "AIDOCS"), name);
 
   const sourceIndex = join(SOURCE_ROOT, "AIDOCS", "_index.json");
-  const source = JSON.parse(await readFile(sourceIndex, "utf8"));
+  const source = JSON.parse(readFileSync(sourceIndex, "utf8"));
   const sourceName = source.project_name;
   const sub = (s) => s.split(sourceName).join(name);
 
-  await mkdir(join(target, "AIDOCS"), { recursive: true });
+  mkdirSync(join(target, "AIDOCS"), { recursive: true });
 
   // 1. Project-agnostic, verbatim: the engine, the skill bodies, and the router. Skill
   // bodies reference files by domain-owned key, not by project name, so they need no
   // substitution. Auto-memory follows as the one write-if-missing exception.
   // The engine, minus machine-local runtime files: a dogfooded source may carry a
   // staging/ or state.json, which belong to the source project, not a fresh one.
-  await cp(join(SOURCE_ROOT, "AIDOCS", "tools"), join(target, "AIDOCS", "tools"), {
+  cpSync(join(SOURCE_ROOT, "AIDOCS", "tools"), join(target, "AIDOCS", "tools"), {
     recursive: true,
     filter: (src) => { const b = src.split(/[\\/]/).pop(); return b !== "state.json" && b !== "staging"; },
   });
@@ -142,12 +141,12 @@ export async function cmdInit(args) {
   // the canonical set, and the post-archive reinstall sees an emptied tree and lays it
   // fresh too.
   const automemoryDst = join(target, "AIDOCS", "automemory");
-  if (force || !existsSync(automemoryDst)) await cp(join(SOURCE_ROOT, "AIDOCS", "automemory"), automemoryDst, { recursive: true });
-  await cp(join(SOURCE_ROOT, "AIDOCS", "SKILL"), join(target, "AIDOCS", "SKILL"), { recursive: true });
+  if (force || !existsSync(automemoryDst)) cpSync(join(SOURCE_ROOT, "AIDOCS", "automemory"), automemoryDst, { recursive: true });
+  cpSync(join(SOURCE_ROOT, "AIDOCS", "SKILL"), join(target, "AIDOCS", "SKILL"), { recursive: true });
   const routerSrc = join(SOURCE_ROOT, ".claude", "skills", "321", "SKILL.md");
   if (existsSync(routerSrc)) {
-    await mkdir(join(target, ".claude", "skills", "321"), { recursive: true });
-    await cp(routerSrc, join(target, ".claude", "skills", "321", "SKILL.md"));
+    mkdirSync(join(target, ".claude", "skills", "321"), { recursive: true });
+    cpSync(routerSrc, join(target, ".claude", "skills", "321", "SKILL.md"));
   }
 
   // The onboarding reference files (INSTALL/setup.md and friends): read-and-execute
@@ -157,7 +156,7 @@ export async function cmdInit(args) {
   // those are runtime, not template.
   const installSrc = join(SOURCE_ROOT, "INSTALL");
   if (existsSync(installSrc)) {
-    await cp(installSrc, join(target, "INSTALL"), {
+    cpSync(installSrc, join(target, "INSTALL"), {
       recursive: true,
       filter: (src) => { const b = src.split(/[\\/]/).pop(); return b !== "engine" && b !== "INSTALL.log"; },
     });
@@ -171,15 +170,15 @@ export async function cmdInit(args) {
   // Resolve and record Claude Code's external memory path (auto_memory.path) - the runtime
   // source of truth. Stored home-relative so a tracked _index.json carries no absolute home
   // path. The seed below copies the canonical rules into it.
-  const memAbs = await resolveMemoryPath(args, target, name);
+  const memAbs = resolveMemoryPath(args, target, name);
   const memRef = toHomeRef(memAbs);
   const scaffolds = [];
   for (const f of VERBATIM_ROOT) {
     const srcAbs = join(SOURCE_ROOT, f);
-    if (existsSync(srcAbs)) scaffolds.push({ dst: join(target, f), body: await readFile(srcAbs, "utf8") });
+    if (existsSync(srcAbs)) scaffolds.push({ dst: join(target, f), body: readFileSync(srcAbs, "utf8") });
   }
   for (const f of SUBSTITUTED_ROOT) {
-    scaffolds.push({ dst: join(target, f), body: sub(await readFile(join(SOURCE_ROOT, f), "utf8")) });
+    scaffolds.push({ dst: join(target, f), body: sub(readFileSync(join(SOURCE_ROOT, f), "utf8")) });
   }
   // _index.json carries the resolved privacy mode, overriding the source's "full"
   // template mode. Re-serialized from the parsed source (2-space, same key order), then
@@ -193,7 +192,7 @@ export async function cmdInit(args) {
   // fork URL survives a reinstall because _index.json is write-if-missing, not by us
   // refusing to overwrite the scaffold value.
   const explicitUpstream = flag(args, "--upstream") || process.env.STD321_UPSTREAM || "";
-  const recalledUpstream = explicitUpstream ? "" : await recallUpstream(target, name);
+  const recalledUpstream = explicitUpstream ? "" : recallUpstream(target, name);
   const upstream = explicitUpstream || recalledUpstream;
   const idxObj = { ...source, privacy, auto_memory: { ...source.auto_memory, path: memRef } };
   if (upstream) {
@@ -207,14 +206,14 @@ export async function cmdInit(args) {
   if (!renaming) {
     for (const rel of Object.values(source.files)) {
       const srcAbs = join(SOURCE_ROOT, rel.replace(/^\.\//, ""));
-      scaffolds.push({ dst: join(target, sub(rel).replace(/^\.\//, "")), body: sub(await readFile(srcAbs, "utf8")) });
+      scaffolds.push({ dst: join(target, sub(rel).replace(/^\.\//, "")), body: sub(readFileSync(srcAbs, "utf8")) });
     }
   }
   let wrote = 0, kept = 0;
   for (const { dst, body } of scaffolds) {
     if (!force && existsSync(dst)) { kept++; continue; }
-    await mkdir(dirname(dst), { recursive: true });
-    await writeFile(dst, body, "utf8");
+    mkdirSync(dirname(dst), { recursive: true });
+    writeFileSync(dst, body, "utf8");
     wrote++;
   }
   console.log(`  scaffold: ${wrote} written, ${kept} preserved${force ? " (--force)" : ""}.`);
@@ -224,14 +223,14 @@ export async function cmdInit(args) {
   // name-based SETUP_ARCHIVE is the migration recovery-net home, preseeded so
   // migrate-archive has a place to move content into.
   for (const d of [...STOCK_DIRS, `AIDOCS/${name}_SETUP_ARCHIVE`]) {
-    await mkdir(join(target, d), { recursive: true });
-    await writeFile(join(target, d, ".gitkeep"), "", "utf8");
+    mkdirSync(join(target, d), { recursive: true });
+    writeFileSync(join(target, d, ".gitkeep"), "", "utf8");
   }
   // public hides the auto-memory content (its rules + the user profile), so a .gitkeep
   // keeps the dir in the published skeleton. private / full track the content directly.
   if (privacy === "public") {
-    await mkdir(automemoryDst, { recursive: true });
-    await writeFile(join(automemoryDst, ".gitkeep"), "", "utf8");
+    mkdirSync(automemoryDst, { recursive: true });
+    writeFileSync(join(automemoryDst, ".gitkeep"), "", "utf8");
   }
 
   // Seed Claude Code's external memory from the in-repo seed (the runtime source of truth),

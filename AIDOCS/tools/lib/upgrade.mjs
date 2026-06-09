@@ -204,11 +204,10 @@ export function cmdUpgrade(index, args) {
 // (the operator can re-fetch as a fallback).
 function snapshotPriorEngine(root) {
   const dst = join(root, "TEMP", "engine-backup-pre-upgrade");
-  const items = ["AIDOCS/tools", "AIDOCS/SKILL", ".claude/skills/321/SKILL.md"];
   try {
     if (existsSync(dst)) rmSync(dst, { recursive: true, force: true });
     mkdirSync(dst, { recursive: true });
-    for (const rel of items) {
+    for (const rel of ENGINE_CLASS) {
       const src = join(root, rel);
       if (!existsSync(src)) continue;
       const dstPath = join(dst, rel);

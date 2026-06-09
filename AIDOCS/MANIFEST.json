@@ -31,6 +31,11 @@
       "file": "AIDOCS/tools/SYNC.md"
     },
     {
+      "name": "delete_lib_fetch_engine_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/fetch-engine.mjs"
+    },
+    {
       "name": "rename_files_memoryupdate_memory",
       "type": "dictionary_rename",
       "dictionary": "files",
@@ -190,6 +195,31 @@
       "name": "delete_stale_staging_memory_example",
       "type": "file_delete",
       "file": "AIDOCS/tools/staging/memory-update.example.json"
+    },
+    {
+      "name": "delete_lib_migrate_archive_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/migrate-archive.mjs"
+    },
+    {
+      "name": "delete_lib_migrate_import_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/migrate-import.mjs"
+    },
+    {
+      "name": "delete_lib_migrate_import_audit_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/migrate-import-audit.mjs"
+    },
+    {
+      "name": "delete_lib_migrate_normalize_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/migrate-normalize.mjs"
+    },
+    {
+      "name": "delete_lib_migrate_restore_kebab",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/migrate-restore.mjs"
     }
   ]
 }

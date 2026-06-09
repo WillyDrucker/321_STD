@@ -1,6 +1,6 @@
-// migrate-normalize.mjs - the token rewrites applied to archived content as it
-// enters the canonical structure during a migration. Shared by migrate-import (the
-// EXTENDED scavenge) and migrate-restore (the config-section copy), so a legacy
+// migrateNormalize.mjs - the token rewrites applied to archived content as it
+// enters the canonical structure during a migration. Shared by migrateImport (the
+// EXTENDED scavenge) and migrateRestore (the config-section copy), so a legacy
 // install and a project rename normalize the same way through both lanes.
 
 function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }

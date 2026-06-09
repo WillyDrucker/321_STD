@@ -42,6 +42,16 @@ export function reconcilePending() {
   return loadState().reconcile_pending === true;
 }
 
+// The rolling fingerprint window for a skill's state entry, with the legacy key
+// honored: an older state.json carries last_captured, the current schema
+// recent_captured. Readers treat them as one field through this accessor, and the
+// next commit writes the canonical key, so the legacy name migrates forward on its own.
+export function recentCaptured(entry) {
+  if (Array.isArray(entry?.recent_captured)) return entry.recent_captured;
+  if (Array.isArray(entry?.last_captured)) return entry.last_captured;
+  return [];
+}
+
 // A cross-project doc ref (an un-renamed <Other>_MEMORY.md after a rename migration)
 // or an unresolved import marker is the signature of an incomplete reconcile. The
 // data lanes are scanned, the project's own name is the baseline, so any other
@@ -101,8 +111,8 @@ export function cmdState(_index, args) {
     const normalized = { reconcile_pending: false };
     for (const skill of SKILLS) {
       const entry = { runs: state[skill]?.runs || 0, last_committed_at: now };
-      const recent = state[skill]?.recent_captured ?? state[skill]?.last_captured;
-      if (Array.isArray(recent)) entry.recent_captured = recent;
+      const recent = recentCaptured(state[skill]);
+      if (recent.length) entry.recent_captured = recent;
       normalized[skill] = entry;
     }
     saveState(normalized);

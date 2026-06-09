@@ -4,7 +4,7 @@
 // answer "did I capture this arc?" without re-reading SESSION / MEMORY.
 
 import { flag } from "./args.mjs";
-import { loadState, SKILLS } from "./state.mjs";
+import { loadState, recentCaptured, SKILLS } from "./state.mjs";
 
 export function cmdWatermark(_index, args) {
   const skill = flag(args, "--skill");
@@ -20,10 +20,7 @@ export function cmdWatermark(_index, args) {
       console.log(`${name}: never committed.`);
       continue;
     }
-    // Fall back to the legacy last_captured key so an older state.json still reads.
-    const captured = Array.isArray(entry.recent_captured) ? entry.recent_captured
-      : Array.isArray(entry.last_captured) ? entry.last_captured
-      : [];
+    const captured = recentCaptured(entry);
     console.log(`${name}:`);
     console.log(`  last_committed_at: ${entry.last_committed_at}`);
     console.log(`  runs: ${entry.runs || 0}`);

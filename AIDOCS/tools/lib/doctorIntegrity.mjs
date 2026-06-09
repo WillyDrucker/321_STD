@@ -216,7 +216,7 @@ function checkUpgradeSchema(index) {
     else {
       for (const path of custom) {
         if (typeof path !== "string") { issues.push(`customizations has a non-string entry: ${JSON.stringify(path)}`); continue; }
-        if (!existsSync(fromRoot(`./${path}`.replace(/^\.\/\.\//, "./")))) issues.push(`customizations entry "${path}" points to a missing file`);
+        if (!existsSync(fromRoot(path))) issues.push(`customizations entry "${path}" points to a missing file`);
       }
     }
   }

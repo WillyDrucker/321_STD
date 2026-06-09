@@ -1,5 +1,6 @@
-// migrate-restore.mjs - the deterministic restore lane, the mirror of
-// migrate-archive. After init relays a clean structure, this layers the project's
+// migrateRestore.mjs - the deterministic restore lane, the mirror of migrateArchive,
+// backing the `migrate-restore` CLI command. After init relays a clean structure,
+// this layers the project's
 // own content back from AIDOCS/<NAME>_SETUP_ARCHIVE/: user docs (WDDOCS) verbatim, a
 // union-merge of the archived .gitignore so custom ignores are never dropped, the
 // section-shaped docs (DEV-AUDIT specifics, AUTO-PUSH release steps, the BACKLOG
@@ -7,7 +8,7 @@
 // CHANGELOG verbatim. The knowledge files (MEMORY / SESSION / Big-6) are not restored
 // here - they are captured through UpdateSession / UpdateMemory and distilled by the
 // gated -Update reconcile pass instead, and so is the dedup / reformat of the sections
-// this lane copies. ENV is left in place by migrate-archive.
+// this lane copies. ENV is left in place by migrateArchive.
 
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -15,7 +16,7 @@ import { basename, join } from "node:path";
 import { flag, validName } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { findSectionBounds, isPlaceholderBody } from "./markdown.mjs";
-import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
+import { normalizeLegacy, normalizeNames } from "./migrateNormalize.mjs";
 import { overwriteSection } from "./mutators.mjs";
 import { repoRoot } from "./paths.mjs";
 

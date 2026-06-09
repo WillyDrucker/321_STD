@@ -38,8 +38,14 @@ export function cmdDoctor(index) {
     return;
   }
   if (errors === 0) {
+    // A graduated project has no migration in flight, so its reconcile-class warnings
+    // (an over-cap lane, residue) are plain distillation targets - "mid-migration"
+    // phrasing would misread as an unfinished onboarding.
+    const reconcileHint = index.graduated === true
+      ? "distillation targets (run /321 -Update to distill)"
+      : "expected mid-migration, cleared by distillation";
     const msgs = [];
-    if (reconcileWarns) msgs.push(`${reconcileWarns} reconcile warning(s) - expected mid-migration, cleared by distillation`);
+    if (reconcileWarns) msgs.push(`${reconcileWarns} reconcile warning(s) - ${reconcileHint}`);
     if (otherWarns) msgs.push(`${otherWarns} advisory warning(s) - steady-state (privacy drift, sub-section budget), not a reconcile target`);
     console.log(`\ndoctor: structure clean. ${msgs.join(". ")}.`);
     return;

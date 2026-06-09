@@ -1,7 +1,7 @@
-// migrate-import-audit.mjs - the --audit feature of migrate-import: diff the parsed
+// migrateImportAudit.mjs - the --audit feature of migrate-import: diff the parsed
 // archived entries against the distilled EXTENDED's surviving headings, and for each
 // archived entry with no verbatim survivor surface fuzzy candidates from those headings.
-// The shared parseEntries in migrate-import.mjs hands the entries in already-parsed.
+// The shared parseEntries in migrateImport.mjs hands the entries in already-parsed.
 // The reconcile pass
 // runs this read-only to confirm every archived entry is either accounted for or
 // deliberately dropped, with the fuzzy candidates flagging likely merges/rewrites so the

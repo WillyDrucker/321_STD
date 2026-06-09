@@ -4,18 +4,16 @@
 // the skills write through (validate, commit). Kept small so the command surface
 // is visible in one read. The logic lives in lib/.
 
-import process from "node:process";
-
 import { cmdBigsix } from "./lib/bigsix.mjs";
 import { cmdCommit } from "./lib/commit.mjs";
 import { cmdDoctor } from "./lib/doctor.mjs";
-import { cmdFetchEngine } from "./lib/fetch-engine.mjs";
+import { cmdFetchEngine } from "./lib/fetchEngine.mjs";
 import { cmdGraduate } from "./lib/graduate.mjs";
 import { cmdInit } from "./lib/init.mjs";
 import { cmdMergeStatus } from "./lib/mergeStatus.mjs";
-import { cmdMigrateArchive } from "./lib/migrate-archive.mjs";
-import { cmdMigrateImport } from "./lib/migrate-import.mjs";
-import { cmdMigrateRestore } from "./lib/migrate-restore.mjs";
+import { cmdMigrateArchive } from "./lib/migrateArchive.mjs";
+import { cmdMigrateImport } from "./lib/migrateImport.mjs";
+import { cmdMigrateRestore } from "./lib/migrateRestore.mjs";
 import { cmdOrphans } from "./lib/orphans.mjs";
 import { loadIndex, setRoot } from "./lib/paths.mjs";
 import { cmdPrivacy } from "./lib/privacy.mjs";
@@ -29,7 +27,7 @@ import { cmdWatermark } from "./lib/watermark.mjs";
 
 const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
-async function main() {
+function main() {
   const [, , cmd, ...rawArgs] = process.argv;
   if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
     printHelp();
@@ -48,9 +46,9 @@ async function main() {
     args = rawArgs.filter((_, i) => i !== rootIdx && i !== rootIdx + 1);
   }
   // init runs pre-registry: it scaffolds a new project and has no index to read.
-  if (cmd === "init") { await cmdInit(args); return; }
+  if (cmd === "init") { cmdInit(args); return; }
   // fetch-engine writes into the active root's INSTALL/, no registry needed.
-  if (cmd === "fetch-engine") { await cmdFetchEngine(args); return; }
+  if (cmd === "fetch-engine") { cmdFetchEngine(args); return; }
   // state reads state.json, and migrate-archive moves _index.json itself, so both
   // run pre-registry.
   if (cmd === "state") { cmdState(null, args); return; }
@@ -71,7 +69,7 @@ async function main() {
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "watermark": cmdWatermark(index, args); break;
-    case "migrate-import": await cmdMigrateImport(index, args); break;
+    case "migrate-import": cmdMigrateImport(index, args); break;
     case "graduate": cmdGraduate(index, args); break;
   }
 }
@@ -171,4 +169,4 @@ Commands:
 `);
 }
 
-main().catch((e) => { console.error(`fatal: ${e.message}`); process.exit(99); });
+try { main(); } catch (e) { console.error(`fatal: ${e.message}`); process.exit(99); }

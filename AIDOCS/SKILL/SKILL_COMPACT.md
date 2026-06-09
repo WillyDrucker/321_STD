@@ -43,5 +43,5 @@ The user copies from `/compact` through the closing line and pastes that into th
 - **You write the block, the user runs it.** Never invoke `/compact` yourself - the skill prints, the user paste-and-runs in the next conversation.
 - **House voice.** The generated text follows the house voice so the pasted block does not flag as banned prose in the next session.
 - **Scale to significance.** A trivial session does not earn six expanded sections. A marathon does not get four bullets. Match the block to the work.
-- **Concrete over vague.** "Open items: finish migrate-restore.mjs union-merge edge case" beats "Open items: keep working on migration." Name the file, the function, the next call.
+- **Concrete over vague.** "Open items: finish migrateRestore.mjs union-merge edge case" beats "Open items: keep working on migration." Name the file, the function, the next call.
 - **No invented state.** Only what actually happened this session goes in the block. Drop an empty section rather than pad it.

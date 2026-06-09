@@ -47,7 +47,7 @@ Distill both EXTENDED lanes evenly - `SESSION_EXTENDED` carries the same over-sp
 
 ## Mechanism: direct curated edits, doctor as the gate
 
-A wholesale reshape (dozens of sub-sections down to a handful) is far more reliable authored directly than as hundreds of staging ops, since the staging pipeline is built for incremental bullets, not a full reshape. Edit `MEMORY`, `MEMORY_EXTENDED`, `SESSION`, `SESSION_EXTENDED`, and `BACKLOG` directly, then verify with `node AIDOCS/tools/engine.mjs doctor`. The hardened doctor is the mechanical gate: it fails (errors) on a broken `[+]`/`### ` pair and on the shape and house-voice checks (registry, memory and session shape, auto-memory pointers, banned prose), and it warns while a lane is over cap or an elided-import marker survives. Those over-cap and import-residue warnings are the reconcile targets - clearing them is the signal the distillation is done. A WDDOCS-prose warning is user authorship, not a reconcile target, so it persists and does not hold the pass. Cross-source dedup and migration-content ordering are judgment doctor cannot see, so verify those by eye. Bullet-shaped odds and ends (a BACKLOG sweep, a single Big-6 touch-up) can still ride the staging pipeline where that is cleaner, keeping the orphan and cap checks. This is the one sanctioned exception to "everything routes through staging," and it applies only to the gated reconciliation pass, never to a routine update.
+A wholesale reshape (dozens of sub-sections down to a handful) is far more reliable authored directly than as hundreds of staging ops, since the staging pipeline is built for incremental bullets, not a full reshape. Edit `MEMORY`, `MEMORY_EXTENDED`, `SESSION`, `SESSION_EXTENDED`, and `BACKLOG` directly, then verify with `node AIDOCS/tools/engine.mjs doctor`. The hardened doctor is the mechanical gate: it fails (errors) on a broken `[+]`/`### ` pair and on the shape and house-voice checks (registry, memory and session shape, auto-memory pointers, banned prose), and it warns while a lane is over cap or an elided-import marker survives. Those over-cap and import-residue warnings are the reconcile targets - clearing them is the signal the distillation is done. WDDOCS is user authorship and outside doctor's prose scan entirely, so nothing there holds the pass. Cross-source dedup and migration-content ordering are judgment doctor cannot see, so verify those by eye. Bullet-shaped odds and ends (a BACKLOG sweep, a single Big-6 touch-up) can still ride the staging pipeline where that is cleaner, keeping the orphan and cap checks. This is the one sanctioned exception to "everything routes through staging," and it applies only to the gated reconciliation pass, never to a routine update.
 
 **Two kinds of cap, do not conflate them.** The `_index.json` `sizes` block carries two thresholds per lane. The **lane cap** (`updatememory.memory.cap`, `updatesession.session.cap`, and their `_extended` counterparts) gates closure. The **sub-section budget** (`subsections` on each lane) is advisory, a hint that summary may help on an oversize entry. Doctor reports both as warnings, but only the lane cap is a reconcile target. A genuinely load-bearing sub-section (a catalog, an exception list) marked with `<!-- LOAD_BEARING -->` rides the budget warning forever, on purpose. Distilling it just to clear the hint would lose the content.
 
@@ -116,17 +116,17 @@ Each run lists the archived entries with no surviving `### sub-section` and surf
 
 Then run the full **archive-alignment check**: walk `AIDOCS/<PROJECT>_SETUP_ARCHIVE/` and confirm every archived source is accounted for - landed in the live structure or deliberately dropped. The `--audit` above covers the SESSION / MEMORY EXTENDED lanes mechanically. For the config docs, CHANGELOG, the archived AGENTS / CLAUDE, the archived skill snapshot, and any swept docs, confirm each by eye against the lanes above. A source that is neither reflected nor consciously dropped means the pass is unfinished - resolve it before clearing.
 
-Once doctor's errors are zero and its reconcile warnings are cleared (no import residue, every lane under cap), and the archive is accounted for - WDDOCS-prose warnings are user authorship and do not block:
+Once doctor's errors are zero and its reconcile warnings are cleared (no import residue, every lane under cap), and the archive is accounted for:
 
 ```bash
 node AIDOCS/tools/engine.mjs state --clear-reconcile
 ```
 
-This clears the gate and stamps both lane watermarks current (the direct-edit reshape bypassed `commit`, which would otherwise stamp them). If doctor still reports a reconcile warning (a surviving import marker or an over-cap lane) or an error, or an audit surfaces a lost entry, leave the gate set so the next `/321 -Update` resumes the reconciliation. A WDDOCS-prose warning is not a reason to hold - it is the user's own docs. Then run the graduation steps below.
+This clears the gate and stamps both lane watermarks current (the direct-edit reshape bypassed `commit`, which would otherwise stamp them). If doctor still reports a reconcile warning (a surviving import marker or an over-cap lane) or an error, or an audit surfaces a lost entry, leave the gate set so the next `/321 -Update` resumes the reconciliation. Then run the graduation steps below.
 
 ## Graduate (onboarding teardown)
 
-Runs only after reconciliation verifies - the gate is cleared and doctor's errors are zero (a WDDOCS-prose warning is user content, not a blocker). The project is steady, so tear down the onboarding tier it no longer needs:
+Runs only after reconciliation verifies - the gate is cleared and doctor's errors are zero. The project is steady, so tear down the onboarding tier it no longer needs:
 
 ```bash
 node AIDOCS/tools/engine.mjs graduate

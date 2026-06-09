@@ -1,5 +1,6 @@
-// migrate-import.mjs - the mechanical 1:1 scavenge of an archived doc into a staging
-// file the standard commit pipeline applies. The migration capture uses this so depth
+// migrateImport.mjs - the mechanical 1:1 scavenge of an archived doc into a staging
+// file the standard commit pipeline applies, backing the `migrate-import` CLI
+// command. The migration capture uses this so depth
 // content lands verbatim (one anchored ### sub-section per entry, with its paired [+]
 // main bullet) instead of distilled at capture. It is the script half of a hybrid:
 // the script grabs the text and emits a landing report, the AI verifies what landed
@@ -13,15 +14,14 @@
 // and a structureless doc (imported as one blob). Both sides derive from one slug
 // list, so the commit orphan check passes by construction.
 
-import { existsSync, readFileSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { flag } from "./args.mjs";
 import { installLog } from "./installLog.mjs";
 import { slugify } from "./markdown.mjs";
-import { auditImport } from "./migrate-import-audit.mjs";
-import { normalizeLegacy, normalizeNames } from "./migrate-normalize.mjs";
+import { auditImport } from "./migrateImportAudit.mjs";
+import { normalizeLegacy, normalizeNames } from "./migrateNormalize.mjs";
 import { isContained, repoRoot, stagingDir } from "./paths.mjs";
 import { loadStaging } from "./state.mjs";
 
@@ -47,7 +47,7 @@ function stripTrailingPeriod(s) { return s.endsWith(".") ? s.slice(0, -1) : s; }
 //   --audit re-reads the archive and diffs it against the distilled EXTENDED.
 //   --from-archive <archive root> reads MANIFEST.json to resolve --from / --old / --new
 //     from the recorded role mapping, so the AI does not re-derive them from filenames.
-export async function cmdMigrateImport(index, args) {
+export function cmdMigrateImport(index, args) {
   let from = flag(args, "--from");
   const skill = flag(args, "--skill");
   let oldName = flag(args, "--old");
@@ -103,7 +103,7 @@ export async function cmdMigrateImport(index, args) {
   if (!isContained(root, fromAbs)) { console.error(`migrate-import: --from "${from}" escapes the project root.`); process.exit(5); }
   if (!existsSync(fromAbs)) { console.error(`migrate-import: source not found: ${from}`); process.exit(16); }
 
-  let content = await readFile(fromAbs, "utf8");
+  let content = readFileSync(fromAbs, "utf8");
   if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);   // strip BOM
   content = content.replace(/\r\n/g, "\n");
   if (oldName && newName) content = normalizeNames(content, oldName, newName);
@@ -162,7 +162,7 @@ export async function cmdMigrateImport(index, args) {
     reportLanding(report, blob);
     return;
   }
-  await writeFile(stagingFile, `${JSON.stringify(staging, null, 2)}\n`, "utf8");
+  writeFileSync(stagingFile, `${JSON.stringify(staging, null, 2)}\n`, "utf8");
   installLog(root, `migrate-import: ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${from} into ${skill} staging.`);
   console.log(`migrate-import: ${existing ? "appended" : "wrote"} ${entries.length} entr${entries.length === 1 ? "y" : "ies"} (${actions.length} actions) -> ${stagingFile}`);
   reportLanding(report, blob);

@@ -11,7 +11,7 @@ import { lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.
 import { applyExtendedAction, findOrphanBullets } from "./mutatorsExtended.mjs";
 import { resolveFile } from "./paths.mjs";
 import { autoPrune } from "./prune.mjs";
-import { clearStaging, loadStaging, loadState, reconcilePending, saveState, SKILLS } from "./state.mjs";
+import { clearStaging, loadStaging, loadState, recentCaptured, reconcilePending, saveState, SKILLS } from "./state.mjs";
 import { validateStaging } from "./validate.mjs";
 
 // recent_captured rolling-window size. The AI uses it to answer "did I capture
@@ -78,16 +78,13 @@ export function cmdCommit(index, args) {
   // clear staging. recent_captured is a rolling window of the last FINGERPRINT_LIMIT
   // lifo_insert slugs across recent commits (newest first). The AI reads them via
   // `watermark` to answer "did I capture this arc?" without re-reading SESSION /
-  // MEMORY. The read falls back to the legacy `last_captured` key so a state.json
-  // laid by an older engine migrates forward on the next commit.
+  // MEMORY. recentCaptured honors the legacy last_captured key, so a state.json
+  // laid by an older engine migrates forward on this commit.
   for (const [key, content] of Object.entries(edited)) writeFileSync(resolveFile(index, key), content, "utf8");
   const state = loadState();
   const captured = [];
   for (const a of staging.actions) if (a.op === "lifo_insert") captured.push(slugify(a.bullet));
-  const prior = Array.isArray(state[skill]?.recent_captured) ? state[skill].recent_captured
-    : Array.isArray(state[skill]?.last_captured) ? state[skill].last_captured
-    : [];
-  const merged = [...captured.reverse(), ...prior].slice(0, FINGERPRINT_LIMIT);
+  const merged = [...captured.reverse(), ...recentCaptured(state[skill])].slice(0, FINGERPRINT_LIMIT);
   state[skill] = {
     runs: (state[skill]?.runs || 0) + 1,
     last_committed_at: new Date().toISOString(),

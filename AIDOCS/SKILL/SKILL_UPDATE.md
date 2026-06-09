@@ -39,7 +39,4 @@ A mixed-mode run (one lane `-FULL`, the other default) is not supported here. Ru
 - **Order is fixed.** SESSION first (events), then MEMORY (the state events imply), so the memory lane distills against a fresh backbone.
 - **Stop on a failed lane.** A failed SESSION commit halts the chain before MEMORY runs.
 - **`-FULL` propagates to both lanes.** No mixed-mode runs from `-Update`.
-
-## Deferred
-
-The skills lane (reconciling a project's own custom `/321` skill bodies after migration) lands with `import-skills`. Until then, `-UpdateScraper` and other project-owned skill bodies stay manually authored.
+- **Project-custom skill bodies are manually authored.** They survive engine updates by absence (no source counterpart), and no chain step here touches them.

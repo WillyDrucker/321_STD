@@ -1,11 +1,11 @@
-// fetch-engine.mjs - fetch a 321 engine source into INSTALL/engine so an engine
+// fetchEngine.mjs - fetch a 321 engine source into INSTALL/engine so an engine
 // update or re-setup can run the latest tier without the steady project carrying
 // it. git clone for a remote source, or copy a local tree (the offline / test
 // path, excluding INSTALL / .git / TEMP / node_modules so it never recurses).
+// Backs the `fetch-engine` CLI command (command names stay kebab-case).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { cp } from "node:fs/promises";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { flag } from "./args.mjs";
@@ -16,7 +16,7 @@ import { installEngineDir, repoRoot } from "./paths.mjs";
 // transit ~1.5MB into INSTALL/engine just to have cleanup delete it.
 const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules", "test"]);
 
-export async function cmdFetchEngine(args) {
+export function cmdFetchEngine(args) {
   const from = flag(args, "--from");
   let repo = flag(args, "--repo");
   const ref = flag(args, "--ref") || "main";
@@ -41,7 +41,7 @@ export async function cmdFetchEngine(args) {
 
   if (from) {
     const src = resolve(from);
-    await cp(src, dest, {
+    cpSync(src, dest, {
       recursive: true,
       filter: (p) => { const r = relative(src, p); return r === "" || !EXCLUDE.has(r.split(/[\\/]/)[0]); },
     });
