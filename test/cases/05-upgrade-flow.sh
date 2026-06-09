@@ -343,3 +343,66 @@ echo "$SCOUT" | grep -q "both-absent" && pass "auto-drop-clean labels the both-a
 # local-absent must survive: dropping would let upgrade copy the file back
 SCREMAIN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).customizations.join(","))' "$SC/AIDOCS/_index.json")"
 [ "$SCREMAIN" = "AIDOCS/SKILL/SKILL_DEV-AUDIT.md" ] && pass "local-absent customization survived auto-drop-clean (safety: upgrade would restore the file otherwise)" || fail "local-absent class wrongly dropped (customizations[] left as: $SCREMAIN)"
+
+echo "=== T75: orphans surfaces three classes (safe / review-skill / review-automemory) and --auto-drop-safe only drops the safe class ==="
+# The AI-steered cleanup half: read-only by default so the AI walks each class and
+# decides per file. --auto-drop-safe handles the mechanically safe class only
+# (AIDOCS/tools/lib + AIDOCS/tools/*.md - no user files live there). The two review
+# classes always need AI judgment because a project-custom skill or auto-memory rule
+# could be there.
+ORP="$BASE/orphans"
+node "$RENG" init "$ORP" --name OrpProj >/dev/null 2>&1
+ORPENG="$ORP/AIDOCS/tools/engine.mjs"
+ORPSRC="$BASE/orphans-src"
+mkdir -p "$ORPSRC/AIDOCS" "$ORPSRC/.claude/skills/321"
+cp -r "$REAL/AIDOCS/tools" "$ORPSRC/AIDOCS/tools"
+cp -r "$REAL/AIDOCS/SKILL" "$ORPSRC/AIDOCS/SKILL"
+cp -r "$REAL/AIDOCS/automemory" "$ORPSRC/AIDOCS/automemory"
+cp "$REAL/AIDOCS/_index.json" "$ORPSRC/AIDOCS/_index.json"
+cp "$REAL/.claude/skills/321/SKILL.md" "$ORPSRC/.claude/skills/321/SKILL.md"
+printf '{ "operations": [] }\n' > "$ORPSRC/AIDOCS/MANIFEST.json"
+# Plant orphans in each class (these files exist in project, not in upstream)
+printf '// legacy engine helper\n' > "$ORP/AIDOCS/tools/lib/legacy-helper.mjs"
+printf '# Legacy pattern\n**Purpose:** stale.\n' > "$ORP/AIDOCS/tools/PATTERN-LEGACY.md"
+printf '---\nname: projectcustom\ndescription: project-only skill\n---\n# /321 -ProjectCustom\n**Purpose:** project-owned skill body.\n' > "$ORP/AIDOCS/SKILL/SKILL_PROJECT-CUSTOM.md"
+printf '# Project rule\n' > "$ORP/AIDOCS/automemory/project_local_rule.md"
+# Refuses without a fetch
+ORPNOFETCH="$(node "$ORPENG" orphans 2>&1)"; ORPNFCC=$?
+echo "$ORPNOFETCH" | grep -q "no fetched engine" && pass "orphans reports no fetched engine when INSTALL/engine is missing" || fail "no missing-fetch message (output: $ORPNOFETCH)"
+[ "$ORPNFCC" = "20" ] && pass "orphans exits 20 when fetch is missing" || fail "orphans exit code on missing fetch was $ORPNFCC (expected 20)"
+node "$ORPENG" fetch-engine --from "$ORPSRC" >/dev/null 2>&1
+# Read-only walk: surfaces all three classes
+ORPOUT="$(node "$ORPENG" orphans 2>&1)"
+echo "$ORPOUT" | grep -q "safe (2)" && pass "orphans surfaces 2 safe orphans (legacy-helper.mjs + PATTERN-LEGACY.md)" || fail "no safe count (output: $ORPOUT)"
+echo "$ORPOUT" | grep -q "AIDOCS/tools/lib/legacy-helper.mjs" && pass "orphans names the lib/ orphan" || fail "lib orphan not named"
+echo "$ORPOUT" | grep -q "AIDOCS/tools/PATTERN-LEGACY.md" && pass "orphans names the tools/*.md orphan" || fail "pattern orphan not named"
+echo "$ORPOUT" | grep -q "review-skill (1)" && pass "orphans surfaces the review-skill class for SKILL_PROJECT-CUSTOM.md" || fail "no review-skill count (output: $ORPOUT)"
+echo "$ORPOUT" | grep -q "AIDOCS/SKILL/SKILL_PROJECT-CUSTOM.md" && pass "orphans names the review-skill orphan" || fail "review-skill orphan not named"
+echo "$ORPOUT" | grep -q "review-automemory (1)" && pass "orphans surfaces the review-automemory class for project_local_rule.md" || fail "no review-automemory count (output: $ORPOUT)"
+echo "$ORPOUT" | grep -q "project_local_rule.md" && pass "orphans names the review-automemory orphan" || fail "review-automemory orphan not named"
+# customizations[] guard: list a safe orphan, verify it gets filtered out
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=["AIDOCS/tools/PATTERN-LEGACY.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$ORP/AIDOCS/_index.json"
+ORPGUARDED="$(node "$ORPENG" orphans 2>&1)"
+echo "$ORPGUARDED" | grep -q "safe (1)" && pass "customizations[] guard filters the listed orphan out of the safe class" || fail "customizations[] not honored in safe-class scan"
+echo "$ORPGUARDED" | grep -q "PATTERN-LEGACY.md" && fail "the customized orphan still appears in safe (guard broken)" || pass "customized orphan absent from safe class output"
+# Clear customizations for the drop test
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.customizations=[];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$ORP/AIDOCS/_index.json"
+# --auto-drop-safe: drops the 2 safe orphans, leaves the review classes
+ORPDROP="$(node "$ORPENG" orphans --auto-drop-safe 2>&1)"
+echo "$ORPDROP" | grep -q "dropped 2 files" && pass "auto-drop-safe drops the 2 safe orphans" || fail "auto-drop-safe count wrong (output: $ORPDROP)"
+[ ! -f "$ORP/AIDOCS/tools/lib/legacy-helper.mjs" ] && pass "lib/legacy-helper.mjs removed by auto-drop-safe" || fail "lib orphan not removed"
+[ ! -f "$ORP/AIDOCS/tools/PATTERN-LEGACY.md" ] && pass "PATTERN-LEGACY.md removed by auto-drop-safe" || fail "pattern orphan not removed"
+# Review classes preserved
+[ -f "$ORP/AIDOCS/SKILL/SKILL_PROJECT-CUSTOM.md" ] && pass "review-skill orphan PRESERVED (AI judgment required)" || fail "review-skill orphan wrongly deleted"
+[ -f "$ORP/AIDOCS/automemory/project_local_rule.md" ] && pass "review-automemory orphan PRESERVED (AI judgment required)" || fail "review-automemory orphan wrongly deleted"
+echo "$ORPDROP" | grep -q "2 files left for AI judgment" && pass "auto-drop-safe summary names the review-class remainder count" || fail "no review-class remainder summary"
+# Idempotency: re-running with no safe orphans is a clean no-op
+node "$ORPENG" fetch-engine --from "$ORPSRC" >/dev/null 2>&1
+ORPRERUN="$(node "$ORPENG" orphans --auto-drop-safe 2>&1)"
+echo "$ORPRERUN" | grep -q "no safe orphans to drop" && pass "auto-drop-safe idempotent: no safe orphans left after first sweep" || fail "second auto-drop-safe pass did not no-op cleanly"
+# Clean project (no orphans at all): friendly no-op message
+CLEAN="$BASE/orphans-clean"
+node "$RENG" init "$CLEAN" --name CleanProj >/dev/null 2>&1
+node "$CLEAN/AIDOCS/tools/engine.mjs" fetch-engine --from "$ORPSRC" >/dev/null 2>&1
+ORPCLEAN="$(node "$CLEAN/AIDOCS/tools/engine.mjs" orphans 2>&1)"
+echo "$ORPCLEAN" | grep -q "nothing to clean" && pass "orphans reports nothing-to-clean on a freshly synced project" || fail "no nothing-to-clean message on clean project (output: $ORPCLEAN)"

@@ -16,6 +16,7 @@ import { cmdMergeStatus } from "./lib/mergeStatus.mjs";
 import { cmdMigrateArchive } from "./lib/migrate-archive.mjs";
 import { cmdMigrateImport } from "./lib/migrate-import.mjs";
 import { cmdMigrateRestore } from "./lib/migrate-restore.mjs";
+import { cmdOrphans } from "./lib/orphans.mjs";
 import { loadIndex, setRoot } from "./lib/paths.mjs";
 import { cmdPrivacy } from "./lib/privacy.mjs";
 import { cmdScrub } from "./lib/scrub.mjs";
@@ -26,7 +27,7 @@ import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 import { cmdWatermark } from "./lib/watermark.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 async function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -66,6 +67,7 @@ async function main() {
     case "sync":     cmdSync(index, args); break;
     case "upgrade":  cmdUpgrade(index, args); break;
     case "merge-status": cmdMergeStatus(index, args); break;
+    case "orphans": cmdOrphans(index, args); break;
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "watermark": cmdWatermark(index, args); break;
@@ -100,7 +102,7 @@ Commands:
             is set ([--force] overrides). [--dry-run]
   merge-status  Print the merge punch list for customizations[] against the fetched
             upstream tree, one of five classes per entry: identical, diverged,
-            both-absent, local-absent, upstream-absent. Read-only by default; the AI
+            both-absent, local-absent, upstream-absent. Read-only by default. The AI
             walks the output during -UpdateSync to drop / merge / delete per entry,
             so customizations[] self-cleans as upstream catches up. --auto-drop-clean
             mechanically drops identical + both-absent entries (no AI judgment), and
@@ -109,6 +111,15 @@ Commands:
             file the user has a position on. This is the script half of -UpdateSync
             -FULL. Requires fetch-engine.
             [--auto-drop-clean]
+  orphans   Print files in the project tree that are NOT present in the fetched
+            upstream, classified as safe / review-skill / review-automemory.
+            Read-only by default. The AI walks the output during -UpdateSync to
+            decide per file (project-custom keep vs abandoned canonical drop), so
+            no critical file is deleted by accident. --auto-drop-safe mechanically
+            drops the safe class only (engine-only paths: AIDOCS/tools/lib +
+            AIDOCS/tools/*.md), leaving the two review classes for AI judgment.
+            Honors customizations[]. Requires fetch-engine.
+            [--auto-drop-safe]
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,

@@ -1,7 +1,7 @@
 // mergeStatus.mjs - the merge punch list for customizations[] against the fetched
 // upstream at INSTALL/engine. Classifies each entry as identical / diverged /
 // both_absent / local_absent / upstream_absent. --auto-drop-clean drops only the
-// two no-file-at-risk classes (identical, both_absent); the three judgment classes
+// two no-file-at-risk classes (identical, both_absent). The three judgment classes
 // stay for AI review because dropping would let upgrade restore, delete, or
 // overwrite a file the user has a position on.
 

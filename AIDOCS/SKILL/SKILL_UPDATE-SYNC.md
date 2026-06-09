@@ -43,7 +43,27 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    This drops the **identical** and **both-absent** entries from `customizations[]` without AI judgment (the file matches upstream verbatim, or no file exists on either side). The other three classes (**diverged**, **local-absent**, **upstream-absent**) survive the sweep because dropping the customization there would let the next upgrade restore, delete, or overwrite a file the user has a position on. Walk the survivors per the per-class rules above. The `--auto-drop-clean` flag is idempotent and read-only when no clean entries exist. On a project with no customizations or only judgment-required classes, it prints a no-op message and continues.
 
-5. **Apply the upgrade.** Preview first when uncertain:
+5. **Walk orphans (AI-driven, before the upgrade).** Stale engine-class files left behind by older engine versions persist downstream unless an explicit `file_delete` manifest op removes them. The `orphans` command surfaces these for AI review so the cleanup is intentional, not accidental. Headless runs use `--auto-drop-safe` for the mechanically safe class.
+
+   Get the punch list:
+   ```bash
+   node AIDOCS/tools/engine.mjs orphans
+   ```
+   The output groups orphans into three classes:
+
+   - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md` + `engine.mjs`). No user file lives in these paths. Mechanically safe to drop. Honors `customizations[]`.
+   - **review-skill** - files in `AIDOCS/SKILL/` with no upstream counterpart. Either a project-custom skill (the project authored it, keep) or an abandoned canonical (upstream deleted the file but no `skill_delete` / `file_delete` op was added, drop). Decide per file. List in `customizations[]` if you want to preserve a project-custom skill through future syncs.
+   - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom feedback rule (keep + `customizations[]`).
+
+   After the review pass, drop or keep per entry. Continue to step 6.
+
+   **`-FULL` shortcut.** When invoked as `/321 -UpdateSync -FULL`, replace this step's read-only walk with the one-shot mechanical sweep:
+   ```bash
+   node AIDOCS/tools/engine.mjs orphans --auto-drop-safe
+   ```
+   This drops the **safe** class only (engine-only paths with no risk of touching user files). The two review classes (review-skill, review-automemory) survive the sweep because dropping there would risk deleting a project-custom skill body or a project-owned auto-memory rule. Walk the survivors by AI judgment, as in the default flow above. The flag is idempotent and read-only when no safe orphans exist.
+
+6. **Apply the upgrade.** Preview first when uncertain:
    ```bash
    node AIDOCS/tools/engine.mjs upgrade --dry-run
    ```
@@ -55,16 +75,16 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    Reads `INSTALL/engine/AIDOCS/MANIFEST.json`, diffs against the project's `engine.operations_applied[]`, runs each missing operation, copies the engine-class paths with customization preservation, and writes a summary. See Operations and Customizations below for the rules.
 
-6. **Rebuild dispatch and verify.**
+7. **Rebuild dispatch and verify.**
    ```bash
    node AIDOCS/tools/engine.mjs sync
    node AIDOCS/tools/engine.mjs doctor
    ```
    `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the structural surface is clean. Read the doctor output. **A clean upgrade can still exit non-zero from pre-existing project content** - banned prose in CHANGELOG history, semicolons in over-long EXTENDED entries, sub-section budget hints, oversized buckets. Those are project debt for `/321 -Update` / `scrub --fix` to handle, not sync failures. Report them as pre-existing, do not retry the upgrade.
 
-7. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
+8. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 
-8. **Report.** Summarize: merges applied and entries dropped (from step 4), operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note bubbles up to the user.
+9. **Report.** Summarize: merges applied and entries dropped (from step 4), orphans dropped or surfaced (from step 5), operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note bubbles up to the user.
 
 ## Operations
 

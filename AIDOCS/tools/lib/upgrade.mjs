@@ -11,7 +11,7 @@
 // the run before the copy step, the version bump, and the index write - the
 // index write is the commit point for the upgrade's bookkeeping. Earlier
 // successful ops in the same run may have already touched files (handler writes
-// are not transactional across ops); re-run resumes where the failure landed
+// are not transactional across ops). Re-run resumes where the failure landed
 // because every op is idempotent.
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
