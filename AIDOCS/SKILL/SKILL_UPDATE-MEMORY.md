@@ -97,8 +97,8 @@ node AIDOCS/tools/engine.mjs commit --skill updatememory
 `-UpdateMemory -FULL` widens the read past the watermark and re-derives populated Big-6 sections, but **uses the existing MEMORY.md bullets and Big-6 prose as a starting reference, not a discard.** Most observations are already captured. Walk the codebase plus conversation plus SESSION against the existing bullets and look for: gaps (an observation that did not land), drift (a bullet or Big-6 line whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
 
 - Re-walk every Big-6 section against current evidence. The lean default only fills placeholders. `-FULL` may `overwrite_section` a populated one when the prose has drifted.
-- Add missing LIFO observations. Correct drift with `replace` (by anchor) rather than re-writing the whole LIFO.
-- For over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
+- Add missing LIFO observations with `lifo_insert` as the lean default would. Main-LIFO bullets have no targeted replace - the only ops are `lifo_insert` (prepend) and `overwrite_section` (rewrite the whole LIFO). Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
+- For depth drift (`### sub-section` body bloated or stale) and over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section by anchor (this is where `replace` belongs - EXTENDED only). A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
 Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation. The lean default appends from the conversation tail and only fills empty Big-6 sections.
 

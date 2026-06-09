@@ -100,8 +100,8 @@ node AIDOCS/tools/engine.mjs commit --skill updatesession
 `-UpdateSession -FULL` widens the read past the watermark, but **uses the existing SESSION.md bullets as a starting reference, not a discard.** Most arcs are already captured. Walk the conversation against the existing bullets and look for: gaps (an arc that did not land), drift (a bullet whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
 
 - Re-derive Current State from current operational reality, the prior snapshot is suspect under `-FULL`.
-- Add missing arcs. Correct drift with `replace` (by anchor) rather than re-writing the whole LIFO.
-- For over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section. A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
+- Add missing arcs with `lifo_insert` as the lean default would. Main-LIFO bullets have no targeted replace - the only ops are `lifo_insert` (prepend) and `overwrite_section` (rewrite the whole LIFO). Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
+- For depth drift (`### sub-section` body bloated or stale) and over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section by anchor (this is where `replace` belongs - EXTENDED only). A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
 Use `-FULL` when SESSION has drifted (a long pause, a context switch, an interrupted prior pass). The lean default appends from the conversation tail and trusts the prior snapshot.
 
