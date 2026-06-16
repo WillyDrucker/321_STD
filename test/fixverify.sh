@@ -13,6 +13,7 @@
 #   05-upgrade-flow.sh   - upgrade lifecycle (cleanup, upstream defaults, router, snapshot)
 #   06-upgrade-guards.sh - safety perimeter (dry-run, fail-fast, gates, containment, deferral)
 #   07-sync-judgment.sh  - AI punch lists (merge-status classes, orphans classes)
+#   08-commit-drift-copy.sh - commit-drift advisory (git) + hash-aware engine-class copy
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/lib/runner.sh"
@@ -26,6 +27,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/cases/05-upgrade-flow.sh"
 . "$HERE/cases/06-upgrade-guards.sh"
 . "$HERE/cases/07-sync-judgment.sh"
+. "$HERE/cases/08-commit-drift-copy.sh"
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi

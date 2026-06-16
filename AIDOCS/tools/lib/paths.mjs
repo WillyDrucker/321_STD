@@ -24,6 +24,18 @@ export function statePath() { return join(activeRoot, "AIDOCS", "tools", "state.
 // The ephemeral fetch target for an engine update / re-setup (gitignored).
 export function installEngineDir() { return join(activeRoot, "INSTALL", "engine"); }
 
+// The engine-class paths, project-relative. Engine code, canonical skill bodies, the
+// router. The copy step refreshes them from upstream, the orphan/snapshot passes scope
+// to them, and the commit-drift check watches them. A project-custom skill body (no
+// source counterpart) survives by absence, a path in customizations[] is skipped. Lives
+// here (the "where things live" module) so upgrade.mjs and gitDrift.mjs share one
+// definition instead of each carrying a copy.
+export const ENGINE_CLASS = [
+  "AIDOCS/tools",
+  "AIDOCS/SKILL",
+  ".claude/skills/321/SKILL.md",
+];
+
 // Absolute path for a registry-relative value ("./AIDOCS/x") against the active root.
 export function fromRoot(rel) { return join(activeRoot, rel.replace(/^\.\//, "")); }
 

@@ -8,11 +8,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { engineDriftNote } from "./gitDrift.mjs";
 import { installEngineDir } from "./paths.mjs";
 
 function readJSON(path) { return JSON.parse(readFileSync(path, "utf8")); }
 
 export function cmdCompare(index) {
+  // Local commit-state advisory first: it reads only the working tree plus git, needs no
+  // fetched engine, so surface it even on the "forgot to fetch" path before the exit below.
+  const driftNote = engineDriftNote(index);
+  if (driftNote) console.log(driftNote);
+
   const source = installEngineDir();
   if (!existsSync(source)) {
     console.error(`compare: no fetched engine at ${source}. Run \`fetch-engine\` first.`);

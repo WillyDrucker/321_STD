@@ -8,7 +8,7 @@ Every file in a 321 project falls into one of four classes by lifecycle ownershi
 
 ### 1. Engine (auto-refresh)
 
-The engine-class paths refresh from upstream on every `-UpdateSync`. They hold no project data, so the engine owns them outright. The set is defined in `lib/upgrade.mjs` as `ENGINE_CLASS`:
+The engine-class paths refresh from upstream on every `-UpdateSync`. They hold no project data, so the engine owns them outright. The set is defined in `lib/paths.mjs` as `ENGINE_CLASS`:
 
 - `AIDOCS/tools/` - engine code (the `.mjs` modules and these PATTERN-* references)
 - `AIDOCS/SKILL/` - canonical skill bodies (the 8: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`)

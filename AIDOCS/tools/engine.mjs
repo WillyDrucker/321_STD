@@ -90,6 +90,8 @@ Commands:
   doctor    Validate this project against its registry: registry resolves, memory
             and session shapes, auto-memory pointers, banned prose. Read-only.
             Exit: 20 structural break, 10 content-only debt (structure intact), 0 clean.
+            In a git repo, also prints a commit-state advisory when the committed
+            engine.version and the working tree disagree (applied-but-uncommitted, or a revert).
   scrub     House-voice gate over authored files. --check (default) reports banned
             prose, --fix rewrites em dashes to " - " (ambiguous cases flagged). Add
             --semicolons to also rewrite clause-joining "; " to " - " (non-joining ones
@@ -107,7 +109,8 @@ Commands:
             engine.version and the names of manifest operations present upstream but not
             yet in engine.operations_applied[]. An update check, not an apply preview
             (that is upgrade --dry-run). Requires a prior fetch-engine. Exits 0 with the
-            report (20 only on a missing fetch).
+            report (20 only on a missing fetch). In a git repo, also flags a committed-vs-
+            working engine.version mismatch (local-only, shown even on the no-fetch path).
   merge-status  Print the merge punch list for customizations[] against the fetched
             upstream tree, one of five classes per entry: identical, diverged,
             both-absent, local-absent, upstream-absent. Read-only by default. The AI

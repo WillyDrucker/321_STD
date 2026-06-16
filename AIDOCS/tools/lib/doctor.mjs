@@ -7,6 +7,7 @@
 
 import { runContentChecks } from "./doctorContent.mjs";
 import { runIntegrityChecks } from "./doctorIntegrity.mjs";
+import { engineDriftNote } from "./gitDrift.mjs";
 
 // Warnings split two ways: reconcile warnings clear as the reconcile pass distills
 // (size caps, import residue), advisory warnings are steady-state and gate nothing
@@ -34,6 +35,13 @@ export function cmdDoctor(index) {
     if (RECONCILE_WARN.has(name)) reconcileWarns += issues.length; else otherWarns += issues.length;
     for (const i of issues) console.log(`  - ${i} (warning)`);
   }
+
+  // Commit-state advisory, independent of the structural / content verdict and the exit
+  // code: an applied-but-uncommitted engine upgrade. Printed before the verdict so it
+  // rides with every exit path. Silent on a non-git project or one that gitignores AIDOCS.
+  const driftNote = engineDriftNote(index);
+  if (driftNote) console.log(`\n${driftNote}`);
+
   if (errors === 0 && reconcileWarns === 0 && otherWarns === 0) {
     console.log("\ndoctor: all checks passed.");
     return;

@@ -13,6 +13,14 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
    **Crossing from a pre-0.1.x engine line.** If `engine.upstream` is unset and the project's local engine is older than 0.1.x (no `MANIFEST.json`, no `engine.operations_applied[]`, no `-UpdateSync` first-class skill), the steps below describe the modern path. The one-shot bootstrap from pre-0.1.x is: set `engine.upstream` to the upstream repo URL by hand, then run the modern flow (the old engine's `-Update -Sync` mode body cannot describe `upgrade` and the rename ops because they did not exist at its release).
 
+   **Crossing a version boundary: drive from the upstream engine (`--root`).** When the local engine is far behind, or predates a guard (the import-aware orphan class, the post-copy reconcilers), the in-place flow means the OLD engine executes step 6, where the copy swaps both the engine code and this skill body underneath the run. The robust alternative is to point a known-good upstream engine at the target instead of upgrading in place. From a current engine checkout (your `321_STD` clone, or any project already on the target version):
+   ```bash
+   node <upstream>/AIDOCS/tools/engine.mjs fetch-engine --from <upstream> --root <project>
+   node <upstream>/AIDOCS/tools/engine.mjs compare       --root <project>
+   node <upstream>/AIDOCS/tools/engine.mjs upgrade       --root <project>
+   ```
+   The driving engine is the new version the whole time, so it knows every op type, never blind-drops a still-imported module, applies the upgrade in one pass, and never swaps the body mid-run. No pre-upgrade `orphans` dance, no second fetch. Verify by loading the project's OWN upgraded engine afterward: `node AIDOCS/tools/engine.mjs doctor` from the project root. This is the preferred path for any pre-guard or multi-version crossing. The in-place flow below stays the steady-state path once the project carries a current, guarded engine.
+
 2. **Fetch.**
    ```bash
    node AIDOCS/tools/engine.mjs fetch-engine
@@ -72,7 +80,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    This drops the **safe** class only (engine-only paths with no risk of touching user files). The **safe** class is import-guarded - a module the running engine still imports is held in the **live-import** class instead, so the pre-upgrade sweep cannot brick the engine even across a rename. The two review classes (review-skill, review-automemory) survive the sweep because dropping there would risk deleting a project-custom skill body or a project-owned auto-memory rule. Walk the survivors by AI judgment, as in the default flow above. The flag is idempotent and read-only when no safe orphans exist.
 
-   **Crossing from a pre-guard engine line.** The import guard lives in the engine, so a project whose LOCAL engine predates it (any engine that renamed lib modules without the live-import class) runs the OLD, unguarded sweep on its first sync. Driving that first pass, do NOT run the pre-upgrade `orphans --auto-drop-safe`: go straight from `merge-status` to the `upgrade`, let the manifest `file_delete` ops clean the renamed modules post-copy, then run `orphans` once the new engine is in place to sweep any genuinely dead leftovers. After that first pass the project carries the guarded engine and the normal flow is safe.
+   **Crossing from a pre-guard engine line.** The import guard lives in the engine, so a project whose LOCAL engine predates it (any engine that renamed lib modules without the live-import class) runs the OLD, unguarded sweep on its first sync. Driving that first pass, do NOT run the pre-upgrade `orphans --auto-drop-safe`: go straight from `merge-status` to the `upgrade`, let the manifest `file_delete` ops clean the renamed modules post-copy, then run `orphans` once the new engine is in place to sweep any genuinely dead leftovers. After that first pass the project carries the guarded engine and the normal flow is safe. Cleaner still for this exact case: drive the whole upgrade from an upstream engine via `--root` (step 1), which is guarded the whole time and sidesteps the boundary entirely.
 
 6. **Apply the upgrade.** Preview first when uncertain:
    ```bash
@@ -86,6 +94,8 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    Reads `INSTALL/engine/AIDOCS/MANIFEST.json`, diffs against the project's `engine.operations_applied[]`, runs each missing operation, copies the engine-class paths with customization preservation, and writes a summary. See Operations and Customizations below for the rules.
 
+   **The copy may replace this skill body.** The copy step refreshes `AIDOCS/SKILL/`, which includes this file. When `engine.version` changes, the procedure can be redefined mid-run - new commands, new steps, a flag you already passed gaining meaning it did not have at the start. After `upgrade`, if the version bumped, re-read `AIDOCS/SKILL/SKILL_UPDATE-SYNC.md` and finish per the freshly-copied body, not the one you started on. The `--root` driven path in step 1 sidesteps this entirely, since the driving engine never swaps underneath the run. The upgrade also prints a commit-state line when it runs in a git repo (`engine version mismatch: HEAD x, tree y`), the reminder to commit or revert the engine change on its own before `-AutoPush` folds it into an unrelated commit.
+
 7. **Rebuild dispatch and verify.**
    ```bash
    node AIDOCS/tools/engine.mjs sync
@@ -95,7 +105,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
 
 8. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 
-9. **Report.** Summarize: merges applied and entries dropped (from step 4), orphans dropped or surfaced (from step 5), operations applied (from the `upgrade` summary), files copied, doctor verdict. Anything left as a manual note bubbles up to the user.
+9. **Report.** Summarize: merges applied and entries dropped (from step 4), orphans dropped or surfaced (from step 5), operations applied (from the `upgrade` summary), files changed / identical (from the copy report), the commit-drift advisory if it printed, doctor verdict. Anything left as a manual note bubbles up to the user.
 
 ## Operations
 

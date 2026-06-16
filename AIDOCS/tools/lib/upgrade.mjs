@@ -17,22 +17,13 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { engineDriftNote } from "./gitDrift.mjs";
 import { installLog } from "./installLog.mjs";
-import { indexPath, installEngineDir, repoRoot } from "./paths.mjs";
+import { ENGINE_CLASS, indexPath, installEngineDir, repoRoot } from "./paths.mjs";
 import { reconcileRouterQuickRef } from "./routerQuickRef.mjs";
 import { migrateLegacyWatermarkKeys, reconcilePending } from "./state.mjs";
 import { flagFromFilename } from "./sync.mjs";
 import { HANDLERS } from "./upgradeOperations.mjs";
-
-// Paths the copy step refreshes, project-relative. Engine code, canonical skill
-// bodies, router. A project-custom skill body (no source counterpart) survives by
-// virtue of not appearing in the source tree. A path listed in customizations[] is
-// skipped entirely (user opt-out).
-const ENGINE_CLASS = [
-  "AIDOCS/tools",
-  "AIDOCS/SKILL",
-  ".claude/skills/321/SKILL.md",
-];
 
 export function cmdUpgrade(index, args) {
   const root = repoRoot();
@@ -160,7 +151,7 @@ export function cmdUpgrade(index, args) {
 
   const tag = dryRun ? " (dry-run)" : "";
   console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.deferred} deferred, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
-  console.log(`copy${tag}: ${copyReport.copied} file(s) copied, ${copyReport.skipped} skipped`);
+  console.log(`copy${tag}: ${copyReport.changed} changed, ${copyReport.identical} identical, ${copyReport.skipped} skipped`);
   for (const n of opNotes) console.log(`  ${n}`);
   for (const s of copyReport.skipList) console.log(`  SKIP ${s} (customizations[])`);
   if (versionNote) console.log(`  ${versionNote}`);
@@ -193,7 +184,7 @@ export function cmdUpgrade(index, args) {
   if (!dryRun) {
     const graduated = index.graduated === true;
     if (!graduated) {
-      installLog(root, `upgrade: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${copyReport.copied} files copied, ${copyReport.skipped} skipped${versionNote ? `, ${versionNote}` : ""}`);
+      installLog(root, `upgrade: ${counts.applied} applied, ${counts.noop} no-op, ${counts.opSkipped} unsupported, ${copyReport.changed} changed, ${copyReport.identical} identical, ${copyReport.skipped} skipped${versionNote ? `, ${versionNote}` : ""}`);
     }
     try {
       cleanupInstallAfterUpgrade(root, graduated);
@@ -201,6 +192,12 @@ export function cmdUpgrade(index, args) {
       console.warn(`upgrade: cleanup of INSTALL/ failed (${e.message}). The upgrade itself succeeded - remove INSTALL/engine by hand.`);
     }
   }
+
+  // A real upgrade just bumped engine.version in the working tree while HEAD still
+  // carries the old one, so this fires the commit reminder exactly when it is owed.
+  // Silent on a non-git project or one that gitignores AIDOCS (nothing to commit there).
+  const driftNote = engineDriftNote(index);
+  if (driftNote) console.log(`  ${driftNote}`);
 }
 
 // Snapshot the engine-class paths to TEMP/engine-backup-pre-upgrade/ before any handler
@@ -249,7 +246,7 @@ function readJSON(path) { return JSON.parse(readFileSync(path, "utf8")); }
 // SKILL_SETUP.md if a source copy lands. dryRun counts what would copy without writing.
 function copyEngineClass(source, root, customizations, graduated, dryRun) {
   const skip = new Set(customizations || []);
-  const counters = { copied: 0, skipped: 0, skipList: [] };
+  const counters = { changed: 0, identical: 0, skipped: 0, skipList: [] };
 
   for (const rel of ENGINE_CLASS) {
     const src = join(source, rel);
@@ -290,10 +287,31 @@ function copyFile(srcFile, dstFile, relPath, skip, counters, dryRun) {
     counters.skipped++;
     return;
   }
+  // Content-compare before writing. A byte-identical file is a no-op, so skip the
+  // write (no mtime churn, no phantom git-dirty entry) and count it apart from a real
+  // change. This keeps the copy report honest - a same-version -FULL sweep reads as
+  // "0 changed, N identical" instead of "N copied" - and surfaces a silent overwrite
+  // of an unlisted hand edit as a "changed" file. An unreadable dest falls through to
+  // a copy counted as changed.
+  if (sameContent(srcFile, dstFile)) {
+    counters.identical++;
+    return;
+  }
   if (!dryRun) {
     const dir = dirname(dstFile);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     cpSync(srcFile, dstFile);
   }
-  counters.copied++;
+  counters.changed++;
+}
+
+// Byte-equal compare of two files. A missing or unreadable dest (or src) returns
+// false, so the caller treats it as a change and copies. Engine-class files are small
+// text, so reading both fully is cheap.
+function sameContent(a, b) {
+  try {
+    return readFileSync(a).equals(readFileSync(b));
+  } catch {
+    return false;
+  }
 }
