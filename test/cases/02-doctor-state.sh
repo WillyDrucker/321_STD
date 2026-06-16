@@ -1,5 +1,6 @@
 # 02-doctor-state.sh - doctor's check dimensions (registry shape, prose tiers, sub-section
-# budget, malformed schema, EISDIR safety), the state machine plus reconcile gate (set /
+# budget, malformed schema, EISDIR safety, structural-vs-content exit-code split), the
+# state machine plus reconcile gate (set /
 # clear / cross-project residue / legacy watermark normalize / digit-leading project /
 # historical-prose downgrade), the discovery sweep (verdict containment, suggest, validate),
 # and bigsix. The post-migration $PROJ tree from 01-migration is reused by T6-T13 (those
@@ -83,7 +84,7 @@ echo "$WOUT" | grep -q "WDDOCS prose" && fail "WDDOCS prose section wrongly repo
 [ "$WCODE" = "0" ] && pass "WDDOCS prose ignored, doctor exits 0" || fail "doctor wrongly failed on WDDOCS prose (exit $WCODE)"
 printf '\nA capture line with a semicolon; here.\n' >> "$TP/AIDOCS/ProseTier_MEMORY.md"
 CCODE=0; node "$TPENG" doctor >/dev/null 2>&1 || CCODE=$?
-[ "$CCODE" != "0" ] && pass "core authored semicolon is error-tier (doctor exits $CCODE)" || fail "core authored semicolon did not fail doctor"
+[ "$CCODE" = "10" ] && pass "core authored semicolon is content-tier (doctor exits 10, structure intact)" || fail "core authored semicolon exit was $CCODE (expected 10)"
 node "$TPENG" doctor 2>&1 | grep -A3 "\[Banned prose\]" | grep -q "ProseTier_MEMORY" && pass "core semicolon listed under Banned prose (error)" || fail "core semicolon not under Banned prose"
 
 echo "=== T23: clear-reconcile drops legacy watermark keys, keeps the canonical shape ==="
@@ -154,9 +155,9 @@ node "$RENG" init "$DC" --name DcProj >/dev/null 2>&1
 DCENG="$DC/AIDOCS/tools/engine.mjs"
 # Lay a semicolon in CHANGELOG (a restored historical file) - normally a doctor error
 echo "Some history; with a semicolon." >> "$DC/CHANGELOG.md"
-# Steady state: doctor sees the semicolon as an ERROR and exits 20
+# Steady state: doctor sees the semicolon as a content error and exits 10 (structure intact)
 node "$DCENG" doctor >/dev/null 2>&1; DC1=$?
-[ "$DC1" = "20" ] && pass "doctor errors on CHANGELOG semicolon in steady state (gate on)" || fail "doctor did not error on steady-state semicolon (exit $DC1)"
+[ "$DC1" = "10" ] && pass "doctor content-errors on CHANGELOG semicolon in steady state (exit 10, gate on)" || fail "doctor did not content-error on steady-state semicolon (exit $DC1)"
 # Set reconcile_pending: doctor downgrades CHANGELOG semicolon to reconcile warning, exits 0
 node "$DCENG" state --set-reconcile >/dev/null 2>&1
 node "$DCENG" doctor >/dev/null 2>&1; DC2=$?
@@ -164,7 +165,25 @@ node "$DCENG" doctor >/dev/null 2>&1; DC2=$?
 # Semicolon in an AI-authored file (MEMORY.md) is STILL an error during reconcile - not a historical file
 echo "Some current state; with a semicolon." >> "$DC/AIDOCS/DcProj_MEMORY.md"
 node "$DCENG" doctor >/dev/null 2>&1; DC3=$?
-[ "$DC3" = "20" ] && pass "doctor still errors on MEMORY semicolon during reconcile (only historical files downgrade)" || fail "doctor wrongly downgraded MEMORY semicolon (exit $DC3)"
+[ "$DC3" = "10" ] && pass "doctor still content-errors on MEMORY semicolon during reconcile (exit 10, only historical files downgrade)" || fail "doctor wrongly downgraded MEMORY semicolon (exit $DC3)"
+
+echo "=== T78: doctor exit code splits structural (20) from content-only (10) so a sync wrapper can tell them apart ==="
+# H2: integrity errors exit 20 (the engine surface is wrong, a sync must stop); content-only
+# errors with the structure intact exit 10 (pre-existing prose/shape debt, not a sync
+# failure); a clean project exits 0. Lets -UpdateSync / CI distinguish "the upgrade broke
+# the structure" from "the project carries content debt" by exit code alone.
+SPLIT="$BASE/exit-split"
+node "$RENG" init "$SPLIT" --name SplitProj >/dev/null 2>&1
+SPLITENG="$SPLIT/AIDOCS/tools/engine.mjs"
+node "$SPLITENG" doctor >/dev/null 2>&1 && pass "clean project exits 0 (baseline)" || fail "clean project did not exit 0"
+# Content-only error: a banned semicolon in an AI-authored file, structure intact -> exit 10
+printf '\nA content line with a semicolon; here.\n' >> "$SPLIT/AIDOCS/SplitProj_MEMORY.md"
+CONTENT=0; node "$SPLITENG" doctor >/dev/null 2>&1 || CONTENT=$?
+[ "$CONTENT" = "10" ] && pass "content-only error exits 10 (structure intact)" || fail "content error exit was $CONTENT (expected 10)"
+# Structural error on top (remove a registered file): integrity dominates -> exit 20
+rm "$SPLIT/AIDOCS/SplitProj_BACKLOG.md"
+STRUCT=0; node "$SPLITENG" doctor >/dev/null 2>&1 || STRUCT=$?
+[ "$STRUCT" = "20" ] && pass "a structural error dominates the exit code (20, even with content debt present)" || fail "structural error exit was $STRUCT (expected 20)"
 
 echo "=== T68: PATTERN-STAGING.md ships in a fresh init (engine-class refresh on -UpdateSync) ==="
 # Trim of the duplicated staging contract out of the two update skill bodies. The shared
@@ -225,3 +244,35 @@ node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "slug stamped be
 node "$CRENG" state --set-reconcile >/dev/null 2>&1
 node "$CRENG" state --clear-reconcile >/dev/null 2>&1
 node "$CRENG" state 2>&1 | grep -q "reconcile-survivor" && pass "recent_captured survives state --clear-reconcile normalize" || fail "recent_captured wiped by clear-reconcile (regression on the AI's lookup)"
+
+echo "=== T81: scrub --fix --semicolons rewrites a clause-joining semicolon, leaves code and ambiguous cases alone ==="
+# H5: the sanctioned house-voice fix for a semicolon in SESSION / MEMORY (or any authored
+# file). --fix rewrites em dashes, and --semicolons adds the clause-joining "; " -> " - "
+# rewrite. A line-end semicolon and any semicolon in code stay untouched (code) or flagged
+# (ambiguous), so the writer still decides the genuinely-ambiguous cases.
+SCRUBF="$BASE/scrub-fix.md"
+printf '# Scrub fix\n\n**Purpose:** test.\n\nFirst clause; second clause.\n\nInline `a; b` stays.\n\n```\ncode; here\n```\n\nTrailing semicolon flagged;\n' > "$SCRUBF"
+# Without --semicolons: the clause-joiner stays, the hint points at --semicolons
+S1="$(node "$RENG" scrub --fix --path "$SCRUBF" 2>&1)"; S1C=$?
+echo "$S1" | grep -q "re-run with --semicolons" && pass "scrub --fix surfaces the --semicolons hint when a semicolon remains" || fail "no --semicolons hint (output: $S1)"
+[ "$S1C" = "20" ] && pass "scrub --fix exits 20 with a semicolon still present" || fail "scrub --fix exit was $S1C (expected 20)"
+grep -q "First clause; second clause" "$SCRUBF" && pass "scrub --fix alone leaves the clause-joining semicolon (not auto-removed)" || fail "scrub --fix wrongly rewrote the semicolon without --semicolons"
+# With --semicolons: the clause-joiner is rewritten, code stays, the line-end one is flagged
+S2="$(node "$RENG" scrub --fix --semicolons --path "$SCRUBF" 2>&1)"; S2C=$?
+echo "$S2" | grep -q "rewrote 1 clause-joining semicolon" && pass "scrub --fix --semicolons rewrites the clause-joiner" || fail "no clause-joiner rewrite (output: $S2)"
+grep -q "First clause - second clause" "$SCRUBF" && pass "the clause-joining semicolon became ' - '" || fail "clause-joiner not rewritten to ' - '"
+grep -q 'Inline `a; b` stays' "$SCRUBF" && pass "the inline-code semicolon is untouched" || fail "inline-code semicolon wrongly rewritten"
+grep -q "code; here" "$SCRUBF" && pass "the fenced-code semicolon is untouched" || fail "fenced-code semicolon wrongly rewritten"
+[ "$S2C" = "20" ] && pass "scrub still exits 20 for the remaining line-end semicolon (genuinely ambiguous)" || fail "scrub exit was $S2C (expected 20)"
+echo "$S2" | grep -qE "scrub-fix\.md:[0-9]+ semicolon" && pass "the line-end semicolon is reported for a human (name:line semicolon)" || fail "line-end semicolon not reported (output: $S2)"
+# Em-dash regression: --fix still rewrites em dashes to ' - '
+node -e 'require("fs").writeFileSync(process.argv[1], "# Em\n\n**Purpose:** test.\n\nA clause — a dash.\n")' "$SCRUBF"
+node "$RENG" scrub --fix --path "$SCRUBF" >/dev/null 2>&1
+grep -q "A clause - a dash" "$SCRUBF" && pass "scrub --fix still rewrites em dashes to ' - ' (regression)" || fail "em-dash rewrite regressed"
+# --path resolves a RELATIVE path against the active --root, not the caller's cwd
+SRP="$BASE/scrubroot"
+mk_proj "$SRP" SrpProj >/dev/null
+mkdir -p "$SRP/sub"
+printf '# Root path\n\n**Purpose:** test.\n\nA semicolon; here.\n' > "$SRP/sub/file.md"
+SR="$(node "$RENG" scrub --root "$SRP" --path "sub/file.md" 2>&1)"; SRC=$?
+echo "$SR" | grep -qE "file\.md:[0-9]+ semicolon" && pass "scrub --path resolves a relative path against --root (not cwd)" || fail "scrub --path did not resolve against --root (exit $SRC, output: $SR)"

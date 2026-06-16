@@ -223,6 +223,63 @@ echo "$FZOUT" | grep -q "1 survive verbatim, 3 not found" && pass "audit reports
 echo "$FZOUT" | grep -q "possible match: 16-architectural-patterns" && pass "fuzzy match surfaces the trimmed-headline candidate" || fail "fuzzy match did not surface the trimmed-headline candidate"
 echo "$FZOUT" | grep -q "Old session entry that was deliberately dropped" && pass "deliberately dropped entry still appears in the not-found list" || fail "deliberately dropped entry missing from not-found list"
 
+echo "=== T80: migrate-import no-ops on an empty placeholder EXTENDED instead of manufacturing a phantom entry ==="
+# H4: a pre-321 project's archived EXTENDED is an empty scaffold (H1 + Purpose + empty
+# ## LIFO + "(no entries yet)"). The blob fallback used to invent a phantom entry from the
+# H1/Purpose, which --audit reported as "1 not found" on every fresh-existing migration.
+# Now both import and --audit recognize the scaffold and no-op honestly.
+PH="$BASE/placeholder"
+node "$RENG" init "$PH" --name PhProj >/dev/null 2>&1
+PHENG="$PH/AIDOCS/tools/engine.mjs"
+mkdir -p "$PH/AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS"
+# An empty-placeholder EXTENDED scaffold, the exact shape init lays.
+cat > "$PH/AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_SESSION_EXTENDED.md" <<'EOF'
+# PhProj - SESSION (Extended)
+
+**Purpose:** Longer-form technical narrative for PhProj_SESSION.md. LIFO holds anchored sub-section detail.
+
+## LIFO
+
+(no extended entries yet - anchored sub-sections land here per LIFO bullet that needs depth)
+EOF
+# --audit: recognizes the empty placeholder, no phantom "not found"
+PHAUDIT="$(node "$PHENG" migrate-import --from "AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_SESSION_EXTENDED.md" --skill updatesession --audit 2>&1)"; PHAC=$?
+echo "$PHAUDIT" | grep -q "empty placeholder" && pass "migrate-import --audit recognizes the empty placeholder scaffold" || fail "audit did not recognize the placeholder (output: $PHAUDIT)"
+echo "$PHAUDIT" | grep -q "not found" && fail "audit still reports a phantom 'not found' on the empty placeholder" || pass "audit no longer reports a phantom not-found entry"
+[ "$PHAC" = "0" ] && pass "migrate-import --audit exits 0 on the empty placeholder" || fail "audit exit on placeholder was $PHAC (expected 0)"
+# import: no-ops, no staging file written
+PHIMPORT="$(node "$PHENG" migrate-import --from "AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_SESSION_EXTENDED.md" --skill updatesession 2>&1)"; PHIC=$?
+echo "$PHIMPORT" | grep -q "nothing to import" && pass "migrate-import no-ops on the empty placeholder (import path)" || fail "import did not no-op on placeholder (output: $PHIMPORT)"
+[ "$PHIC" = "0" ] && pass "migrate-import exits 0 on the empty placeholder" || fail "import exit on placeholder was $PHIC (expected 0)"
+[ ! -f "$PH/AIDOCS/tools/staging/updatesession.json" ] && pass "no staging file written for the empty placeholder" || fail "staging file wrongly created for empty placeholder"
+# Regression: a NON-empty archive still imports (the guard is scoped to true placeholders)
+cat > "$PH/AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_MEMORY_EXTENDED.md" <<'EOF'
+# PhProj - MEMORY (Extended)
+
+**Purpose:** Anchored detail.
+
+## LIFO
+
+### A real captured entry
+
+Body with genuine content that must import.
+EOF
+PHREAL="$(node "$PHENG" migrate-import --from "AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_MEMORY_EXTENDED.md" --skill updatememory 2>&1)"
+echo "$PHREAL" | grep -q "wrote 1 entr" && pass "a non-empty archive still imports (placeholder guard is scoped)" || fail "non-empty archive did not import (output: $PHREAL)"
+# A non-placeholder parenthetical line is REAL content, not a scaffold annotation - it must
+# import, not no-op (the predicate matches only "(no ... yet ...)" / "(fill in ...)", not any paren).
+cat > "$PH/AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_PAREN.md" <<'EOF'
+# PhProj - depth
+
+**Purpose:** test.
+
+## LIFO
+
+(a genuine captured note that must survive distillation)
+EOF
+PHPAREN="$(node "$PHENG" migrate-import --from "AIDOCS/PhProj_SETUP_ARCHIVE/AIDOCS/PhProj_PAREN.md" --skill updatesession 2>&1)"
+echo "$PHPAREN" | grep -q "nothing to import" && fail "a real parenthetical-only doc was wrongly dropped as an empty placeholder" || pass "a non-placeholder parenthetical line imports (not misread as scaffold)"
+
 echo "=== T55: classifyMove recognizes DEV-STANDARDS hyphen form (R3) ==="
 DS="$BASE/devstd"
 node "$RENG" init "$DS" --name DsProj >/dev/null 2>&1

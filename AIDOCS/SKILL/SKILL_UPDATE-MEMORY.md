@@ -32,7 +32,7 @@ Default is no change - most sessions produce project work, not memory-track work
 
 Always run `/321 -UpdateSession` first, so SESSION is current before this skill reads it. If it fails, stop and report.
 
-**Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), skip Step 1 - Setup's SESSION capture already ran this pass. `migrate-import` has already scavenged the archived MEMORY_EXTENDED depth 1:1, so do not re-derive those entries - fill the Big 6 from the code scan plus the archive (the initial project check), and add durable observations the import did not carry. Leave BACKLOG alone here: `migrate-restore` already carried it in and the reconciliation pass sweeps it. Capture additively, the reconciliation pass distills later.
+**Migration exception (Setup-driven capture only, never on a graduated project):** skip this Step 1 (Setup already captured SESSION this pass), fill the Big 6 from code plus the archive, add observations `migrate-import` did not scavenge, and leave BACKLOG (`migrate-restore` carried it, reconcile sweeps it). Full steps in `INSTALL/setup.md`.
 
 ## Step 2: Gather context (watermark scopes the read)
 
@@ -107,7 +107,7 @@ Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section
 - **Default is no change.** Ruthless filter - most sessions produce project work, not memory-track.
 - **Never write project events.** SESSION's lane. Code-applicable rules drop to DevAudit's lane.
 - **Auto-invoke -UpdateSession first** so SESSION is current before reading.
-- **Staging only**, and the firewall keeps this skill inside `updatememory.*`.
+- **Staging only**, and the firewall keeps this skill inside `updatememory.*`. The sole hand-edit exception is a mechanical house-voice fix (em dash, clause-joining semicolon) via `scrub --fix --semicolons`, which rewrites voice without touching captured content or the watermark.
 - **AGENTS / auto-memory stay user-scoped** - surface them as suggestive LIFO bullets, never auto-write them.
 
 ## Deferred

@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { installLog } from "./installLog.mjs";
 import { indexPath, installEngineDir, repoRoot } from "./paths.mjs";
 import { reconcileRouterQuickRef } from "./routerQuickRef.mjs";
-import { reconcilePending } from "./state.mjs";
+import { migrateLegacyWatermarkKeys, reconcilePending } from "./state.mjs";
 import { flagFromFilename } from "./sync.mjs";
 import { HANDLERS } from "./upgradeOperations.mjs";
 
@@ -152,6 +152,12 @@ export function cmdUpgrade(index, args) {
     writeFileSync(indexPath(), `${JSON.stringify(index, null, 2)}\n`, "utf8");
   }
 
+  // Migrate legacy state.json watermark keys (sessionupdate -> updatesession, etc). The
+  // registry rename ops moved files / buckets / sizes, but the runtime watermark keys live
+  // in state.json, outside the manifest's reach. Fold them here so a synced project sheds
+  // the dead keys. Dry-run leaves state.json untouched.
+  const watermarkRenames = dryRun ? [] : migrateLegacyWatermarkKeys();
+
   const tag = dryRun ? " (dry-run)" : "";
   console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.deferred} deferred, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
   console.log(`copy${tag}: ${copyReport.copied} file(s) copied, ${copyReport.skipped} skipped`);
@@ -161,6 +167,7 @@ export function cmdUpgrade(index, args) {
   if (routerReport && routerReport.dropped.length > 0) {
     console.log(`  router${tag}: pruned ${routerReport.dropped.length} stale quick-ref line(s) (${routerReport.dropped.join(", ")})`);
   }
+  if (watermarkRenames.length > 0) console.log(`  state${tag}: migrated legacy watermark key(s) (${watermarkRenames.join(", ")})`);
 
   // User-facing command flag changes from skill_rename ops this upgrade applied.
   // Without this, the user discovers their muscle-memory commands stopped working

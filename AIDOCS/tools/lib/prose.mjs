@@ -1,9 +1,9 @@
 // prose.mjs - the house-voice linter shared by doctor (the gate) and scrub (gate
 // plus fix). Owns three things: which files count as authored prose, how to find
 // banned characters in them (em dashes and semicolons, skipping code fences and
-// inline code), and how to mechanically fix the safe case. Em dashes rewrite to
-// " - ". Semicolons are flagged, never auto-removed, because removing one changes
-// the sentence.
+// inline code), and how to mechanically fix them. Em dashes rewrite to " - ".
+// Clause-joining semicolons rewrite to " - " only on scrub's opt-in --semicolons,
+// since the joiner is the one safe case - other semicolons stay flagged for a human.
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -66,8 +66,8 @@ export function scanBanned(content) {
 }
 
 // Rewrite em dashes to " - " in prose, never inside code fences or inline code.
-// Returns the new content and the count rewritten. Semicolons are left alone -
-// removing one changes meaning, so scrub flags them for a human instead.
+// Returns the new content and the count rewritten. Semicolons are left alone here -
+// scrub's opt-in --semicolons handles the joiner case via fixSemicolons below.
 export function fixEmDashes(content) {
   let count = 0;
   let inFence = false;
@@ -75,6 +75,29 @@ export function fixEmDashes(content) {
     if (/^\s*```/.test(line)) { inFence = !inFence; return line; }
     if (inFence || !line.includes("—")) return line;
     return line.replace(/(`[^`]*`)|\s*—\s*/g, (_match, code) => {
+      if (code) return code;   // an inline-code span - leave it untouched
+      count++;
+      return " - ";
+    });
+  });
+  return { content: lines.join("\n"), count };
+}
+
+// Rewrite a clause-joining semicolon ("word; word") to " - ", the house-voice joiner,
+// matching how a writer would replace it by hand. Only the joiner case (a semicolon
+// followed by whitespace) is rewritten - a semicolon at line end or one with no
+// following space is ambiguous and stays for scanBanned to flag. More conservative
+// than fixEmDashes: it also skips indented code blocks, because semicolons are
+// everywhere in code and must never be touched. Opt-in via scrub --fix --semicolons.
+export function fixSemicolons(content) {
+  let count = 0;
+  let inFence = false;
+  const lines = content.split("\n").map((line) => {
+    if (/^\s*```/.test(line)) { inFence = !inFence; return line; }
+    if (inFence) return line;
+    if (/^ {4,}\S/.test(line)) return line;   // indented code block - not prose
+    if (!line.includes(";")) return line;
+    return line.replace(/(`[^`]*`)|\s*;\s+/g, (_match, code) => {
       if (code) return code;   // an inline-code span - leave it untouched
       count++;
       return " - ";

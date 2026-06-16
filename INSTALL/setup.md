@@ -96,7 +96,7 @@ The target holds content worth preserving. Land the canonical structure, then la
    node AIDOCS/tools/engine.mjs fetch-engine   # defaults --repo from engine.upstream, or pass --from <local 321 checkout>
    node INSTALL/engine/AIDOCS/tools/engine.mjs init . --name <PROJECT>
    ```
-   The fetched engine's `init` is write-if-missing for the data files, so it relays the archived-away docs as fresh scaffolds, lays the canonical auto-memory back, and leaves the engine in place. If the install was AI-driven and you still have the install-time temp clone of the source repo on disk, point `fetch-engine --from <that-clone>` at it to skip a network round-trip - the result is identical.
+   The fetched engine's `init` is write-if-missing for the data files, so it relays the archived-away docs as fresh scaffolds, lays the canonical auto-memory back, and leaves the engine in place. On a local install (the script ran from your own clone of the source repo), point `fetch-engine --from <that clone>` at it to skip the network round-trip - the result is identical. A remote one-liner install leaves no clone behind (`install.ps1` removes its temp clone on every path), so there `fetch-engine` defaults `--repo` from the recorded upstream and clones fresh.
 
    **Engine-skew guard (the runbook and the engine must match).** The reinstall ran `init` from the fetched engine, overwriting the project's `AIDOCS/tools`, so a stale fetched source can leave the project missing commands the rest of this migration calls. Verify before capture:
    ```bash

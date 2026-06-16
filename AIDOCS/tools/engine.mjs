@@ -6,6 +6,7 @@
 
 import { cmdBigsix } from "./lib/bigsix.mjs";
 import { cmdCommit } from "./lib/commit.mjs";
+import { cmdCompare } from "./lib/compareEngine.mjs";
 import { cmdDoctor } from "./lib/doctor.mjs";
 import { cmdFetchEngine } from "./lib/fetchEngine.mjs";
 import { cmdGraduate } from "./lib/graduate.mjs";
@@ -25,7 +26,7 @@ import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 import { cmdWatermark } from "./lib/watermark.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "compare", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -64,6 +65,7 @@ function main() {
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
     case "upgrade":  cmdUpgrade(index, args); break;
+    case "compare":  cmdCompare(index); break;
     case "merge-status": cmdMergeStatus(index, args); break;
     case "orphans": cmdOrphans(index, args); break;
     case "validate": cmdValidate(index, args); break;
@@ -87,9 +89,12 @@ Global:
 Commands:
   doctor    Validate this project against its registry: registry resolves, memory
             and session shapes, auto-memory pointers, banned prose. Read-only.
+            Exit: 20 structural break, 10 content-only debt (structure intact), 0 clean.
   scrub     House-voice gate over authored files. --check (default) reports banned
-            prose, --fix auto-rewrites the safe cases (ambiguous ones flagged, not removed).
-            [--path <file>]
+            prose, --fix rewrites em dashes to " - " (ambiguous cases flagged). Add
+            --semicolons to also rewrite clause-joining "; " to " - " (non-joining ones
+            stay flagged). The sanctioned voice fix for any authored file, SESSION /
+            MEMORY included. [--fix [--semicolons]] [--path <file>]
   sync      Rebuild skills.dispatch in _index.json from the AIDOCS/SKILL/ bodies.
             [--dry-run]
   upgrade   Drive the project up to the fetched engine's manifest plus refresh the
@@ -98,6 +103,11 @@ Commands:
             each missing op (idempotent), skips paths in customizations[], bumps
             engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending
             is set ([--force] overrides). [--dry-run]
+  compare   Read-only "is there anything to sync" check. Prints the local-vs-upstream
+            engine.version and the names of manifest operations present upstream but not
+            yet in engine.operations_applied[]. An update check, not an apply preview
+            (that is upgrade --dry-run). Requires a prior fetch-engine. Exits 0 with the
+            report (20 only on a missing fetch).
   merge-status  Print the merge punch list for customizations[] against the fetched
             upstream tree, one of five classes per entry: identical, diverged,
             both-absent, local-absent, upstream-absent. Read-only by default. The AI
@@ -110,14 +120,15 @@ Commands:
             -FULL. Requires fetch-engine.
             [--auto-drop-clean]
   orphans   Print files in the project tree that are NOT present in the fetched
-            upstream, classified as safe / review-skill / review-automemory.
+            upstream, classified as safe / live-import / review-skill / review-automemory.
             Read-only by default. The AI walks the output during -UpdateSync to
             decide per file (project-custom keep vs abandoned canonical drop), so
             no critical file is deleted by accident. --auto-drop-safe mechanically
-            drops the safe class only (engine-only paths: AIDOCS/tools/lib/ and
-            top-level AIDOCS/tools/*.md - engine.mjs is always present upstream so
-            it is excluded), leaving the two review classes for AI judgment.
-            Honors customizations[]. Requires fetch-engine.
+            drops the safe class only (engine-only paths the live engine no longer
+            imports). A path still imported locally (a pending rename) is held in the
+            live-import class so a pre-upgrade sweep cannot brick the engine - the
+            manifest file_delete ops clean it post-copy. Honors customizations[].
+            Requires fetch-engine.
             [--auto-drop-safe]
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>

@@ -1,9 +1,10 @@
-# 07-sync-judgment.sh - the AI-judgment surface of -UpdateSync: merge-status classifies
-# customizations[] entries against the fetched upstream (T67), --auto-drop-clean trims
-# only the mechanically safe classes (T72, T73 five-class safety), and orphans surfaces
-# the three target-only classes with --auto-drop-safe handling just the safe one (T75,
-# T76 seed-path regression). These commands produce the punch lists the AI walks during
-# -UpdateSync; the scripts stay mechanical, the judgment stays with the AI. The apply
+# 07-sync-judgment.sh - the read + AI-judgment surface of -UpdateSync: compare reports the
+# version and pending-op delta (T79), merge-status classifies customizations[] entries
+# against the fetched upstream (T67), --auto-drop-clean trims only the mechanically safe
+# classes (T72, T73 five-class safety), and orphans surfaces the target-only classes with
+# --auto-drop-safe handling just the safe one (T75, T76 seed-path regression, T77 the
+# import-aware brick guard). These commands produce the punch lists the AI walks during
+# -UpdateSync. The scripts stay mechanical, the judgment stays with the AI. The apply
 # surface lives in 04-upgrade-ops.sh, the safety perimeter in 06-upgrade-guards.sh.
 
 echo "=== T67: merge-status classifies customizations[] entries against the fetched upstream (AI merge punch list) ==="
@@ -179,3 +180,73 @@ echo "$SPOUT" | grep -q "feedback_lean_docs.md" && fail "canonical feedback_lean
 echo "$SPOUT" | grep -q "user_name.md" && fail "canonical user_name.md misclassified (basename comparison broken)" || pass "canonical user_name.md recognized despite relocated project seed"
 # The genuine project-only rule SHOULD show as review-automemory
 echo "$SPOUT" | grep -q "project_relocated_only.md" && pass "project-only rule at relocated seed correctly flagged as review-automemory" || fail "project-only rule not flagged (output: $SPOUT)"
+
+echo "=== T77: orphans holds a still-imported engine module out of the safe class (the camelCase-rename brick guard) ==="
+# Reproduces the 0.1.15 rename hazard: a downstream engine still imports a module under a
+# name absent upstream (kebab fetch-engine.mjs vs camel fetchEngine.mjs). The pre-upgrade
+# sweep must NOT drop a module the running engine imports, or the next engine call dies
+# with ERR_MODULE_NOT_FOUND before upgrade can land the new tree. Here a project-only lib
+# imported by the engine stands in for the not-yet-renamed module (HELD), and a second
+# project-only lib imported by nobody is the genuine dead orphan (DROPPED).
+GUARD="$BASE/orphan-guard"
+GUARDENG="$(mk_proj "$GUARD" GuardProj)"
+GUARDSRC="$BASE/orphan-guard-src"
+mk_src "$GUARDSRC" --empty-manifest
+# still-imported.mjs: a live module (the engine imports it) absent upstream -> must be HELD.
+printf '// planted live module for the orphan guard test\nexport const planted = true;\n' > "$GUARD/AIDOCS/tools/lib/still-imported.mjs"
+printf '\nimport "./lib/still-imported.mjs";\n' >> "$GUARD/AIDOCS/tools/engine.mjs"
+# dyn-imported.mjs: referenced only via a dynamic import() in a never-called function -> must
+# be HELD too (the scan covers the import() form, not just static from/side-effect imports).
+printf '// planted dynamically-imported module\nexport const dyn = true;\n' > "$GUARD/AIDOCS/tools/lib/dyn-imported.mjs"
+printf '\nexport function _dynRef() { return import("./lib/dyn-imported.mjs"); }\n' >> "$GUARD/AIDOCS/tools/engine.mjs"
+# truly-dead.mjs: a module imported by nobody, absent upstream -> genuine safe orphan.
+printf '// planted dead module\n' > "$GUARD/AIDOCS/tools/lib/truly-dead.mjs"
+node "$GUARDENG" fetch-engine --from "$GUARDSRC" >/dev/null 2>&1
+# Read-only walk: still-imported is live-import, truly-dead is safe.
+GOUT="$(node "$GUARDENG" orphans 2>&1)"
+echo "$GOUT" | grep -q "live-import (2)" && pass "orphans surfaces the live-import class for both held modules (static + dynamic)" || fail "no live-import (2) class (output: $GOUT)"
+echo "$GOUT" | grep -q "still-imported.mjs" && pass "orphans names the static-import held module" || fail "static-import module not named (output: $GOUT)"
+echo "$GOUT" | grep -q "dyn-imported.mjs" && pass "orphans holds a dynamically-imported module too (import() coverage)" || fail "dynamic-import module not held (output: $GOUT)"
+echo "$GOUT" | grep -q "safe (1)" && pass "orphans keeps the genuinely-dead module in the safe class" || fail "dead module not in safe class (output: $GOUT)"
+echo "$GOUT" | grep -q "truly-dead.mjs" && pass "orphans names the dead safe orphan" || fail "dead orphan not named (output: $GOUT)"
+# --auto-drop-safe: drops the dead one, HOLDS the live ones.
+GDROP="$(node "$GUARDENG" orphans --auto-drop-safe 2>&1)"
+[ ! -f "$GUARD/AIDOCS/tools/lib/truly-dead.mjs" ] && pass "auto-drop-safe removed the genuinely-dead module" || fail "dead module not removed"
+[ -f "$GUARD/AIDOCS/tools/lib/still-imported.mjs" ] && pass "auto-drop-safe HELD the still-imported module (brick prevented)" || fail "still-imported module wrongly dropped (would brick the engine)"
+[ -f "$GUARD/AIDOCS/tools/lib/dyn-imported.mjs" ] && pass "auto-drop-safe HELD the dynamically-imported module" || fail "dynamic-import module wrongly dropped"
+echo "$GDROP" | grep -q "held in live-import" && pass "auto-drop-safe summary reports the live-import holds (not silently omitted)" || fail "post-drop summary did not mention the live-import holds (output: $GDROP)"
+# The money check: the engine still loads after the sweep (no ERR_MODULE_NOT_FOUND).
+node "$GUARDENG" help >/dev/null 2>&1 && pass "engine still loads after the sweep (import-aware guard prevented the brick)" || fail "engine failed to load after auto-drop-safe (brick not prevented)"
+
+echo "=== T79: compare reports the version delta and pending manifest ops (the read-only is-there-anything-to-sync check) ==="
+# H3: answers "do I need to sync" without a hand-rolled manifest diff. Reads local
+# engine.version + operations_applied[] and the fetched upstream version + MANIFEST.json,
+# prints the version line and the names of ops present upstream but not yet applied.
+CMP="$BASE/compare"
+CMPENG="$(mk_proj "$CMP" CmpProj)"
+CMPSRC="$BASE/compare-src"
+mk_src "$CMPSRC" --version 9.9.9
+# Lay a one-op manifest upstream (the project's operations_applied[] is empty after init).
+cat > "$CMPSRC/AIDOCS/MANIFEST.json" <<'JSON'
+{ "operations": [ { "name": "demo_pending_op", "type": "file_delete", "file": "AIDOCS/tools/nonexistent.md" } ] }
+JSON
+# Refuses cleanly without a fetch
+CMPNF="$(node "$CMPENG" compare 2>&1)"; CMPNFCC=$?
+echo "$CMPNF" | grep -q "no fetched engine" && pass "compare reports no fetched engine when INSTALL/engine is missing" || fail "no missing-fetch message (output: $CMPNF)"
+[ "$CMPNFCC" = "20" ] && pass "compare exits 20 when fetch is missing" || fail "compare exit on missing fetch was $CMPNFCC (expected 20)"
+node "$CMPENG" fetch-engine --from "$CMPSRC" >/dev/null 2>&1
+# Version delta + pending op surfaced, exit 0 (read-only)
+CMPOUT="$(node "$CMPENG" compare 2>&1)"; CMPCC=$?
+[ "$CMPCC" = "0" ] && pass "compare exits 0 (read-only check)" || fail "compare exit was $CMPCC (expected 0)"
+echo "$CMPOUT" | grep -q "upstream 9.9.9" && pass "compare prints the local-vs-upstream version delta" || fail "no version delta (output: $CMPOUT)"
+echo "$CMPOUT" | grep -q "1 operation(s) pending" && pass "compare counts the pending manifest op" || fail "no pending-op count (output: $CMPOUT)"
+echo "$CMPOUT" | grep -q "demo_pending_op (file_delete)" && pass "compare names the pending op with its type" || fail "pending op not named (output: $CMPOUT)"
+# Apply the op: pending drops to 0 but the version still differs -> engine-only refresh
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.engine.operations_applied=["demo_pending_op"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CMP/AIDOCS/_index.json"
+CMPDONE="$(node "$CMPENG" compare 2>&1)"
+echo "$CMPDONE" | grep -q "no structural operations are pending" && pass "compare reports engine-only refresh when ops are applied but version differs" || fail "no engine-only-refresh message (output: $CMPDONE)"
+# Match the version too -> fully up to date
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.engine.version="9.9.9";fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CMP/AIDOCS/_index.json"
+CMPUTD="$(node "$CMPENG" compare 2>&1)"
+echo "$CMPUTD" | grep -q "up to date" && pass "compare reports up-to-date when version matches and no ops pending" || fail "no up-to-date message (output: $CMPUTD)"
+echo "$CMPUTD" | grep -q "both 9.9.9" && pass "compare prints the matched-version line" || fail "no matched-version line (output: $CMPUTD)"

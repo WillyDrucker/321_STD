@@ -110,6 +110,16 @@ export function cmdMigrateImport(index, args) {
   content = normalizeLegacy(content);
 
   let entries = parseEntries(content);
+
+  // An empty placeholder scaffold (a fresh-install EXTENDED: H1 + Purpose + the empty
+  // ## LIFO header and its "(no entries yet)" annotation) parses to zero entries. Without
+  // this guard the blob fallback below manufactures a phantom entry from the H1/Purpose,
+  // which --audit then reports as a lost entry on every pre-321 migration. No-op honestly.
+  if (entries.length === 0 && isPlaceholderScaffold(content)) {
+    console.log(`migrate-import${audit ? " --audit" : ""}: ${audit ? "no entries to audit" : "nothing to import"} - ${from} is an empty placeholder (no captured content).`);
+    return;
+  }
+
   let blob = false;
   if (entries.length === 0) {
     // No headings or bold-leads to split on (a hand-written doc, loose notes). Import
@@ -263,4 +273,31 @@ function parseEntries(content) {
   // Drop contentless group headers (a heading with no prose of its own) - their
   // bold-lead children were captured as their own entries, so no detail is lost.
   return entries.filter((e) => e.title.length > 0 && e.body.length > 0);
+}
+
+// True when the doc is a fresh-install scaffold with no captured content: only the H1, a
+// **Purpose:** callout (one or more lines until the next blank), --- dividers, the empty
+// canonical section headers (## LIFO, ## Current State, the Big-6), and parenthetical
+// "(no entries yet)" / "(fill in ...)" annotations. Anything else is real content. Lets
+// migrate-import no-op honestly on an empty EXTENDED rather than manufacture a phantom
+// entry from the H1/Purpose that --audit would later flag as a lost entry.
+function isPlaceholderScaffold(content) {
+  const SECTION = /^##\s+(LIFO|Current State|Overview|Stack|Architecture|Environment|Pipeline|Conventions)\s*$/i;
+  // Only the canonical scaffold annotations, NOT any parenthetical line: a "(no ... yet ...)"
+  // placeholder under an empty section, or a "(fill in ...)" placeholder in a Big-6 slot. A
+  // real parenthetical note (genuine captured content) must not read as scaffold and get dropped.
+  const PLACEHOLDER_NOTE = /^\((no\b[^)]*\byet\b|fill in\b)[^)]*\)$/i;
+  let inPurpose = false;
+  for (const raw of content.split("\n")) {
+    const line = raw.trim();
+    if (line === "") { inPurpose = false; continue; }
+    if (inPurpose) continue;                                              // wrapped Purpose continuation
+    if (/^#\s+/.test(line)) continue;                                    // H1 title
+    if (/^\*\*Purpose:\*\*/.test(line)) { inPurpose = true; continue; }  // Purpose callout
+    if (line === "---") continue;                                        // divider
+    if (SECTION.test(line)) continue;                                    // empty canonical section header
+    if (PLACEHOLDER_NOTE.test(line)) continue;                           // scaffold placeholder annotation
+    return false;                                                        // real content found
+  }
+  return true;
 }

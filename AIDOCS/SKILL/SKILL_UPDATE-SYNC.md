@@ -19,10 +19,14 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```
    Lands the upstream engine in `INSTALL/engine`. With no flag, `fetch-engine` defaults `--repo` from `engine.upstream` (the registry already knows it). Pass `--repo <url>` to override or `--from <dir>` for a local checkout. A clone failure (offline, bad ref) is a non-zero exit. Report it and stop. The local engine keeps working.
 
-3. **Compare.** Read `engine.version` from `INSTALL/engine/AIDOCS/_index.json` and diff the source manifest against `engine.operations_applied[]`. Three cases:
+3. **Compare.** Run the read-only update check:
+   ```bash
+   node AIDOCS/tools/engine.mjs compare
+   ```
+   It prints the local-vs-upstream `engine.version` and the names of any manifest operations present upstream but not yet in `engine.operations_applied[]` - the answer to "is there anything to sync" without a hand-rolled diff. Three cases:
 
    - **Default mode, same version + empty manifest delta:** the engine is already current. Clean up `INSTALL/engine/` and stop here. The lean routine sync does not re-walk maintenance steps when there is nothing to upgrade.
-   - **`-FULL` mode, same version + empty manifest delta:** the engine is current but `-FULL` is the comprehensive sweep, so fall through to step 4 (`merge-status --auto-drop-clean`) and step 5 (`orphans --auto-drop-safe`) to surface customization drift and stale files even when the engine itself has not changed. Steps 6-8 still execute (snapshot, copy of identical engine-class files, registry rewrite, sync rebuild, doctor) but produce no real diff against the existing tree - the manifest delta is empty and the canonical content already matches upstream.
+   - **`-FULL` mode, same version + empty manifest delta:** the engine is current but `-FULL` is the comprehensive sweep, so fall through to step 4 (`merge-status --auto-drop-clean`) and step 5 (`orphans --auto-drop-safe`) to surface customization drift and stale files even when the engine itself has not changed. Steps 6-8 still execute (snapshot, copy of engine-class files, registry rewrite, sync rebuild, doctor). The manifest delta is empty, so the run is idempotent when the canonical content already matches upstream - but the copy step still refreshes any unlisted local edit to a canonical engine file, so list such a file in `customizations[]` first to preserve it.
    - **Any other state** (version changed, missing manifest ops, or both): continue to step 4 to run the full flow.
 
 4. **Merge `customizations[]` (AI-driven, before the script upgrade).** `customizations[]` is not an opt-out from upstream - it is a merge hint. The script-level skip in copy / `file_delete` / `skill_delete` / `skill_rename` / `section_text_diff` is the fallback for headless runs. With AI present (the normal `-UpdateSync` invocation), merge first so each listed file picks up upstream improvements without losing local intent, and the entry self-cleans when no longer load-bearing.
@@ -53,9 +57,10 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```bash
    node AIDOCS/tools/engine.mjs orphans
    ```
-   The output groups orphans into three classes:
+   The output groups orphans into four classes:
 
-   - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md`). No user file lives in these paths (`engine.mjs` is always present upstream so it never appears here). Mechanically safe to drop. Honors `customizations[]`.
+   - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md`) the live engine no longer imports. No user file lives in these paths (`engine.mjs` is always present upstream so it never appears here). Mechanically safe to drop. Honors `customizations[]`.
+   - **live-import** - engine-only paths absent upstream but STILL imported by the local engine (a rename whose new name lands on the upgrade copy step). Held back from the safe class and never auto-dropped: dropping one pre-upgrade would brick the running engine on its next call. The manifest `file_delete` ops clean these post-copy, at the point nothing imports them. Informational only - no action needed.
    - **review-skill** - files in `AIDOCS/SKILL/` with no upstream counterpart. Either a project-custom skill (the project authored it, keep) or an abandoned canonical (upstream deleted the file but no `skill_delete` / `file_delete` op was added, drop). Decide per file. Project-custom skills do NOT belong in `customizations[]` - the array is for edits to canonical files. Project-custom files survive by absence in the copy step and will re-appear in this class on each sync as a reminder.
    - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom feedback rule (keep). Auto-memory files are seeded write-if-missing by `init` and `automemory_add`, so project-custom rules survive without listing in `customizations[]`.
 
@@ -65,7 +70,9 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    ```bash
    node AIDOCS/tools/engine.mjs orphans --auto-drop-safe
    ```
-   This drops the **safe** class only (engine-only paths with no risk of touching user files). The two review classes (review-skill, review-automemory) survive the sweep because dropping there would risk deleting a project-custom skill body or a project-owned auto-memory rule. Walk the survivors by AI judgment, as in the default flow above. The flag is idempotent and read-only when no safe orphans exist.
+   This drops the **safe** class only (engine-only paths with no risk of touching user files). The **safe** class is import-guarded - a module the running engine still imports is held in the **live-import** class instead, so the pre-upgrade sweep cannot brick the engine even across a rename. The two review classes (review-skill, review-automemory) survive the sweep because dropping there would risk deleting a project-custom skill body or a project-owned auto-memory rule. Walk the survivors by AI judgment, as in the default flow above. The flag is idempotent and read-only when no safe orphans exist.
+
+   **Crossing from a pre-guard engine line.** The import guard lives in the engine, so a project whose LOCAL engine predates it (any engine that renamed lib modules without the live-import class) runs the OLD, unguarded sweep on its first sync. Driving that first pass, do NOT run the pre-upgrade `orphans --auto-drop-safe`: go straight from `merge-status` to the `upgrade`, let the manifest `file_delete` ops clean the renamed modules post-copy, then run `orphans` once the new engine is in place to sweep any genuinely dead leftovers. After that first pass the project carries the guarded engine and the normal flow is safe.
 
 6. **Apply the upgrade.** Preview first when uncertain:
    ```bash
@@ -84,7 +91,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    node AIDOCS/tools/engine.mjs sync
    node AIDOCS/tools/engine.mjs doctor
    ```
-   `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the structural surface is clean. Read the doctor output. **A clean upgrade can still exit non-zero from pre-existing project content** - banned prose in CHANGELOG history, semicolons in over-long EXTENDED entries, sub-section budget hints, oversized buckets. Those are project debt for `/321 -Update` / `scrub --fix` to handle, not sync failures. Report them as pre-existing, do not retry the upgrade.
+   `sync` re-registers every skill body present in `AIDOCS/SKILL/`. `doctor` confirms the structural surface is clean. Read the doctor output **and its exit code**, which splits the two failure kinds: **20 is a structural break** (the engine surface is wrong - the upgrade did not land cleanly, investigate, do not accept the sync), **10 is content-only debt** with the structure intact (banned prose in CHANGELOG history, semicolons in over-long EXTENDED entries, sub-section budget hints, oversized buckets), and **0 is clean** (advisory warnings may still print). A content-debt exit (10) is project debt for `/321 -Update` / `scrub --fix` to handle, not a sync failure - report it as pre-existing, do not retry the upgrade. A structural exit (20) means the upgrade left the surface wrong - resolve it before the sync is done.
 
 8. **Verify the cleanup.** `upgrade` already bumped `engine.version` and cleaned up the fetched source: `INSTALL/engine/` is removed on success, and `INSTALL/` itself is removed if it became empty (the steady-state case on a graduated project). A graduated project keeps `-Setup` deregistered, and the engine already deletes `SKILL_SETUP.md` post-copy if it slipped in. Mid-migration `INSTALL/` survives with its runbooks plus `INSTALL.log` waiting for `graduate`. No manual `rm` needed in either case.
 

@@ -52,6 +52,36 @@ export function recentCaptured(entry) {
   return [];
 }
 
+// Legacy watermark keys from the action-first skill rename (-SessionUpdate ->
+// -UpdateSession). The registry files / buckets / sizes were migrated by dictionary_rename
+// ops, but state.json's runtime watermark keys live outside the manifest's reach, so a
+// project that ran the old skills carries dead sessionupdate / memoryupdate (or the even
+// older underscore forms) beside the canonical keys.
+const LEGACY_WATERMARK_KEYS = {
+  sessionupdate: "updatesession",
+  session_update: "updatesession",
+  memoryupdate: "updatememory",
+  memory_update: "updatememory",
+};
+
+// One-time migration: fold any legacy watermark key into its canonical skill key, then
+// drop the legacy one. The canonical wins when both exist (it is the live key), so a
+// legacy run count is shed rather than merged - watermarks are advisory. Idempotent:
+// returns the renames done, empty when nothing legacy remains. upgrade calls this so a
+// synced project sheds the dead keys the registry rename left behind in state.json.
+export function migrateLegacyWatermarkKeys() {
+  const state = loadState();
+  const renamed = [];
+  for (const [legacy, canonical] of Object.entries(LEGACY_WATERMARK_KEYS)) {
+    if (!(legacy in state)) continue;
+    if (!(canonical in state)) state[canonical] = state[legacy];
+    delete state[legacy];
+    renamed.push(`${legacy} -> ${canonical}`);
+  }
+  if (renamed.length) saveState(state);
+  return renamed;
+}
+
 // A cross-project doc ref (an un-renamed <Other>_MEMORY.md after a rename migration)
 // or an unresolved import marker is the signature of an incomplete reconcile. The
 // data lanes are scanned, the project's own name is the baseline, so any other

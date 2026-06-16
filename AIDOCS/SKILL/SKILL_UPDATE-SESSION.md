@@ -67,7 +67,7 @@ The watermark answers "did I capture this arc in the last few runs?" The live SE
 | Project-significant event (change, decision, finding, friction, milestone, failed attempt) | LIFO | `lifo_insert` |
 | Forward-looking work, durable rule, code-applicable pattern | DROP - belongs in `-UpdateMemory` / `-DevAudit` | (n/a) |
 
-**Migration exception:** when the `-Setup` migration capture drives this skill (migration mode), capture additively - the DROP row and arc-level aggregation are routine-run rules, not migration ones. Ambiguous-home content routes to SESSION LIFO rather than dropping. `migrate-import` has already scavenged the archived SESSION_EXTENDED depth 1:1, so do not re-derive those entries - add only Current State and the main LIFO bullets the import did not carry. The reconciliation pass distills the additive capture later.
+**Migration exception (Setup-driven capture only, never on a graduated project):** capture additively (the DROP row and arc-level aggregation are routine-run rules), route ambiguous content to SESSION LIFO, and do not re-derive the SESSION_EXTENDED entries `migrate-import` already scavenged - add only Current State and the bullets the import missed. Full steps in `INSTALL/setup.md`.
 
 ## Step 2: Stage
 
@@ -110,5 +110,5 @@ Use `-FULL` when SESSION has drifted (a long pause, a context switch, an interru
 - **You are logging project history.** Future-session usefulness is the bar.
 - **Capture SESSION raw.** `-UpdateMemory` distills the abstracted lesson later.
 - **Arc-level, not iteration-level.** One entry per arc. End-state captures the journey.
-- **Staging only.** Never edit SESSION by hand - validate then commit.
+- **Staging only.** Never hand-edit SESSION content - validate then commit. The sole exception is a mechanical house-voice fix (an em dash, a clause-joining semicolon) via `scrub --fix --semicolons`, which rewrites voice without touching captured content or the watermark.
 - **Project work only.** BACKLOG, MEMORY static, CHANGELOG, and code patterns route through their own skills.

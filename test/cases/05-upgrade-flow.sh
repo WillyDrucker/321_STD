@@ -3,8 +3,9 @@
 # graduated removes the empty INSTALL/, dry-run mutates nothing), init --upstream
 # recording + the recall path through SETUP_ARCHIVE, fetch-engine's upstream-defaulting
 # behavior, the user-facing rename summary, the router quick-ref reconciler (on upgrade,
-# for new upstream flags, and on graduate), and the pre-upgrade engine snapshot to TEMP/
-# (taken before handlers run so it is a complete rollback target).
+# for new upstream flags, and on graduate), the pre-upgrade engine snapshot to TEMP/
+# (taken before handlers run so it is a complete rollback target), and the legacy
+# state.json watermark-key migration (T82).
 
 echo "=== T46: upgrade cleans up INSTALL/engine after success; removes INSTALL/ if it becomes empty ==="
 CL="$BASE/cleanup"
@@ -188,3 +189,35 @@ grep -q "^/321 -Setup" "$GR/.claude/skills/321/SKILL.md" && pass "router carries
 node "$GRENG" graduate >/dev/null 2>&1
 # After graduate: router has no -Setup line (without any upgrade step)
 grep -q "^/321 -Setup" "$GR/.claude/skills/321/SKILL.md" && fail "router still carries -Setup line after graduate (the reconciler did not run)" || pass "graduate pruned the -Setup quick-ref line directly"
+
+echo "=== T82: upgrade migrates legacy state.json watermark keys (sessionupdate -> updatesession) ==="
+# L1: the action-first skill rename moved the registry files / buckets / sizes via
+# dictionary_rename ops, but state.json's runtime watermark keys were left behind. A
+# project that ran the old -SessionUpdate / -MemoryUpdate carries dead sessionupdate /
+# memoryupdate keys. upgrade folds them into the canonical keys and drops the legacy ones.
+WMK="$BASE/watermark-keys"
+WMKENG="$(mk_proj "$WMK" WmkProj)"
+WMKSRC="$BASE/watermark-keys-src"
+mk_src "$WMKSRC" --empty-manifest
+# Plant a state.json with legacy keys plus an existing canonical updatesession, to prove
+# the canonical wins on a collision (its runs are not overwritten by the legacy key).
+cat > "$WMK/AIDOCS/tools/state.json" <<'JSON'
+{
+  "sessionupdate": { "runs": 11, "last_committed_at": "x" },
+  "memoryupdate": { "runs": 4, "last_committed_at": "y" },
+  "updatesession": { "runs": 2, "last_committed_at": "z" }
+}
+JSON
+node "$WMKENG" fetch-engine --from "$WMKSRC" >/dev/null 2>&1
+WMKOUT="$(node "$WMKENG" upgrade 2>&1)"
+echo "$WMKOUT" | grep -q "migrated legacy watermark key" && pass "upgrade reports the watermark-key migration" || fail "no watermark migration report (output: $WMKOUT)"
+WMKSTATE="$(node "$WMKENG" state 2>&1)"
+echo "$WMKSTATE" | grep -q '"sessionupdate"' && fail "legacy sessionupdate key survived the migration" || pass "legacy sessionupdate key dropped"
+echo "$WMKSTATE" | grep -q '"memoryupdate"' && fail "legacy memoryupdate key survived the migration" || pass "legacy memoryupdate key dropped"
+echo "$WMKSTATE" | grep -q '"updatememory"' && pass "memoryupdate folded into canonical updatememory" || fail "updatememory canonical key missing"
+# Canonical wins on collision: updatesession kept runs:2 (not overwritten by sessionupdate runs:11)
+node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(s.updatesession&&s.updatesession.runs===2?0:1)' "$WMK/AIDOCS/tools/state.json" && pass "canonical updatesession kept its own runs (legacy did not overwrite)" || fail "canonical updatesession was overwritten by the legacy key"
+# Idempotency: a second upgrade reports no watermark migration
+node "$WMKENG" fetch-engine --from "$WMKSRC" >/dev/null 2>&1
+WMKOUT2="$(node "$WMKENG" upgrade 2>&1)"
+echo "$WMKOUT2" | grep -q "migrated legacy watermark key" && fail "second upgrade still reports a watermark migration (not idempotent)" || pass "second upgrade no-ops the watermark migration (idempotent)"

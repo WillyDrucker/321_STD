@@ -63,7 +63,7 @@ See `feedback_naming` in auto-memory for the always-on naming and renaming princ
 
 See `feedback_code_comments` in auto-memory for the principle and the worth-writing / delete-on-sight rules.
 
-- **Module headers.** Four to six lines at the top of every code file. File's job + load-bearing invariants. Forward-facing voice.
+- **Module headers.** A few lines for a simple module, up to a dozen for a contract-heavy boundary module. File's job + load-bearing invariants. Forward-facing voice.
 - **Source-true only.** Do not encode unproven theories as fact. If you do not have wire-level proof, log the observation, verify, then promote to a comment.
 - **Best-effort contract.** `// best-effort` is the explicit contract for any `try { ... } catch { /* ... */ }` that intentionally swallows failure. The comment makes the swallow read as deliberate.
 - **Error messages.** Passive, friendly, short, no jargon. Never imply the user must act.
@@ -72,7 +72,7 @@ See `feedback_code_comments` in auto-memory for the principle and the worth-writ
 
 Baseline conventions every project inherits.
 
-- **ES modules.** No CommonJS in new code.
+- **ES modules.** No CommonJS in new code, unless a runtime constraint requires it - the exception documents itself in the module header (a .cjs a VM runtime demands).
 - **Async / await** over callback chains.
 - **Strict null handling.** No `any` escapes. Optional chaining + nullish coalescing where they reduce noise.
 - **Discriminated unions** over optional-field soup. State shapes use a discriminator tag (`{ status: "loading" }` / `{ status: "ok", data }`) so null-handling is compile-time, not runtime.
