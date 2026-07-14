@@ -32,7 +32,7 @@ Never edit the target file directly. The staging file is the artifact, `commit` 
 
 Each `lifo_insert` PREPENDS to the section. The LAST insert in the `actions` array ends up on top of LIFO. **List this run's entries oldest-first** in `actions` so the newest one lands on top.
 
-`overwrite_section` replaces the whole section body. Put the Current State overwrite first in `actions` so this run's new LIFO entries land above the engine-written `**Last State:**` marker that demotion drops in.
+`overwrite_section` replaces the whole section body and **discards what was there**. On Current State it does NOT demote the outgoing snapshot into LIFO - overwritten state is not history, and treating it as history is how a file starts asserting facts that stopped being true long ago.
 
 ## `[+]` paired bullets and `slugify`
 

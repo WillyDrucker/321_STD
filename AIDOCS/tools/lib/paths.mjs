@@ -33,8 +33,23 @@ export function installEngineDir() { return join(activeRoot, "INSTALL", "engine"
 export const ENGINE_CLASS = [
   "AIDOCS/tools",
   "AIDOCS/SKILL",
+  "AIDOCS/automemory",
   ".claude/skills/321/SKILL.md",
 ];
+
+// Project-owned files that live INSIDE an engine-class directory. The copy step must
+// never replace them, or an upgrade would inject the placeholder user profile into every
+// project and overwrite the rule index that lists the project's OWN rules (which upstream
+// has never heard of). They ship in the seed so a fresh init has them, and upgrade leaves
+// them alone. Project-authored rule files need no entry here - they survive by having no
+// source counterpart.
+const PROJECT_OWNED = [
+  /^AIDOCS\/automemory\/MEMORY\.md$/,
+  /^AIDOCS\/automemory\/user_.+\.md$/,
+];
+export function isProjectOwned(relPath) {
+  return PROJECT_OWNED.some((re) => re.test(relPath));
+}
 
 // Absolute path for a registry-relative value ("./AIDOCS/x") against the active root.
 export function fromRoot(rel) { return join(activeRoot, rel.replace(/^\.\//, "")); }
@@ -125,4 +140,13 @@ export function toHomeRef(abs) {
 }
 export function fromHomeRef(ref) {
   return ref?.startsWith("~") ? join(memoryHome(), ref.slice(1)) : ref;
+}
+
+// An external runtime path must be absolute or home-relative. A bare relative value (a
+// stale hand edit, a legacy registry) would otherwise resolve against the PROCESS cwd, so a
+// --root run driven from another checkout would write a project's memory into whatever
+// directory the engine happened to be launched from. Refuse rather than guess: silently
+// picking cwd is how a rule set lands somewhere nobody thinks to look.
+export function isExternalRef(ref) {
+  return typeof ref === "string" && ref.length > 0 && (ref.startsWith("~") || isAbsolute(ref));
 }

@@ -6,5 +6,3 @@ metadata:
 ---
 
 (Rename this file to `user_<your-name>.md`. Replace this paragraph with factual details about the user: role, what they own, working style, naming conventions, anything stable across sessions. No interpretation, no personality summaries.)
-
-**Project-specific addenda below this line.**

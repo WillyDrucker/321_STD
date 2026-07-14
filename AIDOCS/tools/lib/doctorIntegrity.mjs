@@ -32,7 +32,8 @@ export function runIntegrityChecks(index) {
       "Upgrade schema":       checkUpgradeSchema(index),
     },
     warns: {
-      "Privacy drift": checkPrivacyDrift(index),
+      "Privacy drift":        checkPrivacyDrift(index),
+      "Dispatch description": checkDispatchDescriptions(index),
     },
   };
 }
@@ -126,12 +127,18 @@ function checkSkillBodies(index) {
   return issues;
 }
 
-// AGENTS Hard-rules links resolve to auto-memory files, and every feedback /
-// profile file has a pointer (both directions). The mirror is checked against
-// the in-repo seed (auto_memory.seed), the shippable canonical set. The runtime
-// source of truth is the external Claude memory (auto_memory.path), which may
-// carry extra project-custom rules - not a mirror concern. Legacy
-// auto_memory.source (pre-seed/path schema) is honored so the rename is non-breaking.
+// AGENTS auto-memory links resolve to real rule files. The mirror is checked against the
+// in-repo seed (auto_memory.seed), the shippable canonical set. The runtime source of
+// truth is the external Claude memory (auto_memory.path), which may carry extra
+// project-custom rules - not a mirror concern. Legacy auto_memory.source (pre-seed/path
+// schema) is honored so the rename is non-breaking.
+//
+// The mirror is OPT-IN (auto_memory.agents_mirror: true), and OFF by default, because the
+// template AGENTS.md deliberately carries no rules inventory - a restated rule drifts, and
+// this one did. A project that still wants the mirror (to feed a model that cannot load
+// Claude's native memory) turns it on and gets both directions checked. Defaulting it on
+// would fail once per rule file on every run, forever, and a check that is always red is
+// worse than no check: it trains everyone to skim past the doctor.
 function checkAutoMemory(index) {
   const issues = [];
   const agentsRel = index.paths?.agents_md;
@@ -141,10 +148,35 @@ function checkAutoMemory(index) {
   const dirAbs = fromRoot(srcRel);
   if (!existsSync(agentsAbs) || !existsSync(dirAbs)) return issues;
   const agents = readFileSync(agentsAbs, "utf8");
-  const linked = [...agents.matchAll(/\]\(((?:feedback_|user_)[^)]+\.md)\)/g)].map((m) => m[1]);
-  const onDisk = readdirSync(dirAbs).filter((f) => /^(feedback_|user_).+\.md$/.test(f));
-  for (const l of linked) if (!onDisk.includes(l)) issues.push(`AGENTS Hard-rule link "${l}" has no auto-memory file`);
-  for (const f of onDisk) if (!linked.includes(f)) issues.push(`auto-memory "${f}" has no AGENTS Hard-rule pointer`);
+  const linked = [...agents.matchAll(/\]\(((?:feedback_|reference_|user_)[^)]+\.md)\)/g)].map((m) => m[1]);
+  const onDisk = readdirSync(dirAbs).filter((f) => /^(feedback_|reference_|user_).+\.md$/.test(f));
+
+  // A dangling link is ALWAYS a bug, mirror or not - it points at a file that is not there.
+  for (const l of linked) if (!onDisk.includes(l)) issues.push(`AGENTS auto-memory link "${l}" has no rule file`);
+  if (index.auto_memory?.agents_mirror !== true) return issues;
+  for (const f of onDisk) if (!linked.includes(f)) issues.push(`auto-memory "${f}" has no AGENTS pointer`);
+  return issues;
+}
+
+// The registry's skills.dispatch.<key>.description is a hand-maintained copy of each skill
+// body's frontmatter description:. When a body changes, the registry silently keeps the old
+// text - ours drifted and nothing caught it. `sync` repairs it, but nothing tells you to run
+// `sync`, so this is the thing that tells you.
+function checkDispatchDescriptions(index) {
+  const issues = [];
+  const dispatch = index.skills?.dispatch || {};
+  for (const [key, entry] of Object.entries(dispatch)) {
+    if (!entry?.body || !entry?.description) continue;
+    const abs = fromRoot(entry.body);
+    if (!existsSync(abs)) continue;
+    const fm = readFileSync(abs, "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) continue;
+    const desc = fm[1].match(/^description:[ \t]*(.+)$/m)?.[1]?.trim();
+    if (!desc) continue;
+    if (desc !== entry.description.trim()) {
+      issues.push(`dispatch "${key}" description has drifted from its skill body. Run \`engine.mjs sync\` to regenerate.`);
+    }
+  }
   return issues;
 }
 

@@ -1,19 +1,18 @@
 ---
 name: feedback-no-dates-in-memory
-description: No dates or version stamps in memory, session, CLAUDE, or AGENTS files. LIFO carries the time signal.
+description: No freshness stamps in memory or session files. LIFO carries the time signal. Live Current State versions are REQUIRED, not a stamp.
 metadata:
   type: feedback
 ---
 
-Never embed dates, version numbers, or "Last Updated" metadata in memory-track files, SESSION files, CLAUDE.md, AGENTS.md, or any auto-memory file. Specifically:
+Never add freshness metadata to memory-track files, SESSION, CLAUDE.md, AGENTS.md, or auto-memory:
 
-- No `[YYYY-MM-DD]` prefixes on bullets
-- No `Last Updated:` or `Updated By:` lines
-- No `v1.X.Y` version stamps as metadata
-- Branch names with version numbers (`<PROJECT>_v1.X.Y`) are AT RISK. Prefer abstract references like "active branch" or "branch ahead of main by N commits".
+- No `[YYYY-MM-DD]` prefixes on bullets, no `Last Updated:` or `Updated By:` lines
+- No "as of vX" or version-history label attached to an entry to date it
+- LIFO ordering IS the freshness signal. Newest sits at the top of its section
 
-LIFO ordering carries the time signal. Newest entries sit at the top of their section. References inside bullet text to operational reality (a literal branch name when copy-paste matters, `[Unreleased]` CHANGELOG sections) are natural references, not metadata stamps.
+**This does NOT reach live operational state.** SESSION's Current State exists to carry the version, the stack, the branch, and gate status. MEMORY's Big-6 exists to name the SDK and framework versions. **Those are current truth, not stamps on an entry. Strip them and you have destroyed the thing the section is for.**
 
-**Why:** Date and version stamps tend to spread once they appear in one place. They show up in bullets, comments, and code without anyone asking. Git already carries the activity log. LIFO is the freshness signal.
+**Why:** a stamp dates the ENTRY, and entries rot. A version in Current State describes the PROJECT, and it is overwritten every pass. Git carries the activity log.
 
-**How to apply:** When writing or auditing memory or session files, scan for dates and version stamps. Strip them. Restructure if needed.
+**How to apply:** ask what the number is attached to. Attached to a bullet, to say when it was written, strip it. Attached to the project, to say what it currently is, keep it.

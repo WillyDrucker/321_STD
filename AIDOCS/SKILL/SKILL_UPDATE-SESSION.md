@@ -76,7 +76,7 @@ Write `AIDOCS/tools/staging/updatesession.json`. The staging contract (action sh
 The skill-specific notes:
 
 - **Domain firewall.** This skill writes only to `updatesession.session` and `updatesession.session_extended`.
-- **Current State.** Use `overwrite_section` on `Current State`. Put it FIRST in `actions` so the engine demotes the prior snapshot's bullets to the top of LIFO and stamps the `**Last State:**` marker before this run's new events land above it. Never write the marker yourself.
+- **Current State.** Use `overwrite_section` on `Current State`. **Overwrite means overwrite - the outgoing snapshot is DISCARDED, never demoted into LIFO.** State that was true once is not an event, and demoting it is what made SESSION assert a dead stack through an entire framework migration. If a fact in the outgoing snapshot genuinely BECAME an event ("moved off the dual version source"), emit that as one `lifo_insert` **by judgment**. Never the raw snapshot.
 - **LIFO events.** Use `lifo_insert` on section `LIFO`. List the run's events oldest-first in `actions` so the newest one lands on top.
 - **Earned depth.** Pair a bullet with an `add` on `updatesession.session_extended` when it needs more than a line or two. Keep bullets short and punctuation-light (the `slugify` rule).
 

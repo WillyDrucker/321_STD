@@ -100,6 +100,16 @@ When invoked, load the `myskill.reference` file (per `_index.json` paths.files) 
 
 The body is short on purpose. The substance is in the reference, where the AI can read it once at invocation rather than carrying it in context at session start.
 
+### The thin-wrapper rule: describe HOW you load the file, never WHAT it says
+
+**A thin body must not summarize, inventory, or restate its data file.** The moment it does, it holds a second copy of content it does not own, and the copy rots while the original stays right. `SKILL_DEV-AUDIT.md` learned this the hard way: it advertised a "hard-rules inventory mirrored from auto-memory" long after that block had been deleted from the audit file, and every audit run inherited the lie.
+
+- **Do** say which registry key to load, when to load it, and what to do with what it says.
+- **Do not** list the file's sections, restate its rules, or name its dimensions. If a rule is not in the data file, it is not in scope.
+- **Say it out loud in the body:** "apply what the file says, not what you remember it saying."
+
+This applies to every registered thin wrapper, `-DevAudit` and `-AutoPush` included. It is the same defect as a restated auto-memory rule or a stale dispatch description, and it has exactly one fix: hold the content in one place.
+
 ### Why register vs hardcode the path
 
 `doctor` validates that registered paths exist and scans them for banned prose. A path hardcoded inside the skill body skips both checks. Registration also lets the file move (under a rename, a code reorg) with a one-line registry edit instead of grepping every skill body.

@@ -1,20 +1,14 @@
 ---
 name: feedback-no-em-dashes
-description: No em dashes or semicolons under our authorship - includes public-facing copy, marketing prose, AI-formatted output, memory files, and code comments.
+description: No em dashes and no clause-joining semicolons in any prose under our authorship. Hyphens or a rewrite.
 metadata:
   type: feedback
 ---
 
-Never use em dashes (`—`) or semicolons (`;`) in anything under our authorship:
+- **Never an em dash, never a clause-joining semicolon**, in any prose we author: public copy, code comments, commits, CHANGELOG, PR bodies, memory and session files, and anything the user will paste onward.
+- **Use a hyphen, or rewrite the sentence.** A period almost always works.
+- **Exempt:** code syntax, string literals that genuinely need them, URLs, commands, generated data, and quoted external content.
 
-- Website copy (headings, hero text, marketing prose, project descriptions)
-- AI-formatted output the user will paste into copy (release notes, landing-page drafts)
-- CHANGELOG entries, PR bodies
-- Auto-memory rule files, MEMORY / SESSION files, CLAUDE.md, AGENTS.md, project documentation
-- Code comments (module headers, why-comments, contracts - all of it)
+**Why:** both read as AI-generated and undercut the voice. The pattern leaks between layers - once it is in a code comment it reaches the commit, then the CHANGELOG, then the website.
 
-Use hyphens (-) or rewrite the sentence. Only exempt: source code string literals when the language or content genuinely demands them, and quoted external content.
-
-**Why:** Em dashes and semicolons read as AI-generated and undercut the voice. The pattern leaks between layers - if it's in code comments, it spreads to commits, then to CHANGELOG, then to the website.
-
-**How to apply:** Before writing prose under our authorship, scan for em dashes and semicolons. If you catch yourself reaching for one, rewrite - usually a hyphen or a period works fine.
+**How to apply:** scan before writing prose. If you reach for one, a hyphen or a period is the fix.

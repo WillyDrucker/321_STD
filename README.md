@@ -18,7 +18,9 @@ Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321do
 
 ### What the install writes
 
-The install runs locally. The engine source is a normal git clone of the public repo (or used in place if you already have it), and `init` then writes only inside the target folder and executes no fetched code. The engine (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`) and the `INSTALL/` runbooks always refresh. Your data files (`AGENTS.md`, `_index.json`, MEMORY / SESSION / BACKLOG / DEV-AUDIT / AUTO-PUSH) are written only if missing, so a re-install never clobbers content. The hard-rule auto-memory ships in-project at `AIDOCS/automemory` and is mirrored in the `AGENTS.md` Hard rules. A direct `init ... --force` rewrites the scaffold anyway (a recovery flag the install scripts do not expose).
+The install runs locally. The engine source is a normal git clone of the public repo (or used in place if you already have it), and `init` then writes only inside the target folder and executes no fetched code. The engine (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`, and the shared authoring rules in `AIDOCS/automemory`) and the `INSTALL/` runbooks always refresh. Your data files (`AGENTS.md`, `_index.json`, MEMORY / SESSION / BACKLOG / DEV-AUDIT / AUTO-PUSH) are written only if missing, so a re-install never clobbers content. A direct `init ... --force` rewrites the scaffold anyway (a recovery flag the install scripts do not expose).
+
+The authoring rules (comment discipline, naming, house voice) ship in-project at `AIDOCS/automemory` and are mirrored into the agent's runtime memory. Upstream owns the shared rules and refreshes them on every sync. Two files stay yours and are never overwritten: `MEMORY.md`, the rule index, and `user_*.md`, your profile. A rule you write yourself has no upstream counterpart, so it survives untouched. `AGENTS.md` carries a pointer to the rule index rather than a copy of it, because a restated rule drifts from its original.
 
 ### No AI
 

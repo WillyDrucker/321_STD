@@ -1,11 +1,11 @@
 ---
 name: updatememory
-description: Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes -UpdateSession first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline.
+description: Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes -UpdateSession first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline. BACKLOG is written ONLY here, never ad-hoc.
 ---
 
 # /321 -UpdateMemory
 
-**Purpose:** Distill durable observations into `<PROJECT>_MEMORY.md` (LIFO plus the Big-6 static sections) and manage `<PROJECT>_BACKLOG.md` (forward-looking Features plus Ideas). Always auto-invokes `-UpdateSession` first so SESSION is current before this reads it. Writes only through the staging pipeline.
+**Purpose:** Distill durable observations into `<PROJECT>_MEMORY.md` (LIFO plus the Big-6 static sections) and manage `<PROJECT>_BACKLOG.md` (forward-looking Features plus Ideas). Always auto-invokes `-UpdateSession` first so SESSION is current before this reads it. Writes only through the staging pipeline. **This skill is the sole writer of BACKLOG** - entries are added only on an Update run, never ad-hoc mid-task.
 
 ## MEMORY's two functions
 
@@ -59,7 +59,11 @@ The watermark answers "did I capture this arc in the last few runs?" The live ME
 
 ### BACKLOG capture filter
 
-BACKLOG is long-term direction only - items the project may pursue eventually, not immediate items marked for review. The bar: a "don't forget this at some point" entry earns BACKLOG, a "store these here for now" entry does not. Follow-ups, cross-track flags, and the next step of in-flight work belong in SESSION, not here. Capture for BACKLOG only when one of these holds: explicit user future intent ("we should do X eventually"), user directional weight ("would be nice if..."), or AI-surfaced with user consent (tag `_(source: ai-surfaced)_`). Format: `**<title>.** <one-line description> _(source: user|ai-surfaced)_`. Features = committed long-term direction. Ideas = exploratory, what-if. When in doubt -> Ideas. When still in doubt -> drop, the SESSION lane will catch it as an event.
+BACKLOG is long-term direction only - items the project may pursue eventually, not immediate items marked for review. The bar: a "don't forget this at some point" entry earns BACKLOG, a "store these here for now" entry does not. Follow-ups, cross-track flags, and the next step of in-flight work belong in SESSION, not here. Capture for BACKLOG only when one of these holds: explicit user future intent ("we should do X eventually"), user directional weight ("would be nice if..."), or AI-surfaced with user consent (tag `_(source: ai-surfaced)_`). Format: `**<title>.** <one-line description> _(source: user|ai-surfaced)_`. **One bullet per item, always.** Features = committed long-term direction. Ideas = exploratory, what-if. When in doubt -> Ideas. When still in doubt -> drop, the SESSION lane will catch it as an event.
+
+**BACKLOG becomes a dumping ground the moment you stop guarding it.** It is the most-abused lane precisely because everything technically "fits" - resist that. **A quiet run that adds nothing to BACKLOG is the common, correct outcome.**
+
+**BACKLOG is written ONLY here, only by this skill, only on an Update run.** Never add to it ad-hoc mid-task, and never treat it as a consideration outside `/321 -Update` / `-UpdateMemory`.
 
 ## Step 4: Big-6 gap-fill (empty sections only)
 
@@ -85,12 +89,27 @@ node AIDOCS/tools/engine.mjs commit --skill updatememory
 
 `commit` validates, simulates, persists, stamps the watermark (timestamp + this run's bullet fingerprints), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
 
+## Step 7: Mirror BACKLOG to a tracker issue (opt-in, off by default)
+
+```bash
+node AIDOCS/tools/engine.mjs sync-backlog
+```
+
+**Inert until the project declares an issue.** With no `integrations.backlog_issue` in `_index.json` this is a clean no-op that prints one line and exits 0, so a project with no tracker workflow simply never turns it on. **Do not invent an issue number** - the user sets it, or the mirror stays off.
+
+Once configured, run it **after** `commit`, unconditionally, even when this pass added nothing. It is idempotent, so a no-change run is a no-op.
+
+It regenerates the issue body wholesale from `<PROJECT>_BACKLOG.md`. **The file is the source of truth, the issue is a generated copy.** Mirroring wholesale is deliberate: LIFO ordering is already the file's shape, so the copy inherits it and there is no diffing or merging to drift. Never hand-edit the issue body - the next run overwrites it. To change an entry, change the file.
+
+It **fails soft.** A missing or unauthenticated `gh` warns and exits 0 rather than failing the run, because `commit` has already persisted the real artifact.
+
 ## Lean execution path (one pass, no extra machinery)
 
 1. Skim the conversation tail since the watermark. Do **not** re-read the prefix. Read this skill body plus the live `<PROJECT>_MEMORY.md` and `<PROJECT>_BACKLOG.md` (the SESSION freshly written by Step 1 is already in context). The PATTERN-STAGING reference loads on demand if you need the staging contract.
 2. **Do NOT read MEMORY_EXTENDED unless an op is `drop` / `replace` against an existing sub-section.** An `add` needs no prior read.
 3. Author the staging JSON directly at `AIDOCS/tools/staging/updatememory.json`. The staging file IS the artifact.
 4. `commit` once. Skip standalone `validate`. Target: read 3 files (plus the SESSION 1 file -UpdateSession already touched), write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
+5. `sync-backlog` once, only when the project has an issue configured. It is idempotent and fails soft.
 
 ## -FULL mode
 
@@ -102,6 +121,14 @@ node AIDOCS/tools/engine.mjs commit --skill updatememory
 
 Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation. The lean default appends from the conversation tail and only fills empty Big-6 sections.
 
+### The Big-6 blind spot, and the guard that closes it
+
+**The lean pass only fills an EMPTY Big-6 section. It never re-derives a populated one.** So a Big-6 that is populated and WRONG is invisible to every routine run, forever. Only `-FULL` re-walks it. This is not hypothetical: a project's MEMORY described its pre-migration framework through an entire rebuild, and because the true facts had nowhere to live they climbed up into AGENTS.md, which is exactly what AGENTS.md must never hold.
+
+`doctor` now catches it. **`[Big-6 drift]` fingerprints the dependency-NAME set that Stack / Architecture / Environment / Pipeline were last written against, and warns when the project's dependency manifest has since added or removed a package.** Names not versions, so a routine version bump is correctly silent while a swapped framework is loud.
+
+**A `[Big-6 drift]` warning is the trigger to run `-UpdateMemory -FULL`.** Committing a code-bound Big-6 section re-stamps the mark and clears the warning. Nothing else does, and nothing else should.
+
 ## Rules
 
 - **Default is no change.** Ruthless filter - most sessions produce project work, not memory-track.
@@ -109,6 +136,8 @@ Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section
 - **Auto-invoke -UpdateSession first** so SESSION is current before reading.
 - **Staging only**, and the firewall keeps this skill inside `updatememory.*`. The sole hand-edit exception is a mechanical house-voice fix (em dash, clause-joining semicolon) via `scrub --fix --semicolons`, which rewrites voice without touching captured content or the watermark.
 - **AGENTS / auto-memory stay user-scoped** - surface them as suggestive LIFO bullets, never auto-write them.
+- **BACKLOG is written only on an Update run**, only by this skill, one bullet per item. Never ad-hoc, never a dumping ground.
+- **Never hand-edit the mirrored issue.** It is a generated copy of the BACKLOG file. Step 7 overwrites it. Edit the file.
 
 ## Deferred
 

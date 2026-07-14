@@ -3,8 +3,8 @@
 // sit at or under their prune_to, or only protected bullets remain. Pairs are archived
 // together under one timestamp into AIDOCS/<NAME>_<LANE>_ARCHIVE/ - the bullets land in
 // <YYYYMMDD-HHMM>_<NAME>_<LANE>.md, the matching sub-sections in the paired _EXTENDED.md,
-// so the archive reads one pass as one event. This commit's fresh bullets and the
-// **Last State:** marker are protected, so new entries never archive on landing.
+// so the archive reads one pass as one event. This commit's fresh bullets are protected,
+// so new entries never archive on landing.
 // The folder is created on the fly. Existing flat-file archives from earlier engines are
 // not migrated - they stay on disk as part of the recovery net.
 
@@ -94,7 +94,7 @@ function appendOrCreate(path, stamp, body) {
 }
 
 export function autoPrune(index, editedKeys, fresh) {
-  const isProtected = (line) => line.startsWith("- **Last State:**") || fresh.has(line);
+  const isProtected = (line) => fresh.has(line);
   // Either lane being edited brings the pair under scrutiny - an extended edit can push
   // the pair over its cap even when main is untouched, so its main key still gets a check.
   const mainKeys = new Set();

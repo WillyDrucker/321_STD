@@ -12,7 +12,10 @@ The engine-class paths refresh from upstream on every `-UpdateSync`. They hold n
 
 - `AIDOCS/tools/` - engine code (the `.mjs` modules and these PATTERN-* references)
 - `AIDOCS/SKILL/` - canonical skill bodies (the 8: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`)
+- `AIDOCS/automemory/` - the shared authoring rules, **minus the two project-owned files** (`MEMORY.md`, the rule index, and `user_*.md`, the profile). See `PATTERN-AUTOMEMORY.md` for the ownership table. `syncAutoMemory` extends the copy into the external runtime, which the copy step alone cannot reach.
 - `.claude/skills/321/SKILL.md` - the router
+
+**Project-owned files inside an engine-class directory** are listed in `lib/paths.mjs` as `PROJECT_OWNED` and skipped by the copy step. That is the engine's own carve-out, distinct from `customizations[]`, which is the user's. Both appear in the copy report, labelled apart.
 
 `INSTALL/` (the install + setup runbooks) is engine-owned but **not** part of the auto-refresh class. It is written by `init` (at install time) and removed by `graduate` once the project is steady. A routine `-UpdateSync` does not touch it, so a graduated project never re-acquires the onboarding tier.
 
@@ -34,10 +37,14 @@ The configs (DEV-AUDIT `## Project specifics`, AUTO-PUSH `## Project release ste
 
 Auto-memory has two homes: the canonical seed in `AIDOCS/automemory/` (rides in the repo) and Claude Code's native external memory at `auto_memory.path` (the runtime source of truth, loaded by the harness each session).
 
-- `AIDOCS/automemory/feedback_*.md`, `AIDOCS/automemory/user_*.md` - the seed
+- `AIDOCS/automemory/feedback_*.md`, `reference_*.md`, `user_*.md`, `MEMORY.md` - the seed
 - `auto_memory.path` (e.g. `~/.claude/projects/<key>/memory/`) - the runtime
 
-`init` records the external path in `_index.json` and seeds the canonical rules into it write-if-missing, so a project's live custom rules survive. New seed files arrive via the manifest `automemory_add` op (idempotent: write-if-missing in the project's seed, and write-if-missing in the external runtime in the same op so the canonical rule reaches the harness without waiting for a re-install). `migrate-archive` snapshots the external memory into the archive at re-install. The reconcile pass merges back the profile plus any unique guidance summarized into a canonical rule, default drop. The `AGENTS.md` Hard rules block mirrors the seed and points back at it both ways - `doctor` verifies the mirror.
+`init` records the external path in `_index.json` and seeds the canonical rules into it write-if-missing, so a project's live custom rules survive.
+
+**`upgrade` is what keeps a project's rules current.** The seed is engine-class (class 1 above), so the copy step overwrites the shared rule bodies, and `syncAutoMemory` mirrors them into the runtime and reconciles the rule index. Both homes land in one pass. A rule the project authored itself survives by absence, and the two project-owned files (`MEMORY.md`, `user_*.md`) are never overwritten. **Nothing is ever deleted.** The legacy `automemory_add` manifest op still applies (write-if-missing in both homes) and remains valid for a project on an older engine.
+
+`migrate-archive` snapshots the external memory into the archive at re-install. The reconcile pass merges back the profile plus any unique guidance summarized into a canonical rule, default drop. The `AGENTS.md` mirror is **opt-in and off by default** (`auto_memory.agents_mirror: true`), because a restated rule drifts. A dangling AGENTS link is reported either way.
 
 ### 4. User-owned (verbatim or in-place)
 
@@ -63,7 +70,7 @@ User content the engine never authors.
 | `registry_rename` | data (registry) | Renames a dotted-path key (nested-object access). |
 | `dictionary_rename` | data (registry) | Renames a literal flat key in a dictionary (when the key itself contains a dot). |
 | `file_add_template` | data | Creates a new template file with `PROJECTNAME` substitution if absent. Path-contained. |
-| `automemory_add` | auto-memory | Adds a new seed file from the engine to `AIDOCS/automemory/` if absent, and mirrors it into the external runtime memory (`auto_memory.path`) write-if-missing. Rejects anything that is not a bare basename. |
+| `automemory_add` | auto-memory | **Largely superseded by the force-copy.** Adds a new seed file write-if-missing and mirrors it into the external runtime, also write-if-missing. Retained for older engines and for the rare rule that must not overwrite an existing body. A new canonical rule needs no op. |
 | `section_text_diff` | data | Replaces a `## <section>` body in a project file unless the file is in `customizations[]`. Path-contained. |
 
 All file-writing ops resolve their target against `repoRoot()` and reject paths that escape via `..` or absolute form (`paths.isContained`). A typo or hostile manifest cannot write outside the project tree.
@@ -87,7 +94,7 @@ The right path depends on the file's class:
 - **New skill body** (engine class): drop in `AIDOCS/SKILL/` with the action-first naming (`SKILL_UPDATE-<TARGET>.md`). `sync` registers it for dispatch. Downstream projects pick it up via the copy step on next `-UpdateSync`. No manifest op needed.
 - **New engine code module** (engine class): drop in `AIDOCS/tools/lib/`. Copy step handles the rest. No manifest op needed.
 - **New PATTERN reference** (engine class, like this file): drop in `AIDOCS/tools/`. Copy step handles it.
-- **New canonical auto-memory rule** (hybrid class): add the file in `AIDOCS/automemory/`, then add an `automemory_add` op to `MANIFEST.json` with the basename. Downstream projects seed the new rule on next `-UpdateSync`.
+- **New canonical auto-memory rule** (hybrid class): add the file in `AIDOCS/automemory/` and add its pointer line to the seed's `MEMORY.md`. **That is all.** The seed is engine-class, so the copy step lands the file downstream and `syncAutoMemory` mirrors it into the runtime and adds the pointer to each project's index. **No `automemory_add` op is needed** - that op predates the force-copy and is now redundant for any project on this engine. It stays supported for older engines, and for the write-if-missing case where a rule must NOT overwrite an existing body.
 - **New data template** (data class): add a `file_add_template` op to `MANIFEST.json`. The op carries the file path and body (with `PROJECTNAME` placeholders).
 - **New registry key shape** (data class): add a `registry_extend` op to add the key if absent.
 - **Rename or remove existing structure**: use the `skill_rename` / `skill_delete` / `file_delete` / `registry_rename` / `dictionary_rename` op types. `file_delete` covers non-skill engine files (a reference doc folded into a skill body, an obsolete tool module). The journal in `operations_applied[]` records the change so a re-run is a clean no-op.

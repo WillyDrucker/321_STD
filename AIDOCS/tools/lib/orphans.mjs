@@ -165,7 +165,7 @@ export function cmdOrphans(index, args = []) {
     for (const r of reviewSkill) console.log(`    - ${r}`);
   }
   if (reviewAuto.length > 0) {
-    console.log(`  review-automemory (${reviewAuto.length}) - in AIDOCS/automemory/, decide per file. A project_*, user_*, or reference_* file is usually project-owned (keep). A feedback_* not in upstream is either an abandoned canonical (drop) or a project-custom rule (keep). Auto-memory files are seeded write-if-missing by init and automemory_add, so project-custom rules survive without listing in customizations[]:`);
+    console.log(`  review-automemory (${reviewAuto.length}) - in AIDOCS/automemory/, decide per file. A project_*, user_*, or reference_* file is usually project-owned (keep). A feedback_* not in upstream is either an abandoned canonical (drop) or a project-custom rule (keep). These survive the copy step by absence, so they never need listing in customizations[]. --auto-drop-safe never drops this class:`);
     for (const r of reviewAuto) console.log(`    - ${r}`);
   }
 

@@ -1,90 +1,95 @@
 # PROJECTNAME - Dev Audit
 
-**Purpose:** Audit reference. Loaded by `/321 -DevAudit`. The anchor principles, hard rules, and audit dimensions here apply to every project. Stack-specific and project-tied rules live in `## Project specifics` at the bottom. Not a workflow document - the audit is a gate, not iteration guidance.
+**Purpose:** Audit reference. Loaded by `/321 -DevAudit`. Holds this project's **measurable contracts** - anchor principles, structural rules, quality gates, and the exceptions that are deliberate. Always-on authoring preferences (comment length, naming, casing, house voice) live in auto-memory and are NOT restated here. Not a workflow document. The audit is a gate.
+
+## The split
+
+**Auto-memory owns how you write.** It loads on every session, so it holds the always-on preferences: comment discipline, naming, casing, no release stamps in source, no freshness stamps in memory, house voice.
+
+**This file owns what this project contracts to.** Rules that can be measured against the source and would otherwise be argued about. **If a rule is already in auto-memory, it does not appear here.** Duplication is what lets a file like this rot while its copy stays right, and a rotted audit file is worse than none - it re-flags settled questions and trains everyone to skim.
 
 ## Anchor principles
 
 These override every individual rule below.
 
-1. **Small files win, cohesion shapes the cut.** Files at or under ~300 lines. Past 300 the model's edit accuracy drops and regressions cluster, so 10 x 300 beats 5 x 600. One concept per file. If the file's job needs "and" to describe, inspect. Cohesion decides HOW to split (along a real seam, into distinctly named modules), not WHETHER. Never fragment for the number alone, never keep a 400+ file whole for cohesion alone.
-2. **Names are contracts.** Intuitive domain vocabulary. A name should let a reader predict the function's signature before opening it. No generic labels (`utils`, `helpers`, `misc`).
-3. **One canonical home per concern.** A rule, token, or pattern lives in exactly one file. Cross-reference, do not duplicate. Promote a shared helper when the same logic appears in two places.
-4. **Index registries as the spine.** `_index.json` owns paths, sizes, skill bodies, and the engine pointer. Code reads from it. Nothing hardcodes a path.
-5. **Greppable + intuitive structure.** When grep alone falls short, parent-folder plus filename compensates. Folder names carry domain too.
-6. **Fail at gates, not everywhere.** Loud failures concentrated at boundaries (validator, pre-flight checks, strict-uniqueness matches). Normal logic stays quiet.
-7. **Anti-speculation.** No half-finished implementations. No design for hypothetical future requirements. Cut events with no subscriber, exports with no caller, abstractions for the imagined third instance. Reach for an abstraction when the third concrete instance lands.
+1. **Small files win, cohesion shapes the cut.** At or under ~300 lines. Past 300 the model's edit accuracy drops and regressions cluster, so 10 x 300 beats 5 x 600. Cohesion decides HOW to split (along a real seam, into distinctly named modules), never WHETHER. Never fragment for the number alone, never keep a 400+ file whole for cohesion alone.
+2. **One canonical home per concern.** A rule, token, or constant lives in exactly one file. Cross-reference, never duplicate.
+3. **Anti-speculation.** No half-finished implementations, no design for hypothetical requirements. Cut exports with no caller, events with no subscriber, and abstractions built for the imagined third instance.
+4. **Framework standards win first, ours adopt after.** The framework's idiom is the default. Our conventions apply in the space it leaves open, never over the top of it. **A framework-mandated file location, name, or API shape is never a finding.**
+5. **Index registries as the spine.** `_index.json` owns AIDOCS paths, file keys, size budgets, and skill dispatch. Code reads from it. Nothing hardcodes one of those paths. (It is not a source-module registry - a source rename has no key here.)
+6. **Fail at gates, not everywhere.** Loud failures concentrated at boundaries (validators, pre-flight checks, strict-uniqueness matches). Normal logic stays quiet.
 
-## Hard rules
+**The duplication rule.** A canonical table, mapping, or business rule centralizes on the **second** copy - two tables that must never disagree is the most repeated defect there is. A generic *abstraction* waits for the **third** concrete instance. These are different thresholds on purpose.
 
-Audit-facing copy of the auto-memory inventory in `AIDOCS/automemory`. The audit applies these whether or not the rules loaded at session start. Same inventory, audit-facing wording.
+## Contracts
 
-- [Code comments](feedback_code_comments.md) - comments that earn their space. Worth writing: module headers, constraints, failure modes, contracts. Surplus context goes to a doc.
-- [Doc purpose header](feedback_doc_purpose_header.md) - every project MD file gets a **Purpose:** callout after the H1.
-- [Lean docs](feedback_lean_docs.md) - top tiers stay lean. Size targets live in this file under Code structure.
-- [No subagents for review](feedback_no_subagents_for_review.md) - inspect manually with Read/Grep/Glob.
-- [No versions in code](feedback_no_versions_in_code.md) - versions live in package.json, dates live in git.
-- [TEMP folder usage](feedback_temp_folder_usage.md) - TEMP/ at project root for all temporary files.
-- [No em dashes](feedback_no_em_dashes.md) - no em dashes or semicolons in any prose under our authorship.
-- [No dates in memory](feedback_no_dates_in_memory.md) - no dates or version stamps in memory or session files. LIFO carries time signal.
-- [Naming and renaming](feedback_naming.md) - names own their domain. Renames stay in-domain and propagate name, key, and references in one pass.
+Express a contract as a command with an expected count, so it can graduate into a lint gate instead of staying an argument. Fill this in as the project's real boundaries settle.
+
+| Gate | Command | Expected |
+|---|---|---|
+| (fill in) | (fill in) | (fill in) |
+
+## Sanctioned exceptions
+
+Deliberate choices, written down **so the audit stops re-flagging them every pass.** This section is what makes an audit converge instead of oscillating. Add to it whenever a finding is examined and declined on the merits.
+
+- **Engine-synced code is outside the size census.** `AIDOCS/tools` is owned by `/321 -UpdateSync`. A local trim there fights the next upstream sync, so an oversize engine file is upstream's fix, not this project's.
+- **Justified wholes.** A file past 300 may stay whole when a lockstep test pins its source text - a parity test that reads the file as text makes a split churn the gate for no cohesion gain. Record the justification and re-judge it each `-FULL`.
+- (fill in the project's own: barrels that are a real public API, schema versions in source, gated exports parked behind a user decision, timers that legitimately schedule.)
 
 ## Audit dimensions
 
 ### Code structure
 
-- **Module index.** A registry doc lists every module and its key exports. Update on add or rename.
-- **File sizes.** Target ~300 (soft, the noise/regression threshold, not a hard 301-line cliff). 200 stays the inspection trigger. 300-400: keep cohesive unless a split lays groundwork for future scaling (a growth-prone area, a strategy/layer seam). 400+: split outright, even at some cohesion cost. Never split just to cross 300. `-FULL` sweeps everything over 300 for a split-or-justify review.
-- **Directory size.** Soft 12 files. Above that, can you predict each file's job from the name alone? If not, consolidate.
-- **Cohesion test.** One sentence with no "and" describes the file's job. "And" is an inspection trigger, not an automatic split.
-- **Split heuristics.** Only when the result yields two semantically distinct names. Reaching for `-helpers` or `-main` is a "don't split" signal.
-- **Re-export on extraction.** When splitting a module that others import, keep the original path as the public face: re-export the moved types/functions, or keep the entry function local. The split is an internal seam, not an API break.
-- **Prefer direct imports over barrel re-exports.** Re-export indexes hide the real home. Use barrels only where the framework expects them (package public API, framework convention).
-- **No dead exports.** Every export has a caller.
+- **File sizes.** ~300 is the target, not a cliff. 200 is an inspection trigger. 300-400: keep if genuinely cohesive. **400+: split outright.** Never split just to cross 300 - reaching for `-helpers` or `-main` is a "do not split" signal.
+- **Directory size.** Soft 12 files. **A smell threshold, not a rule.** Above it, ask whether you can still predict each file's job from its name alone. If yes, leave it - a subfolder move that churns import paths for no lookup gain is the wrong fix.
+- **Cohesion test.** One sentence with no "and" describes the file's job. "And" triggers inspection, not an automatic split.
+- **Re-export on extraction.** Splitting a module others import keeps the original path as the public face. The split is an internal seam, never an API break.
+- **Prefer direct imports over barrels.** A re-export index hides the real home. Barrels only where the framework expects one.
+- **No dead exports.** Every export has a caller, unless the exception section says otherwise.
 
 ### File organization
 
-- **One-way dependency only.** Higher tier imports lower tier, never the reverse. Type-only imports count - a type import from a higher tier is still a tier inversion.
-- **Feature-based over type-based** for shells with many features. Related code lives together in `features/<name>/`. Type-based folders (`components/`, `services/`, `hooks/`) are fine when the count stays small.
-- **Pure helpers stay pure.** `lib/` / `shared/` never import from `services/` or `features/`. Direction enforced at the boundary.
-- **Documented exceptions live in MEMORY.** Grandfathered tier inversions are project-specific. Don't list them here.
+- **One-way dependencies only.** A higher tier imports a lower tier, never the reverse. **Type-only imports count** - a type imported from a higher tier is still a tier inversion.
+- **Pure helpers stay pure.** A shared lib layer never imports from services or features.
 
-### Naming
+### Comments
 
-See `feedback_naming` in auto-memory for the always-on naming and renaming principle.
+Length and why-first discipline live in auto-memory. Project-specific only:
 
-- **Filenames carry full responsibility.** A file that owns multiple concerns names them. `settingsPicker.ts` (owns theme + locale + timezone), not `themePicker.ts`.
-- **Split by domain concept, never numeric suffix.** `threadPersistence.ts` -> `threadRecord.ts` + `threadNaming.ts`. Never `threadPersistence1.ts`.
-- **Pre-write check.** "What does this file own?" If the answer is "utility stuff" or "common helpers", sharpen the concept first.
-- **Booleans read as predicates.** `isLoaded`, `hasAnchor`, `shouldPrune`, `isPaused`.
-- **No generic dumping grounds.** Never `utils.ts`, `helpers.ts`, `misc.ts`, `common.ts`. Reinforces anchor principle #2.
-- **Rename in-domain, propagate in one pass.** A rename stays within the thing's domain and moves the name, its `_index.json` key, and every reference together. A surviving reference to the old name is a finding.
+- **Source-true.** Never encode an unproven theory as fact. Log the observation, verify, then promote it to a comment.
+- **`// best-effort`** is the explicit contract for a `try / catch` that intentionally swallows failure, so the swallow reads as deliberate rather than forgotten.
+- **State the invariant the code cannot show.** When a comment states an invariant, check the code actually holds it.
 
-### Comments policy
+### Error messages
 
-See `feedback_code_comments` in auto-memory for the principle and the worth-writing / delete-on-sight rules.
-
-- **Module headers.** A few lines for a simple module, up to a dozen for a contract-heavy boundary module. File's job + load-bearing invariants. Forward-facing voice.
-- **Source-true only.** Do not encode unproven theories as fact. If you do not have wire-level proof, log the observation, verify, then promote to a comment.
-- **Best-effort contract.** `// best-effort` is the explicit contract for any `try { ... } catch { /* ... */ }` that intentionally swallows failure. The comment makes the swallow read as deliberate.
-- **Error messages.** Passive, friendly, short, no jargon. Never imply the user must act.
+Short, plain, no jargon. **Say what the user must do when they must do something.** An error whose whole job is "your password is too short" must say so.
 
 ### Modern patterns
 
-Baseline conventions every project inherits.
-
-- **ES modules.** No CommonJS in new code, unless a runtime constraint requires it - the exception documents itself in the module header (a .cjs a VM runtime demands).
-- **Async / await** over callback chains.
-- **Strict null handling.** No `any` escapes. Optional chaining + nullish coalescing where they reduce noise.
-- **Discriminated unions** over optional-field soup. State shapes use a discriminator tag (`{ status: "loading" }` / `{ status: "ok", data }`) so null-handling is compile-time, not runtime.
+- **ES modules.** No CommonJS in new code unless a runtime constraint demands it, and the exception documents itself in the module header.
+- **Strict null handling.** No `any` escapes outside a documented framework shim carrying a why-comment.
+- **Discriminated unions** over optional-field soup, so null-handling is compile-time.
 - **Pure functions** where possible. I/O at boundaries.
-- **Prefer immutable updates** for shared state unless the framework owns mutation.
 
-Reference Context7 or current library docs when modernizing. Patterns move. The audit catches up by suggesting DEV-AUDIT updates.
+Reference current library docs when modernizing. Patterns move, and the audit catches up by proposing an update to this file.
 
 ---
 
 ## Project specifics
 
-Stack-specific conventions, framework patterns, deployment idioms, language-specific style rules below this line. The baseline above applies to every project using this template. Architecture / decisions / rules tied to the codebase identity live in `PROJECTNAME_MEMORY.md`, not here.
+Stack, quality gates, framework patterns, and deployment idioms below this line. The baseline above applies to every project using this template. Identity and architecture live in `PROJECTNAME_MEMORY.md`, not here.
 
-(fill in)
+**Quality gates.** (fill in the exact commands, and name any command that does NOT exist so nobody invents one.)
+
+**Change impact map.** When you change X, update Y and Z. The single highest-value thing a mature project hands a cold session.
+
+- (fill in: "new DB column" -> migration -> types -> query layer -> display)
+
+(fill in the rest: styling, types, data access, naming, test policy)
+
+## Open findings
+
+Live, unresolved, and not doc problems. A finding examined and **declined** stays here with its reason, so the same argument does not reopen every sweep.
+
+(none yet)

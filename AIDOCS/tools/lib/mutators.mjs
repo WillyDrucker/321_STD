@@ -41,27 +41,12 @@ export function overwriteSection(content, heading, body) {
   return [...lines.slice(0, sec.head + 1), ...block, ...lines.slice(sec.end)].join("\n");
 }
 
-const LAST_STATE = "**Last State:** ";
-
-// Overwrite Current State, demoting the prior snapshot's bullets to the top of
-// LIFO. The first demoted bullet carries the **Last State:** marker - the boundary
-// between "since last update" above and older history below. Any prior marker is
-// stripped first, so exactly one exists. The first overwrite (placeholder, no
-// bullets) writes plainly with no marker. The engine owns the marker, never the AI.
+// Overwrite Current State. OVERWRITE MEANS OVERWRITE - the outgoing snapshot is
+// discarded, never demoted into LIFO. Current State is operational reality, replaced
+// each pass. Demoting it turned a snapshot into permanent history, so every fact that
+// was ever true became a claim the file made forever (SESSION asserted a dead stack
+// through an entire framework migration). A state snapshot is not an event. When a
+// fact genuinely BECAME one, the skill emits it as a lifo_insert by judgment.
 export function overwriteCurrentState(content, body) {
-  const lines = content.split("\n");
-  const cs = sectionLines(lines, "Current State");
-  if (!cs) throw new Error('section "## Current State" not found');
-  const prior = lines.slice(cs.head + 1, cs.end).filter((l) => l.startsWith("- "));
-  if (prior.length === 0) return overwriteSection(content, "Current State", body);
-
-  const demoted = prior.map((l, i) => (i === 0 ? l.replace(/^- /, `- ${LAST_STATE}`) : l));
-  const updated = overwriteSection(content, "Current State", body).split("\n");
-  const lifo = sectionLines(updated, "LIFO");
-  if (!lifo) return updated.join("\n");
-  const existing = updated.slice(lifo.head + 1, lifo.end)
-    .filter((l) => l.startsWith("- "))
-    .map((l) => l.replace(/^- \*\*Last State:\*\* /, "- "));
-  const block = ["", ...demoted, ...existing, ""];
-  return [...updated.slice(0, lifo.head + 1), ...block, ...updated.slice(lifo.end)].join("\n");
+  return overwriteSection(content, "Current State", body);
 }

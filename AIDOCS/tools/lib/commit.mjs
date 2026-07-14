@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { flag } from "./args.mjs";
+import { depFingerprint, touchesCodeBoundBigSix } from "./bigsixDrift.mjs";
 import { slugify } from "./markdown.mjs";
 import { lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
 import { applyExtendedAction, findOrphanBullets } from "./mutatorsExtended.mjs";
@@ -89,15 +90,24 @@ export function cmdCommit(index, args) {
     runs: (state[skill]?.runs || 0) + 1,
     last_committed_at: new Date().toISOString(),
     recent_captured: merged,
+    // Carry the Big-6 mark across runs that did not touch it.
+    ...(state[skill]?.bigsix ? { bigsix: state[skill].bigsix } : {}),
   };
+  // Re-stamp only when this run actually re-derived a code-bound Big-6 section. That is
+  // what makes doctor's drift check meaningful: the mark records the dependency set the
+  // Big-6 was last WRITTEN against, so a later dep change reads as genuine drift.
+  if (touchesCodeBoundBigSix(staging.actions)) {
+    const fp = depFingerprint(index);
+    if (fp) state[skill].bigsix = { hash: fp.hash, names: fp.names, derived_at: new Date().toISOString() };
+  }
   saveState(state);
   clearStaging(skill);
   console.log(`commit: ${skill} applied ${staging.actions.length} action(s) to ${Object.keys(edited).length} file(s).`);
 
   // Post-commit auto-prune: trim over-cap LIFO files, protecting this commit's
-  // fresh bullets (by rendered line) and the Last State marker. Held whenever a
-  // reconcile is pending, so a migration capture stays additive - nothing is
-  // reaped until the reconcile pass curates under cap and clears the gate.
+  // fresh bullets (by rendered line). Held whenever a reconcile is pending, so a
+  // migration capture stays additive - nothing is reaped until the reconcile pass
+  // curates under cap and clears the gate.
   if (reconcilePending()) {
     console.log("commit: auto-prune held - reconcile pending (capture stays additive until reconcile clears the gate).");
     return;

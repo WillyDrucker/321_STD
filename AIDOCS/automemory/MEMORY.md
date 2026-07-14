@@ -1,10 +1,13 @@
-- [Code comments](feedback_code_comments.md) - comments that earn their space. Worth writing: module headers, constraints, failure modes, contracts. Surplus context goes to a doc.
-- [Doc purpose header](feedback_doc_purpose_header.md) - every project MD file gets a **Purpose:** callout after the H1.
-- [Lean docs](feedback_lean_docs.md) - top tiers stay lean. Size targets live in skill bodies.
-- [No subagents for review](feedback_no_subagents_for_review.md) - inspect manually with Read/Grep/Glob, no Explore / general-purpose agents.
-- [No versions in code](feedback_no_versions_in_code.md) - versions live in package.json, dates live in git.
-- [TEMP folder usage](feedback_temp_folder_usage.md) - TEMP/ at project root is the single home for all temporary files.
-- [No em dashes](feedback_no_em_dashes.md) - no em dashes or semicolons under our authorship: public-facing copy, marketing prose, AI-formatted output, memory files, code comments.
-- [No dates in memory](feedback_no_dates_in_memory.md) - no dates or version stamps in memory or session files. LIFO carries the time signal.
-- [Naming and renaming](feedback_naming.md) - names state what a thing owns. Renames stay in-domain and move the name, its registry key, and every reference in one pass.
+- [Code comments](feedback_code_comments.md) - four lines is the default, module headers included. Rewrite a long comment in place. Never truncate mechanically, never hand-file into the memory track.
+- [Naming](feedback_naming.md) - name it before you write it. A name states what the thing owns. Renames move the name and every reference in one atomic pass.
+- [Case convention](feedback_case_convention.md) - framework and established names win first. Otherwise UPPERCASE is documentation, lowercase is code. No generic files.
+- [No em dashes](feedback_no_em_dashes.md) - no em dashes, no clause-joining semicolons, in any prose we author. Hyphens or a rewrite.
+- [No versions in code](feedback_no_versions_in_code.md) - no release stamps in source. Schema versions and the project's single version source are exempt.
+- [No dates in memory](feedback_no_dates_in_memory.md) - no freshness stamps on entries. Live Current State versions are REQUIRED, not stamps.
+- [Doc purpose header](feedback_doc_purpose_header.md) - every project MD file we author gets a **Purpose:** callout after the H1.
+- [Lean docs](feedback_lean_docs.md) - detail cascades one tier down. AGENTS.md owns the read order. A rule lives in exactly one tier.
+- [No subagents for review](feedback_no_subagents_for_review.md) - review stays with the lead. A cross-model bridge is NOT a subagent and is encouraged.
+- [No background processes](feedback_no_background_processes.md) - everything runs foreground in the main lane. Never background on your own initiative.
+- [TEMP folder usage](feedback_temp_folder_usage.md) - scratch goes in TEMP/ when writes are authorized. Never creates it during read-only work.
+- [Loop arming](feedback_loop_arming.md) - unattended runs go through /loop. Arm as the terminal action and emit nothing after it.
 - [User profile](user_name.md) - one-line summary (role, scope, working style). Rename file on use.

@@ -70,7 +70,7 @@ description: Refresh the project's engine code, skill bodies, router, manifest-d
    - **safe** - engine-only paths (`AIDOCS/tools/lib/` + top-level `AIDOCS/tools/*.md`) the live engine no longer imports. No user file lives in these paths (`engine.mjs` is always present upstream so it never appears here). Mechanically safe to drop. Honors `customizations[]`.
    - **live-import** - engine-only paths absent upstream but STILL imported by the local engine (a rename whose new name lands on the upgrade copy step). Held back from the safe class and never auto-dropped: dropping one pre-upgrade would brick the running engine on its next call. The manifest `file_delete` ops clean these post-copy, at the point nothing imports them. Informational only - no action needed.
    - **review-skill** - files in `AIDOCS/SKILL/` with no upstream counterpart. Either a project-custom skill (the project authored it, keep) or an abandoned canonical (upstream deleted the file but no `skill_delete` / `file_delete` op was added, drop). Decide per file. Project-custom skills do NOT belong in `customizations[]` - the array is for edits to canonical files. Project-custom files survive by absence in the copy step and will re-appear in this class on each sync as a reminder.
-   - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom feedback rule (keep). Auto-memory files are seeded write-if-missing by `init` and `automemory_add`, so project-custom rules survive without listing in `customizations[]`.
+   - **review-automemory** - files in `AIDOCS/automemory/` with no upstream counterpart. A `project_*`, `user_*`, or `reference_*` file is usually project-owned (keep). A `feedback_*` not in upstream is either an abandoned canonical (drop) or a project-custom rule (keep). These survive the copy step by absence, so they never need listing in `customizations[]`. **`--auto-drop-safe` never touches this class** - it drops only the `safe` class.
 
    After the review pass, drop or keep per entry. Continue to step 6.
 
@@ -120,7 +120,7 @@ A manifest operation is a named structural change. The list is append-only and l
 | `dictionary_rename`  | `dictionary` (dotted), `from`, `to` (literal keys) | Renames a flat key inside a single-level dictionary - `dictionary` is the dotted path to the parent (traversed), `from` and `to` are literal key names (not traversed). Use this when the keys themselves contain dots (e.g., `files["updatememory.memory"]`), which `registry_rename`'s dot-splitting cannot reach. Same idempotency cases as `registry_rename`. |
 | `file_add_template`  | `file` (relative to root), `body`         | Creates the file with the body if absent. Never overwrites an existing file. For new project template files like `<NAME>_BACKLOG_EXTENDED.md`. The body uses `PROJECTNAME` which gets substituted to the project's name on apply. Path-contained against the project root - a `../` escape is rejected. |
 | `file_delete`        | `file` (relative to root)                 | Removes the file from the project if present. For engine-class files removed upstream that linger downstream (e.g. a reference doc folded into a skill body, or an orphaned tree from an older engine generation). Idempotent: an already-absent file is a clean no-op. Path-contained against the project root. Honors `customizations[]` - a listed path is skipped with a note (the user removes from `customizations[]` to apply, mirroring the copy step's opt-out). |
-| `automemory_add`     | `file` (basename in `AIDOCS/automemory/`) | Writes the seed file from `INSTALL/engine/AIDOCS/automemory/<file>` if absent in the project's seed. Also seeds the external runtime memory at `auto_memory.path` write-if-missing, so the canonical rule reaches the harness without waiting for a re-install. The op rejects anything that is not a bare basename. |
+| `automemory_add`     | `file` (basename in `AIDOCS/automemory/`) | **Largely superseded.** `AIDOCS/automemory` is engine-class now, so a new canonical rule reaches every project through the copy step plus `syncAutoMemory` with no op at all. This op remains for older engines and for the rare rule that must NOT overwrite an existing body: it writes the seed file and the external runtime copy write-if-missing. Rejects anything that is not a bare basename. |
 | `section_text_diff`  | `file` (relative), `section`, `body`      | Replaces the named `## <section>` body in the project file with the given body, unless the project-relative `file` path is listed in `customizations[]`. Section-level customization (one section edited inside an otherwise-canonical file) is not detected. Mark the whole file customized to opt out. Path-contained against the project root. A future drift check (Phase B) will compare against a prior-canonical baseline and skip on a real user edit. |
 
 Operations are idempotent. Re-running a `skill_delete` for an already-deleted file is a clean no-op. `registry_extend` for an already-present path is a no-op. Apply order is the manifest array order, so a later operation can build on an earlier one without coordinating across releases.
@@ -133,12 +133,15 @@ After operations, the engine-class paths copy from `INSTALL/engine` into the pro
 
 - `AIDOCS/tools/` (engine code)
 - `AIDOCS/SKILL/` (canonical skill bodies)
+- `AIDOCS/automemory/` (the shared authoring rules)
 - `.claude/skills/321/SKILL.md` (router)
 
 A file in any of these is replaced if:
 - It exists in `INSTALL/engine/<same path>`, AND
 - Its project-relative path is NOT listed in `customizations[]`, AND
-- For `AIDOCS/SKILL/`: the project has a matching canonical body (project-custom skill bodies, those with no counterpart in the source tree, are never touched).
+- Its path is not **project-owned** (`AIDOCS/automemory/MEMORY.md`, the rule index, and `AIDOCS/automemory/user_*.md`, the profile). These live inside an engine-class directory but belong to the project, so the copy step skips them and reports them apart from `customizations[]`.
+
+**Auto-memory gets a second step the copy cannot do.** The rules the model actually loads live OUTSIDE the project root (`auto_memory.path`), and the copy step resolves every path against the root. So `syncAutoMemory` mirrors the freshly-copied seed into the runtime and reconciles the rule index (upstream's hook text wins for the rules it ships, the project's pointers to its own rules are preserved). Without it an upstream rule fix would land in the repo and change nothing the AI reads. A rule the project authored itself survives by absence, and nothing is deleted.
 
 A graduated project keeps `-Setup` deregistered. If the copy lands `SKILL_SETUP.md`, delete it after the copy.
 

@@ -58,10 +58,17 @@
   },
   "auto_memory": {
     "seed": "./AIDOCS/automemory",
-    "path": ""
+    "path": "",
+    "agents_mirror": false
+  },
+  "bigsix": {
+    "dep_manifest": "package.json"
+  },
+  "integrations": {
+    "backlog_issue": null
   },
   "engine": {
-    "version": "0.1.17",
+    "version": "0.1.18",
     "upstream": "",
     "operations_applied": []
   },
@@ -83,7 +90,7 @@
       "devaudit": {
         "flag": "-DevAudit",
         "body": "./AIDOCS/SKILL/SKILL_DEV-AUDIT.md",
-        "description": "Audit the source against DEV-AUDIT.md - anchor principles, hard rules, audit dimensions, project specifics. The skill is thin, with the substance in the audit file, which -Setup / reconcile enrich over time. Default reports findings, -FULL audits and refactors."
+        "description": "Audit the source against DEV-AUDIT.md. The skill is thin - the file is the contract. Default reports findings, -FULL applies fixes."
       },
       "setup": {
         "flag": "-Setup",
@@ -93,7 +100,7 @@
       "updatememory": {
         "flag": "-UpdateMemory",
         "body": "./AIDOCS/SKILL/SKILL_UPDATE-MEMORY.md",
-        "description": "Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes -UpdateSession first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline."
+        "description": "Distill durable observations into MEMORY (LIFO + Big-6 static sections) and manage BACKLOG (Features + Ideas). Auto-invokes -UpdateSession first so SESSION is current. Fills empty Big-6 sections from code + conversation + SESSION. Writes through the staging pipeline. BACKLOG is written ONLY here, never ad-hoc."
       },
       "updatesession": {
         "flag": "-UpdateSession",

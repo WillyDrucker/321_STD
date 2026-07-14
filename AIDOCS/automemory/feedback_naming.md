@@ -1,24 +1,20 @@
 ---
 name: feedback-naming
-description: Names state what a thing owns. Renames stay in-domain and propagate the name, its registry key, and every reference in one pass.
+description: Name it before you write it. A name states what the thing owns. Renames move the name and every reference in one atomic pass.
 metadata:
   type: feedback
 ---
 
-A name is a contract. It states what the thing owns - its domain - specifically enough that a reader predicts its shape before opening it.
+A name is a contract. It states what the thing owns, specifically enough that a reader predicts its shape before opening it.
 
-Naming guidelines:
-
-- **Own one domain.** One concept per name. If naming it needs an "and", it owns two things - that is a split, not a name.
-- **No dumping grounds.** Never `utils`, `helpers`, `misc`, `common`. A generic name means the concept is not sharp yet - sharpen it first.
+- **Name it before you write it.** Ask "what does this file or function own?" If the honest answer needs "utility stuff" or "common helpers", the concept is not sharp yet. Sharpen it, then write.
+- **Own one domain.** If naming it needs an "and", that is an inspection trigger, not an automatic split. Investigate, then decide.
+- **No dumping grounds.** Never `utils`, `helpers`, `misc`, `common`.
 - **Folders carry domain too.** Parent plus filename together should let a reader predict the file's job where grep alone falls short.
 - **Predict the signature.** A reader should guess inputs and outputs from the name. Booleans read as predicates (`isLoaded`, `hasAnchor`, `shouldPrune`).
 
-Renaming guidelines:
+**Renames are one atomic pass.** The name and every reference move together, and the rename stays within the thing's domain. Update a registry **only when the renamed thing is actually registered in one.** `_index.json` registers AIDOCS paths and skill dispatch. It is NOT a source-module registry, so a source-file rename has no key there and inventing one is the bug.
 
-- **Rename within the domain.** The new name still names what the thing owns. Never rename across domains - it breaks ownership.
-- **One atomic pass.** The name, its `_index.json` key or path, and every reference move together. The index is the registry, so a half-applied rename leaves drift - a key pointing at an old path, a caller importing a gone symbol, a doc citing a stale file.
+**Why:** names are the cheapest documentation and the first thing a reader trusts. Naming first is a design gate - a thing you cannot name is a thing you have not thought through. A half-finished rename leaves a caller importing a gone symbol, and grep stops being honest.
 
-**Why:** Names are the cheapest documentation and the first thing a reader trusts. A vague name sends a reader to the wrong file. A half-finished rename lets the registry drift from the tree, and grep stops being honest.
-
-**How to apply:** When you create or rename a file, function, or key, ask "does this name state what it owns, and does anything still point at the old name?"
+**How to apply:** before creating anything, name it. Before finishing a rename, ask what still points at the old name.

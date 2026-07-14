@@ -1,16 +1,15 @@
 ---
 name: feedback-temp-folder-usage
-description: TEMP/ at project root is the single home for ALL temporary working files. Always gitignored, never committed.
+description: When a task authorizes writes and needs a scratch file, it goes in the gitignored TEMP/ at the project root. Never at the repo root.
 metadata:
   type: feedback
 ---
 
-Every project using this standard has a gitignored `TEMP/` folder at its root. ALL temporary or working-only files belong there. Default to it for any non-shipping file: scratchpads, working drafts, one-off scripts, throwaway data, audit logs, intermediate analysis output.
+- **When you need a persisted scratch file and writes are in scope, put it in `TEMP/`.** Scratchpads, working drafts, one-off scripts, throwaway data, audit logs, intermediate output.
+- **Never `TEMP/`** for source, project documentation (AIDOCS / WDDOCS), runtime config, or anything that should be committed. If a temporary file turns out to deserve committing, move it to its real home first.
+- **This does not authorize writes on its own.** During a read-only task (a review, an audit, a comparison), do not create `TEMP/` and do not edit `.gitignore` to add it. If `TEMP/` is missing or ungitignored on a task that needs it, say so and let the user decide.
+- **A project that publishes a bundle** (an extension, a package) also excludes `TEMP/` from its publish-ignore file (`.vscodeignore`, `.npmignore`).
 
-Do NOT use TEMP/ for source code, project documentation (AIDOCS / WDDOCS), runtime configuration, or anything that should be committed.
+**Why:** one predictable home keeps the repo root clean and keeps scratch out of commits. Loose files at the repo root have been staged and shipped before.
 
-**Gitignore is load-bearing.** If `TEMP/` doesn't exist, create it. Verify it's in `.gitignore` (`TEMP/` line). If not, add it. Never commit TEMP/ contents. If something temporary turns out to deserve committing, move it out of TEMP/ to its proper home first.
-
-**Why:** A single predictable home keeps the project root clean, prevents accidental commits of scratch files, and gives any AI session a known place to drop working artifacts. Scratch at the repo root has previously been staged and shipped in build artifacts. Scattered in `%LOCALAPPDATA%\Temp\` makes it hard to find when continuing investigation later.
-
-**Project-specific addenda below this line.** Projects that publish bundles (extensions, packages) should also exclude `TEMP/` from their publish-ignore file (e.g., `.vscodeignore`, `.npmignore`).
+**How to apply:** before writing any non-shipping file, ask whether the task authorizes writes. If yes, `TEMP/`. If no, do not write it.

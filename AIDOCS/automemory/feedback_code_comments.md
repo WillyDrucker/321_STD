@@ -1,35 +1,20 @@
 ---
 name: feedback-code-comments
-description: Comments explain things the code can't show on its own. Write what helps a future reader. Route surplus context to the right doc layer.
+description: Comments state what the code cannot show. Four lines is the default. Prefer the why. Never narrate, and never mechanically truncate.
 metadata:
   type: feedback
 ---
 
-Write comments that earn their space. They help a future reader (AI or human) understand the code in ways the code can't show on its own: a constraint, an invariant, a contract, a forward-facing warning. The bar is "would removing this confuse a careful reader?" If yes, the comment earns its space.
+A comment earns its space by stating what the code cannot show: a responsibility, an invariant, a constraint, a failure mode. **Four lines is the default, module headers included.**
 
-Worth writing, header first:
+- **Module header** on every nontrivial file. Its job in present tense, plus the load-bearing invariants.
+- **Prefer the why.** State the fact or constraint that made the code this way, rather than what the line does. A nudge, not a requirement - some comments are pure fact and that is fine.
+- **Never narrate.** No history ("was previously", "replaced X"), no activity ("refactored", "cleaned up"), no restating the next line.
 
-- **Module header** at the top of a file (4-6 lines). State the file's job in present tense and the load-bearing invariants. The first thing any reader sees and the highest-leverage comment surface in the file.
-- **Constraint or decision** at a non-obvious code shape. Explain the trade-off or constraint that made the code this way.
-- **Current failure mode** in present tense, forward-facing. Example: `// stale cache can override active config, refresh on read`. Not historical ("we hit a bug last sprint and had to add the refresh").
-- **Contract** that spans files or modules. Name it at both ends so a reader navigating either side sees the contract.
+**A comment earns more than four lines only by stating a constraint that is still TRUE and that the code cannot show.** It never earns them by recording how the code got here, which git already owns. **Never mechanically truncate to hit the number.** The longest headers are usually the ones documenting the trap a passing test suite does not catch, and an automated trim deletes exactly those.
 
-Delete comments that narrate:
+**Rewrite a long comment into a tight one. Deleting words IS the job.** Never relocate one into the memory track by hand. If real reasoning gets displaced, the next `/321 -Update` pass picks it up from the conversation while context is warm. A mid-task hand-write into MEMORY or SESSION is how the backbone fills with code detail nobody asked it to hold.
 
-- History ("was previously", "used to be", "replaced X")
-- Our version numbers or dates (any literal version or date in source)
-- Activity ("refactored", "cleaned up", "removed dead code")
-- What the next line literally does
+**Why:** stamps and narration rot, and git is already the activity log. A comment that survives is one a future reader would have been confused without.
 
-When a comment wants to grow - a why-comment turning into multiple paragraphs, a module header swelling past 6 lines - keep only the terse forward-facing fact in the comment. The surplus reasoning belongs in the backbone, not in source:
-
-- **Architecture deep-dives, pitfall root-causes** -> `<PROJECT>_MEMORY_EXTENDED.md`
-- **In-flight work, recent debugging context** -> `<PROJECT>_SESSION_EXTENDED.md`
-
-You don't hand-file or tag it: writing the lean comment is the only in-the-moment step, and the next `/321 -Update` pass lifts the reasoning into the right layer from the conversation while context is warm. This is for oversized comments only, not a tag on every comment.
-
-**Why:** Stamps and history rot. Git is the activity log. Comments earn their space by helping future-you avoid traps or understand constraints that aren't obvious from the code.
-
-**How to apply:** When writing or auditing code, ask "does this comment help a future reader, or just narrate?" Help -> keep. Narrate -> delete. Code-applicable specifics (density targets, contract formats, TODO patterns, lint exceptions) live in `<PROJECT>_DEV-AUDIT.md`, loaded only when `/321 -DevAudit` runs. This rule is the always-loaded principle.
-
-**Project-specific addenda below this line.**
+**How to apply:** ask "does this help a future reader, or just narrate?" Help, keep it tight. Narrate, cut it. Project-specific comment contracts live in `<PROJECT>_DEV-AUDIT.md`, not here.

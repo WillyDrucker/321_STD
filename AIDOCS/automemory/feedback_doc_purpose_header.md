@@ -1,33 +1,14 @@
 ---
 name: feedback-doc-purpose-header
-description: Every project Markdown file under our authorship has a **Purpose:** callout immediately after the H1. Scope covers AIDOCS, WDDOCS, CLAUDE.md, AGENTS.md, and skill bodies.
+description: Every project Markdown file we author gets a **Purpose:** callout immediately after the H1.
 metadata:
   type: feedback
 ---
 
-Every project Markdown file under our authorship has a `**Purpose:**` callout immediately after the H1 (the first `# Heading` at the top of the file). Scope: AIDOCS, WDDOCS, CLAUDE.md, AGENTS.md, and skill bodies under `.claude/skills/` and `AIDOCS/SKILL/`. For files with YAML frontmatter, the order is frontmatter -> H1 -> Purpose. Do not put Purpose inside the frontmatter - frontmatter `description:` is a separate tooling field with different semantics.
+- **Every project Markdown file under our authorship** gets a `**Purpose:**` callout immediately after the H1. Scope: AIDOCS, WDDOCS, AGENTS.md, and skill bodies. With frontmatter the order is frontmatter, then H1, then Purpose. Never put Purpose inside the frontmatter - `description:` is a separate tooling field with different semantics.
+- **Say what the file is, when to read it, and what is NOT in it** that a reader might expect. One sentence for a small file, a short paragraph for a meta-layer doc.
+- **Exempt:** source and configs, CHANGELOG (its own format), pointer-only files (a `CLAUDE.md` holding just `@AGENTS.md`), legal documents with a governed format, and auto-memory files, whose frontmatter `description:` already serves this role.
 
-Format:
+**Why:** a fresh reader, human or AI, should know whether to read the file, and what falls outside it, before spending context on it.
 
-```markdown
-# Title
-
-**Purpose:** [What this file is. When to read it. What's NOT here that the reader might expect.]
-
-...rest of file...
-```
-
-Purpose depth is a steering call - match it to the file's role:
-
-- A short or config-like file may need one sentence
-- A meta-layer doc (MEMORY, CLAUDE.md, a framework reference) often needs a paragraph or two with a what's-NOT-here clause
-- The signal: a fresh reader (AI or human) should know whether to read this and what falls outside its scope
-
-If a Purpose needs many paragraphs to convey, the file is probably overloaded - split rather than write a longer Purpose.
-
-Do NOT add Purpose to:
-- Source code, `package.json`, configs
-- HTML or non-Markdown reference files
-- `CHANGELOG.md` (historical, has its own format)
-- A pure import-pointer file (e.g. `CLAUDE.md` when it only holds `@AGENTS.md`)
-- Auto-memory rule files (`AIDOCS/automemory/*.md`) - the frontmatter `description:` serves this role
+**How to apply:** if the Purpose needs several paragraphs, the file is overloaded. Split it rather than write a longer Purpose.

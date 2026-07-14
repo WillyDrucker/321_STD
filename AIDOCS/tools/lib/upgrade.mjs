@@ -19,7 +19,8 @@ import { dirname, join } from "node:path";
 
 import { engineDriftNote } from "./gitDrift.mjs";
 import { installLog } from "./installLog.mjs";
-import { ENGINE_CLASS, indexPath, installEngineDir, repoRoot } from "./paths.mjs";
+import { ENGINE_CLASS, indexPath, installEngineDir, isProjectOwned, repoRoot } from "./paths.mjs";
+import { syncAutoMemory } from "./syncAutoMemory.mjs";
 import { reconcileRouterQuickRef } from "./routerQuickRef.mjs";
 import { migrateLegacyWatermarkKeys, reconcilePending } from "./state.mjs";
 import { flagFromFilename } from "./sync.mjs";
@@ -124,6 +125,13 @@ export function cmdUpgrade(index, args) {
 
   const copyReport = copyEngineClass(source, root, index.customizations, index.graduated, dryRun);
 
+  // Auto-memory has two homes and the copy step only reaches one. It refreshed the seed
+  // (inside the project root). The runtime the model actually loads at session start lives
+  // outside the root, so without this the corrected rules would land in the repo and change
+  // nothing the AI reads. Also reconciles the rule index rather than overwriting it, which
+  // would delete the project's pointers to its own rules.
+  const autoMemoryReport = syncAutoMemory(source, index, dryRun);
+
   // Router quick-ref: the engine-class copy lands the upstream router verbatim, which
   // may advertise -Setup or another flag this project no longer registers (graduated).
   // Drop orphan lines so the user does not see a stale flag in the quick-ref. Pass the
@@ -153,7 +161,8 @@ export function cmdUpgrade(index, args) {
   console.log(`upgrade${tag}: ${counts.applied} applied, ${counts.noop} no-op, ${counts.deferred} deferred, ${counts.opSkipped} unsupported, ${counts.failed} failed`);
   console.log(`copy${tag}: ${copyReport.changed} changed, ${copyReport.identical} identical, ${copyReport.skipped} skipped`);
   for (const n of opNotes) console.log(`  ${n}`);
-  for (const s of copyReport.skipList) console.log(`  SKIP ${s} (customizations[])`);
+  for (const s of copyReport.skipList) console.log(`  SKIP ${s}`);
+  if (autoMemoryReport) console.log(`  ${autoMemoryReport}${tag}`);
   if (versionNote) console.log(`  ${versionNote}`);
   if (routerReport && routerReport.dropped.length > 0) {
     console.log(`  router${tag}: pruned ${routerReport.dropped.length} stale quick-ref line(s) (${routerReport.dropped.join(", ")})`);
@@ -282,8 +291,12 @@ function copyDirRecursive(srcDir, dstDir, relRoot, skip, counters, dryRun) {
 }
 
 function copyFile(srcFile, dstFile, relPath, skip, counters, dryRun) {
-  if (skip.has(relPath)) {
-    counters.skipList.push(relPath);
+  // customizations[] is the user's opt-out. isProjectOwned is the engine's own: a file
+  // that lives in an engine-class dir but belongs to the project (the rule index, the
+  // user profile). Both are skipped, and neither is a finding.
+  if (skip.has(relPath) || isProjectOwned(relPath)) {
+    const reason = skip.has(relPath) ? "customizations[]" : "project-owned";
+    counters.skipList.push(`${relPath} (${reason})`);
     counters.skipped++;
     return;
   }

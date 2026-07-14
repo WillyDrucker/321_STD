@@ -21,12 +21,13 @@ import { cmdPrivacy } from "./lib/privacy.mjs";
 import { cmdScrub } from "./lib/scrub.mjs";
 import { cmdState } from "./lib/state.mjs";
 import { cmdSync } from "./lib/sync.mjs";
+import { cmdSyncBacklog } from "./lib/syncBacklogIssue.mjs";
 import { cmdUpgrade } from "./lib/upgrade.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 import { cmdWatermark } from "./lib/watermark.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "upgrade", "compare", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "sync-backlog", "upgrade", "compare", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -64,6 +65,7 @@ function main() {
     case "scrub":    cmdScrub(index, args); break;
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
+    case "sync-backlog": cmdSyncBacklog(index); break;
     case "upgrade":  cmdUpgrade(index, args); break;
     case "compare":  cmdCompare(index); break;
     case "merge-status": cmdMergeStatus(index, args); break;
@@ -99,8 +101,14 @@ Commands:
             MEMORY included. [--fix [--semicolons]] [--path <file>]
   sync      Rebuild skills.dispatch in _index.json from the AIDOCS/SKILL/ bodies.
             [--dry-run]
+  sync-backlog
+            Regenerate a tracker issue's body from the BACKLOG file (the file is the
+            source of truth, the issue is a generated copy). OPT-IN: a clean no-op
+            unless integrations.backlog_issue is set in _index.json. Fails soft when
+            gh is missing or unauthenticated, so it never breaks a commit pipeline.
   upgrade   Drive the project up to the fetched engine's manifest plus refresh the
-            engine-class paths (AIDOCS/tools, AIDOCS/SKILL, .claude/skills/321/SKILL.md).
+            engine-class paths (AIDOCS/tools, AIDOCS/SKILL, AIDOCS/automemory,
+            .claude/skills/321/SKILL.md).
             Diffs MANIFEST.json operations against engine.operations_applied[], applies
             each missing op (idempotent), skips paths in customizations[], bumps
             engine.version. Requires a prior fetch-engine. Refuses while reconcile_pending

@@ -6,9 +6,10 @@
 
 import { readFileSync } from "node:fs";
 
+import { checkBigSixDrift } from "./bigsixDrift.mjs";
 import { readRegisteredFile } from "./paths.mjs";
 import { authoredTargets, scanBanned } from "./prose.mjs";
-import { reconcilePending } from "./state.mjs";
+import { loadState, reconcilePending } from "./state.mjs";
 
 // Banned prose splits two ways. In steady state every authored doc is a hard error -
 // the engine and the AI write to house voice. During the reconcile window, prose in
@@ -35,6 +36,7 @@ export function runContentChecks(index) {
       "Size caps":          checkCaps(index),
       "Import residue":     checkResidue(index),
       "Sub-section budget": checkSubsectionBudget(index),
+      "Big-6 drift":        checkBigSixDrift(index, loadState()),
       "Banned prose in historical (reconcile target)": prose.historical,
     },
   };

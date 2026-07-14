@@ -127,7 +127,19 @@ node "$RENG" init "$LG" --name LegacyAm >/dev/null 2>&1
 # rewrite the registry to the pre-rebuild schema: auto_memory.source, no seed/path
 node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={source:"./AIDOCS/automemory"};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$LG/AIDOCS/_index.json"
 node "$LG/AIDOCS/tools/engine.mjs" doctor >/dev/null 2>&1 && pass "doctor passes on legacy auto_memory.source" || fail "doctor failed on legacy source schema"
-node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -A1 "Auto-memory pointers" | grep -q "ok" && pass "auto-memory mirror check stays active on legacy source (fallback honored)" || fail "auto-memory check went inert on legacy source"
+
+echo "=== T28b: the AGENTS mirror is OPT-IN. Default off, on when asked, dangling link always caught ==="
+# Default (template AGENTS.md carries no rules inventory): the "no pointer" direction is
+# silent, so a lean AGENTS.md does not fail once per rule file forever.
+node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -A1 "Auto-memory pointers" | grep -q "ok" && pass "mirror off by default: a lean AGENTS.md is clean" || fail "lean AGENTS.md still reports missing pointers"
+# Opt in, and every rule file without a pointer is now reported.
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={seed:"./AIDOCS/automemory",path:"",agents_mirror:true};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$LG/AIDOCS/_index.json"
+node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -q "has no AGENTS pointer" && pass "mirror opt-in: missing pointers are reported" || fail "agents_mirror:true did not activate the mirror check"
+# The reverse direction is unconditional: a link to a rule file that does not exist is a
+# real bug whether or not the mirror is in use.
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={seed:"./AIDOCS/automemory",path:""};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$LG/AIDOCS/_index.json"
+printf '\n- [Ghost](feedback_ghost_rule.md) - points at nothing.\n' >> "$LG/AGENTS.md"
+node "$LG/AIDOCS/tools/engine.mjs" doctor 2>&1 | grep -q 'link "feedback_ghost_rule.md" has no rule file' && pass "dangling AGENTS link caught even with the mirror off" || fail "dangling link went unreported with the mirror off"
 
 echo "=== T29: extended-triggered prune drops a paired bullet+sub-section, both files archived under one timestamp ==="
 EP="$BASE/extprune"
