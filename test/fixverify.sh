@@ -16,6 +16,8 @@
 #   08-commit-drift-copy.sh - commit-drift advisory (git) + hash-aware engine-class copy
 #   09-state-automemory.sh  - Current State overwrites (no demotion), auto-memory reaches
 #                             the runtime, dispatch-description drift
+#   10-targeted-ops.sh      - amend_bullet, drop_bullet with its archive and pairing gate,
+#                             changelog_insert, the dictionary_extend manifest op
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/lib/runner.sh"
@@ -31,6 +33,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/cases/07-sync-judgment.sh"
 . "$HERE/cases/08-commit-drift-copy.sh"
 . "$HERE/cases/09-state-automemory.sh"
+. "$HERE/cases/10-targeted-ops.sh"
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi

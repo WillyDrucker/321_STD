@@ -49,7 +49,7 @@ Runs in the current directory and names the project after the folder. Override t
 
 ## Documentation
 
-- **`AGENTS.md`** - the orchestrator: cold-start load order, hard rules, project specifics.
+- **`AGENTS.md`** - the orchestrator: cold-start load order, the pointer to the authoring rules, project specifics.
 - **`INSTALL/install.md` + `INSTALL/setup.md`** - the install and setup runbooks: the fresh-fill and migration lifecycle, step by step.
 - **`AIDOCS/_index.json`** - the registry: paths, file keys, buckets, size caps, and the canonical skill dispatch.
 - **`node AIDOCS/tools/engine.mjs help`** - the engine command surface in one read.

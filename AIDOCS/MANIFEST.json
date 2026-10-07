@@ -220,6 +220,13 @@
       "name": "delete_lib_migrate_restore_kebab",
       "type": "file_delete",
       "file": "AIDOCS/tools/lib/migrate-restore.mjs"
+    },
+    {
+      "name": "extend_files_updatesession_changelog",
+      "type": "dictionary_extend",
+      "dictionary": "files",
+      "key": "updatesession.changelog",
+      "value": "./CHANGELOG.md"
     }
   ]
 }

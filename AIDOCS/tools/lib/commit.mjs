@@ -7,11 +7,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { flag } from "./args.mjs";
 import { depFingerprint, touchesCodeBoundBigSix } from "./bigsixDrift.mjs";
-import { slugify } from "./markdown.mjs";
-import { lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
+import { bulletExtendedAnchor, slugify } from "./markdown.mjs";
+import { amendBullet, dropBullet, lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
+import { changelogInsert } from "./mutatorsChangelog.mjs";
 import { applyExtendedAction, findOrphanBullets } from "./mutatorsExtended.mjs";
 import { resolveFile } from "./paths.mjs";
-import { autoPrune } from "./prune.mjs";
+import { archiveBullets, autoPrune } from "./prune.mjs";
 import { clearStaging, loadStaging, loadState, recentCaptured, reconcilePending, saveState, SKILLS } from "./state.mjs";
 import { validateStaging } from "./validate.mjs";
 
@@ -21,8 +22,17 @@ const FINGERPRINT_LIMIT = 8;
 
 const EXTENDED_OPS = ["add", "drop", "replace"];
 
-function applyOp(content, action) {
+// `dropped` collects every line a drop_bullet removed, for the pairing gate and
+// the archive after the write.
+function applyOp(content, action, dropped) {
   if (action.op === "lifo_insert") return lifoInsert(content, action.section, action.bullet, Boolean(action.extended_anchor));
+  if (action.op === "amend_bullet") return amendBullet(content, action.section, action.match, action.bullet);
+  if (action.op === "drop_bullet") {
+    const r = dropBullet(content, action.section, action.match);
+    dropped.push({ file: action.file, line: r.removed });
+    return r.content;
+  }
+  if (action.op === "changelog_insert") return changelogInsert(content, action.section, action.bullet);
   if (action.op === "overwrite_section") {
     return action.section?.trim().toLowerCase() === "current state"
       ? overwriteCurrentState(content, action.body)
@@ -48,11 +58,24 @@ export function cmdCommit(index, args) {
   // Phase 1: simulate. Apply every op to in-memory copies, keyed by file. Any
   // throw (missing section, bad op) aborts here, before disk is touched.
   const edited = {};
+  const dropped = [];
   staging.actions.forEach((a, i) => {
     if (!(a.file in edited)) edited[a.file] = readFileSync(resolveFile(index, a.file), "utf8");
-    try { edited[a.file] = applyOp(edited[a.file], a); }
+    try { edited[a.file] = applyOp(edited[a.file], a, dropped); }
     catch (e) { console.error(`commit: action ${i} failed: ${e.message} - no files written.`); process.exit(16); }
   });
+
+  // A dropped [+] bullet takes its sub-section with it, by the staging's own
+  // EXTENDED drop: the orphan check below reads main-to-extended only, so a
+  // stranded sub-section would otherwise outlive its bullet in silence.
+  for (const d of dropped) {
+    const anchor = bulletExtendedAnchor(d.line);
+    if (!anchor) continue;
+    const paired = staging.actions.some((a) => a.op === "drop" && a.file === `${d.file}_extended` && a.anchor === anchor);
+    if (paired) continue;
+    console.error(`commit: drop_bullet removed a [+] bullet (anchor "${anchor}") with no drop on ${d.file}_extended in the same staging - no files written.`);
+    process.exit(18);
+  }
 
   // Orphan-pair check on the simulated state: every [+] bullet in a main file
   // needs a matching ### sub-section in its paired EXTENDED file. Covers any pair
@@ -84,7 +107,7 @@ export function cmdCommit(index, args) {
   for (const [key, content] of Object.entries(edited)) writeFileSync(resolveFile(index, key), content, "utf8");
   const state = loadState();
   const captured = [];
-  for (const a of staging.actions) if (a.op === "lifo_insert") captured.push(slugify(a.bullet));
+  for (const a of staging.actions) if (a.op === "lifo_insert" || a.op === "amend_bullet") captured.push(slugify(a.bullet));
   const merged = [...captured.reverse(), ...recentCaptured(state[skill])].slice(0, FINGERPRINT_LIMIT);
   state[skill] = {
     runs: (state[skill]?.runs || 0) + 1,
@@ -103,6 +126,7 @@ export function cmdCommit(index, args) {
   saveState(state);
   clearStaging(skill);
   console.log(`commit: ${skill} applied ${staging.actions.length} action(s) to ${Object.keys(edited).length} file(s).`);
+  for (const key of new Set(dropped.map((d) => d.file))) archiveBullets(index, key, dropped.filter((d) => d.file === key).map((d) => d.line));
 
   // Post-commit auto-prune: trim over-cap LIFO files, protecting this commit's
   // fresh bullets (by rendered line). Held whenever a reconcile is pending, so a
@@ -113,6 +137,10 @@ export function cmdCommit(index, args) {
     return;
   }
   const fresh = new Set();
-  for (const a of staging.actions) if (a.op === "lifo_insert") fresh.add(a.extended_anchor ? `- [+] ${a.bullet}` : `- ${a.bullet}`);
+  for (const a of staging.actions) {
+    if (a.op === "lifo_insert") fresh.add(a.extended_anchor ? `- [+] ${a.bullet}` : `- ${a.bullet}`);
+    // An amended bullet keeps whichever marker it had, so both renderings are fresh.
+    if (a.op === "amend_bullet") { fresh.add(`- ${a.bullet}`); fresh.add(`- [+] ${a.bullet}`); }
+  }
   autoPrune(index, Object.keys(edited), fresh);
 }

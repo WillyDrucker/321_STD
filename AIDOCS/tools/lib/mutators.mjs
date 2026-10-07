@@ -1,9 +1,11 @@
 // mutators.mjs - pure section mutations for the memory / session / backlog files.
 // Each takes file content plus the op's fields and returns new content. No I/O:
 // commit simulates every op in memory first, then writes (DEV-AUDIT: pure
-// functions, I/O at boundaries). Two ops cover both skills - lifoInsert (LIFO
-// lists and BACKLOG, newest on top) and overwriteSection (Current State and the
-// Big-6 static sections).
+// functions, I/O at boundaries). Four ops cover both skills - lifoInsert (LIFO
+// lists and BACKLOG, newest on top), overwriteSection (Current State and the
+// Big-6 static sections), and amendBullet / dropBullet (one bullet, in place).
+
+import { slugify } from "./markdown.mjs";
 
 // Locate a "## <heading>" section. Returns the heading line index and the index
 // of the first line after its body (the next "## " heading or "---" divider, or
@@ -39,6 +41,46 @@ export function overwriteSection(content, heading, body) {
   if (!sec) throw new Error(`section "## ${heading}" not found`);
   const block = ["", ...body.split("\n"), ""];
   return [...lines.slice(0, sec.head + 1), ...block, ...lines.slice(sec.end)].join("\n");
+}
+
+// Find ONE bullet in a section by `match`: the bullet's text (after "- " or
+// "- [+] ") starts with it verbatim, or its slug starts with slugify(match).
+// Zero or several hits throw, so a targeted edit can never land on the wrong line.
+function findBullet(lines, sec, heading, match) {
+  const want = slugify(match);
+  const hits = [];
+  for (let i = sec.head + 1; i < sec.end; i++) {
+    if (!lines[i].startsWith("- ")) continue;
+    const text = lines[i].replace(/^- (\[\+\] )?/, "");
+    if (text.startsWith(match) || (want && slugify(text).startsWith(want))) hits.push(i);
+  }
+  if (hits.length === 1) return hits[0];
+  const how = hits.length === 0 ? "matched no bullet" : `matched ${hits.length} bullets`;
+  throw new Error(`"${match}" ${how} in "## ${heading}"`);
+}
+
+// Rewrite one bullet in place, keeping its seat and its [+] marker: the fix for a
+// bullet the run proved wrong, so a correction never re-emits its section or
+// buries the old text under a newer bullet. Serves LIFO, Current State, BACKLOG.
+export function amendBullet(content, heading, match, bullet) {
+  const lines = content.split("\n");
+  const sec = sectionLines(lines, heading);
+  if (!sec) throw new Error(`section "## ${heading}" not found`);
+  const at = findBullet(lines, sec, heading, match);
+  lines[at] = lines[at].startsWith("- [+] ") ? `- [+] ${bullet}` : `- ${bullet}`;
+  return lines.join("\n");
+}
+
+// Remove one bullet, handing the removed line back so commit can archive it
+// (move, not delete). A [+] bullet's sub-section leaves by its own EXTENDED drop
+// in the same staging - commit refuses the drop without it.
+export function dropBullet(content, heading, match) {
+  const lines = content.split("\n");
+  const sec = sectionLines(lines, heading);
+  if (!sec) throw new Error(`section "## ${heading}" not found`);
+  const at = findBullet(lines, sec, heading, match);
+  const [removed] = lines.splice(at, 1);
+  return { content: lines.join("\n"), removed };
 }
 
 // Overwrite Current State. OVERWRITE MEANS OVERWRITE - the outgoing snapshot is

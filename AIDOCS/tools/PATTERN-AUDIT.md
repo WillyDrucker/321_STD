@@ -2,7 +2,7 @@
 
 **Purpose:** Optional sub-section shapes that earn their place under `## Project specifics` in `<PROJECT>_DEV-AUDIT.md`. Loaded on demand when a project's audit notes grow beyond the baseline. Not loaded at session start.
 
-The baseline DEV-AUDIT template ships with anchor principles, hard rules, audit dimensions, and a `## Project specifics` placeholder. The four patterns below cover the recurring shapes projects add under that placeholder. Each is optional. A project earns the section by having something concrete to say.
+The baseline DEV-AUDIT template ships with the split, anchor principles, contracts, sanctioned exceptions, audit dimensions, and a `## Project specifics` placeholder. The four patterns below cover the recurring shapes projects add under that placeholder. Each is optional. A project earns the section by having something concrete to say.
 
 ## Pattern 1: Change impact map
 

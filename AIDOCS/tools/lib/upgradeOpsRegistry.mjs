@@ -1,7 +1,7 @@
 // upgradeOpsRegistry.mjs - manifest ops that mutate the in-memory registry
 // (_index.json): registry_extend (additive, never overwrites), registry_rename
-// (dotted-path key move), dictionary_rename (flat key move where the key names
-// themselves contain dots). Pure data-structure mutations, no filesystem writes.
+// (dotted-path key move), dictionary_rename and dictionary_extend (a flat key move
+// and a flat key add where the key names themselves contain dots). Pure, no I/O.
 // The driver persists the index at its single commit point (skipped in dry-run),
 // so mutating in-memory during dry-run keeps later ops reading a consistent view.
 // Handler contract and dispatch live in upgradeOperations.mjs.
@@ -86,6 +86,22 @@ export function applyDictionaryRename(op, index, _source, _root, dryRun) {
   delete parent[op.from];
   void dryRun;
   return { applied: true, note: `renamed ${op.dictionary}.${op.from} to .${op.to}` };
+}
+
+// Adds a literal key to a single-level dictionary if absent, creating the dictionary
+// when it is missing. Never overwrites a present value (a project that points the key
+// elsewhere keeps its choice). The additive twin of dictionary_rename, for keys that
+// themselves contain dots (a `files` key) and so cannot ride registry_extend.
+export function applyDictionaryExtend(op, index, _source, _root, dryRun) {
+  let parent = readNestedKey(index, op.dictionary);
+  if (parent == null || typeof parent !== "object") {
+    parent = {};
+    writeNestedKey(index, op.dictionary, parent);
+  }
+  if (parent[op.key] !== undefined) return { applied: false, note: `${op.dictionary}.${op.key} already set, preserved` };
+  parent[op.key] = op.value;
+  void dryRun;
+  return { applied: true, note: `set ${op.dictionary}.${op.key}` };
 }
 
 // Dotted-path helpers shared by the rename handlers. readNestedKey returns undefined

@@ -10,4 +10,11 @@
 - [No background processes](feedback_no_background_processes.md) - everything runs foreground in the main lane. Never background on your own initiative.
 - [TEMP folder usage](feedback_temp_folder_usage.md) - scratch goes in TEMP/ when writes are authorized. Never creates it during read-only work.
 - [Loop arming](feedback_loop_arming.md) - unattended runs go through /loop. Arm as the terminal action and emit nothing after it.
+- [AIDOCS update cadence](feedback_aidocs_update_cadence.md) - SESSION, MEMORY, BACKLOG, and CHANGELOG are written only by a /321 -Update or -AutoPush pass, never ad hoc. WDDOCS move with the work.
+- [Verify agent claims](feedback_verify_agent_claims.md) - agent and reviewer findings are candidates, not facts. One direct look at the primary source before acting.
+- [Audit never in code](feedback_audit_never_in_code.md) - no batch or finding ids, task history, or TEMP pointers in code, comments, tests, or project docs. The trail stays in TEMP.
+- [Reports carry discussions](feedback_reports_carry_discussions.md) - compact blocks and session reports include concerns and parked ideas, not just code state.
+- [AskUserQuestion usage](feedback_askuserquestion_usage.md) - forms only for straight questions. Reasoning and alternatives iterate in prose first.
+- [Line target is informational](feedback_line_target_informational.md) - the size target and the census never block or slow a change. Report, keep building.
+- [Long scripts via Write tool](reference_long_scripts_via_write_tool.md) - patch and log scripts go through Write into the scratchpad, never an inline heredoc.
 - [User profile](user_name.md) - one-line summary (role, scope, working style). Rename file on use.

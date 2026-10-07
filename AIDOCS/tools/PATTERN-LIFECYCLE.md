@@ -69,6 +69,7 @@ User content the engine never authors.
 | `registry_extend` | data (registry) | Adds a key to `_index.json` if absent. Never overwrites a present value. |
 | `registry_rename` | data (registry) | Renames a dotted-path key (nested-object access). |
 | `dictionary_rename` | data (registry) | Renames a literal flat key in a dictionary (when the key itself contains a dot). |
+| `dictionary_extend` | data (registry) | Adds a literal flat key to a dictionary if absent (a `files` key, which carries a dot). Never overwrites a present value. |
 | `file_add_template` | data | Creates a new template file with `PROJECTNAME` substitution if absent. Path-contained. |
 | `automemory_add` | auto-memory | **Largely superseded by the force-copy.** Adds a new seed file write-if-missing and mirrors it into the external runtime, also write-if-missing. Retained for older engines and for the rare rule that must not overwrite an existing body. A new canonical rule needs no op. |
 | `section_text_diff` | data | Replaces a `## <section>` body in a project file unless the file is in `customizations[]`. Path-contained. |
@@ -96,7 +97,7 @@ The right path depends on the file's class:
 - **New PATTERN reference** (engine class, like this file): drop in `AIDOCS/tools/`. Copy step handles it.
 - **New canonical auto-memory rule** (hybrid class): add the file in `AIDOCS/automemory/` and add its pointer line to the seed's `MEMORY.md`. **That is all.** The seed is engine-class, so the copy step lands the file downstream and `syncAutoMemory` mirrors it into the runtime and adds the pointer to each project's index. **No `automemory_add` op is needed** - that op predates the force-copy and is now redundant for any project on this engine. It stays supported for older engines, and for the write-if-missing case where a rule must NOT overwrite an existing body.
 - **New data template** (data class): add a `file_add_template` op to `MANIFEST.json`. The op carries the file path and body (with `PROJECTNAME` placeholders).
-- **New registry key shape** (data class): add a `registry_extend` op to add the key if absent.
+- **New registry key shape** (data class): add a `registry_extend` op to add the key if absent, or a `dictionary_extend` op when the key itself contains a dot (a `files` key such as `updatesession.changelog`).
 - **Rename or remove existing structure**: use the `skill_rename` / `skill_delete` / `file_delete` / `registry_rename` / `dictionary_rename` op types. `file_delete` covers non-skill engine files (a reference doc folded into a skill body, an obsolete tool module). The journal in `operations_applied[]` records the change so a re-run is a clean no-op.
 
 ## Rules

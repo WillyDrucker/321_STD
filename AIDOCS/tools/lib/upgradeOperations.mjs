@@ -16,6 +16,7 @@ import {
   applySkillRename,
 } from "./upgradeOpsFiles.mjs";
 import {
+  applyDictionaryExtend,
   applyDictionaryRename,
   applyRegistryExtend,
   applyRegistryRename,
@@ -27,6 +28,7 @@ export const HANDLERS = {
   registry_extend: applyRegistryExtend,
   registry_rename: applyRegistryRename,
   dictionary_rename: applyDictionaryRename,
+  dictionary_extend: applyDictionaryExtend,
   file_add_template: applyFileAddTemplate,
   file_delete: applyFileDelete,
   automemory_add: applyAutoMemoryAdd,

@@ -52,6 +52,8 @@ The watermark answers "did I capture this arc in the last few runs?" The live ME
 | An empty Big-6 section you can fill from evidence | that section | `overwrite_section` on `updatememory.memory`, section `<Section>` |
 | Long-term feature direction (user-committed eventually, not immediate) | BACKLOG Features | `lifo_insert` on `updatememory.backlog`, section `Features` |
 | Long-term exploratory or what-if direction | BACKLOG Ideas | `lifo_insert` on `updatememory.backlog`, section `Ideas` |
+| A MEMORY LIFO bullet or BACKLOG item this run proved wrong or reframed | that bullet, in place | `amend_bullet` |
+| A BACKLOG item that shipped or died | gone, the line archived by commit | `drop_bullet` on `updatememory.backlog` |
 | Immediate follow-up, next step of in-flight work, cross-track flag | DROP - UpdateSession's lane | (n/a) |
 | AGENTS / auto-memory suggestion | MEMORY LIFO, as a `**Suggested for ...:**` bullet | `lifo_insert` |
 | Project-specific event or active state | DROP - UpdateSession's lane | (n/a) |
@@ -65,9 +67,11 @@ BACKLOG is long-term direction only - items the project may pursue eventually, n
 
 **BACKLOG is written ONLY here, only by this skill, only on an Update run.** Never add to it ad-hoc mid-task, and never treat it as a consideration outside `/321 -Update` / `-UpdateMemory`.
 
-## Step 4: Big-6 gap-fill (empty sections only)
+## Step 4: Big-6 gap-fill (empty sections, and a sentence the run falsified)
 
 For the two script-readable sections, start from the deterministic draft: `node AIDOCS/tools/engine.mjs bigsix --suggest` prints fact bullets for **Stack** and **Pipeline** straight from package.json (language, runtime, framework, deps, the build / test / release scripts). Refine that draft into house-voice prose rather than re-deriving the facts. For each remaining Big-6 section still on its `(fill in ...)` placeholder, gather evidence (codebase scan, conversation, SESSION distillation) and draft 2-4 lines a cold-start session would use. Stage each as `overwrite_section` on that section. Conflict precedence: code and config win for Stack / Pipeline facts, conversation wins for audience / intent / lineage. Where evidence is genuinely missing, leave the placeholder.
+
+**A populated section the run itself proved wrong gets its one sentence corrected in the lean pass.** `overwrite_section` on that section, the changed sentence and the rest carried verbatim, and the run's LIFO bullet names the correction. The lean pass never re-derives a populated section, and it never leaves a known lie standing either: the doctor's drift guard watches dependency names, not facts, so this is the only route a falsified sentence has short of `-FULL`.
 
 ## Step 5: Stage
 
@@ -80,6 +84,7 @@ The skill-specific notes:
 - **LIFO observations.** Use `lifo_insert` on section `LIFO`. List the run's durable observations oldest-first in `actions` so the newest one lands on top.
 - **BACKLOG.** Use `lifo_insert` on `updatememory.backlog`, section `Features` or `Ideas`. Same oldest-first rule.
 - **Earned depth.** Pair a bullet with an `add` on `updatememory.memory_extended` when it needs more than a line or two of rationale.
+- **Targeted edits.** `amend_bullet` rewrites one LIFO bullet or BACKLOG item in place by its opening words or slug (`match`), keeping its `[+]` marker (pair a `drop` and an `add` on the EXTENDED when the text changes, since the anchor moves with it). `drop_bullet` removes a shipped or dead BACKLOG item and commit archives the line under `<PROJECT>_BACKLOG_ARCHIVE/`, move not delete. A `[+]` item leaves with a `drop` on its sub-section in the same staging, or commit refuses.
 
 ## Step 6: Commit
 
@@ -116,7 +121,7 @@ It **fails soft.** A missing or unauthenticated `gh` warns and exits 0 rather th
 `-UpdateMemory -FULL` widens the read past the watermark and re-derives populated Big-6 sections, but **uses the existing MEMORY.md bullets and Big-6 prose as a starting reference, not a discard.** Most observations are already captured. Walk the codebase plus conversation plus SESSION against the existing bullets and look for: gaps (an observation that did not land), drift (a bullet or Big-6 line whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
 
 - Re-walk every Big-6 section against current evidence. The lean default only fills placeholders. `-FULL` may `overwrite_section` a populated one when the prose has drifted.
-- Add missing LIFO observations with `lifo_insert` as the lean default would. Main-LIFO bullets have no targeted replace - the only ops are `lifo_insert` (prepend) and `overwrite_section` (rewrite the whole LIFO). Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
+- Add missing LIFO observations with `lifo_insert` as the lean default would. A main-LIFO bullet that drifted takes `amend_bullet` (one bullet, in place), and `overwrite_section` rewrites the whole LIFO. Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
 - For depth drift (`### sub-section` body bloated or stale) and over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section by anchor (this is where `replace` belongs - EXTENDED only). A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
 
 Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation. The lean default appends from the conversation tail and only fills empty Big-6 sections.

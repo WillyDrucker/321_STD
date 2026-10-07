@@ -7,8 +7,10 @@ import { flag } from "./args.mjs";
 import { slugify } from "./markdown.mjs";
 import { loadStaging, SKILLS } from "./state.mjs";
 
-const OPS = ["lifo_insert", "overwrite_section", "add", "drop", "replace"];
-const MAIN_OPS = ["lifo_insert", "overwrite_section"];   // carry a section - EXTENDED ops carry an anchor
+const OPS = ["lifo_insert", "overwrite_section", "amend_bullet", "drop_bullet", "changelog_insert", "add", "drop", "replace"];
+const MAIN_OPS = ["lifo_insert", "overwrite_section", "amend_bullet", "drop_bullet", "changelog_insert"];   // carry a section - EXTENDED ops carry an anchor
+// Keep a Changelog's section names: the only headings changelog_insert lands under.
+const CHANGELOG_SECTIONS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"];
 
 // Returns a list of human-readable errors (empty when well-formed). When `skill`
 // is given, enforces the domain firewall: every action must target a file the
@@ -29,6 +31,15 @@ export function validateStaging(index, staging, skill) {
       else if (typeof a.bullet === "string" && a.extended_anchor !== slugify(a.bullet)) errors.push(`${at}: extended_anchor "${a.extended_anchor}" must equal slugify(bullet) "${slugify(a.bullet)}"`);
     }
     if (a.op === "overwrite_section" && typeof a.body !== "string") errors.push(`${at}: overwrite_section needs a body string`);
+    if (MAIN_OPS.includes(a.op) && a.op !== "changelog_insert" && /\.changelog$/.test(a.file)) errors.push(`${at}: ${a.op} cannot target the changelog - use changelog_insert`);
+    if ((a.op === "amend_bullet" || a.op === "drop_bullet") && (typeof a.match !== "string" || !a.match)) errors.push(`${at}: ${a.op} needs a match string (the bullet's opening words or its slug)`);
+    if ((a.op === "amend_bullet" || a.op === "drop_bullet") && /_extended$/.test(a.file)) errors.push(`${at}: ${a.op} works on a main file's bullets - EXTENDED sub-sections take drop / replace by anchor`);
+    if (a.op === "amend_bullet" && typeof a.bullet !== "string") errors.push(`${at}: amend_bullet needs a bullet string (the whole rewritten bullet)`);
+    if (a.op === "changelog_insert") {
+      if (typeof a.bullet !== "string" || !a.bullet) errors.push(`${at}: changelog_insert needs a bullet string`);
+      if (!CHANGELOG_SECTIONS.includes(a.section)) errors.push(`${at}: changelog_insert section must be one of ${CHANGELOG_SECTIONS.join(" / ")}`);
+      if (!/\.changelog$/.test(a.file)) errors.push(`${at}: changelog_insert targets the changelog key (<domain>.changelog)`);
+    }
     if (a.op === "add" || a.op === "drop" || a.op === "replace") {
       if (typeof a.anchor !== "string" || !a.anchor) errors.push(`${at}: ${a.op} needs an anchor string`);
       else if (typeof a.heading === "string" && a.heading && a.anchor !== slugify(a.heading)) errors.push(`${at}: anchor "${a.anchor}" must equal slugify(heading) "${slugify(a.heading)}"`);

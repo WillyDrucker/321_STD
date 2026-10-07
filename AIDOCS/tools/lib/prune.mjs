@@ -93,6 +93,20 @@ function appendOrCreate(path, stamp, body) {
   else writeFileSync(path, `${ARCHIVE_HEADER}\n## ${stamp}\n\n${body}\n`, "utf8");
 }
 
+// Archive the bullets a drop_bullet removed into the same dated recovery file the
+// prune writes (move, not delete). No paired sub-sections ride along: a [+]
+// bullet's sub-section leaves by its own EXTENDED drop, which commit requires.
+export function archiveBullets(index, key, bullets) {
+  if (bullets.length === 0) return;
+  const mainPath = resolveFile(index, key);
+  const archiveDir = mainPath.replace(/\.md$/, "_ARCHIVE");
+  mkdirSync(archiveDir, { recursive: true });
+  const stamp = timestamp();
+  appendOrCreate(join(archiveDir, `${stamp}_${basename(mainPath)}`), stamp, bullets.join("\n"));
+  const folderName = archiveDir.split(/[\\/]/).pop();
+  console.log(`commit: archived ${bullets.length} dropped bullet(s) from ${key} into ${folderName}/${stamp}_* (move, not delete).`);
+}
+
 export function autoPrune(index, editedKeys, fresh) {
   const isProtected = (line) => fresh.has(line);
   // Either lane being edited brings the pair under scrutiny - an extended edit can push

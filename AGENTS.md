@@ -17,6 +17,7 @@ Optional, on demand:
 4. EXTENDED files - `AIDOCS/PROJECTNAME_MEMORY_EXTENDED.md` / `AIDOCS/PROJECTNAME_SESSION_EXTENDED.md`, longer prose plus anchored LIFO detail
 5. `AIDOCS/PROJECTNAME_BACKLOG.md` - forward-looking Features plus Ideas
 6. `AIDOCS/PROJECTNAME_DEV-AUDIT.md` - code-standards audit, loads on demand
+7. `AIDOCS/PROJECTNAME_AUTO-PUSH.md` - the release lane, loaded by `/321 -AutoPush` when the work ships
 
 ## Layout
 
