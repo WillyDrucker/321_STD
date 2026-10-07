@@ -27,10 +27,16 @@ function linkTarget(line) {
 // it ships (it just rewrote them, so its one-liner is the accurate one), and the project
 // owns any line pointing at a file upstream does not have. Rebuild in upstream order, then
 // append the project's own lines, deduped by normalized target. Nothing is dropped.
-function reconcileIndex(upstreamMd, projectMd, eol) {
+// An upstream pointer whose target is absent in `dir` is left out: the placeholder
+// profile is project-owned and never copied, so on a project that renamed it the line
+// would dangle beside the real profile's own pointer.
+function reconcileIndex(upstreamMd, projectMd, eol, dir) {
   const bullets = (md) => md.split(/\r?\n/).filter((l) => l.trim().startsWith("- "));
-  const upstream = bullets(upstreamMd);
-  const shipped = new Set(upstream.map(linkTarget).filter(Boolean));
+  const upstream = bullets(upstreamMd).filter((l) => {
+    const t = linkTarget(l);
+    return !t || existsSync(join(dir, t));
+  });
+  const shipped = new Set(bullets(upstreamMd).map(linkTarget).filter(Boolean));
 
   const seen = new Set();
   const projectOnly = [];
@@ -89,7 +95,7 @@ export function syncAutoMemory(source, index, dryRun) {
       const target = join(dir, "MEMORY.md");
       const current = existsSync(target) ? readFileSync(target, "utf8") : "";
       const eol = current.includes("\r\n") ? "\r\n" : "\n"; // do not churn a CRLF project
-      const next = reconcileIndex(upstreamMd, current, eol);
+      const next = reconcileIndex(upstreamMd, current, eol, dir);
       if (next === current) continue;
       if (!dryRun) writeFileSync(target, next, "utf8");
       indexes++;

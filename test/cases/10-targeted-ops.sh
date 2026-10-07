@@ -8,6 +8,9 @@
 #             [Unreleased] on a fresh file, and the firewall keeps every other op off the
 #             changelog key.
 #   T118      dictionary_extend adds a dotted files key once and preserves a present one.
+#   T119-T120 the index reconcile never carries upstream's placeholder-profile pointer into
+#             a project that renamed the profile, and doctor reads the rule index for
+#             pointers to missing files.
 #
 # Sourced after 09.
 
@@ -105,3 +108,30 @@ node -e 'const fs=require("fs"),f=process.argv[1];const j=JSON.parse(fs.readFile
 mkdir -p "$DE/INSTALL"; cp -r "$SRC_DE" "$DE/INSTALL/engine"
 node "$DEENG" upgrade >/dev/null 2>&1
 node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(j.files["updatesession.changelog"]==="./docs/CHANGES.md"?0:1)' "$DE/AIDOCS/_index.json" && pass "a present value is preserved, never overwritten" || fail "dictionary_extend overwrote a project value"
+
+echo "=== T119: the reconciled index carries no pointer to the placeholder profile a project renamed ==="
+PP="$BASE/profileptr"
+PPENG="$(mk_proj "$PP" ProfilePtr)"
+PPRT="$BASE/profileptr-runtime"; mkdir -p "$PPRT"
+node -e 'const fs=require("fs"),f=process.argv[1];const j=JSON.parse(fs.readFileSync(f));j.auto_memory={seed:"./AIDOCS/automemory",path:process.argv[2]};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$PP/AIDOCS/_index.json" "$PPRT"
+rm -f "$PP/AIDOCS/automemory/user_name.md"
+printf -- '---\nname: user-profile-real\ndescription: real\n---\n\nREAL USER\n' > "$PP/AIDOCS/automemory/user_real.md"
+cp "$PP/AIDOCS/automemory/user_real.md" "$PPRT/user_real.md"
+printf -- '- [User profile](user_real.md) - the real one.\n' > "$PPRT/MEMORY.md"
+grep -v "user_name.md" "$PP/AIDOCS/automemory/MEMORY.md" > "$PP/AIDOCS/automemory/MEMORY.tmp" && printf -- '- [User profile](user_real.md) - the real one.\n' >> "$PP/AIDOCS/automemory/MEMORY.tmp" && mv "$PP/AIDOCS/automemory/MEMORY.tmp" "$PP/AIDOCS/automemory/MEMORY.md"
+SRC_PP="$BASE/profileptr-src"
+mk_src "$SRC_PP" --version 9.9.9 --empty-manifest >/dev/null 2>&1
+mkdir -p "$PP/INSTALL"; cp -r "$SRC_PP" "$PP/INSTALL/engine"
+node "$PPENG" upgrade >/dev/null 2>&1
+grep -q "user_name.md" "$PPRT/MEMORY.md" && fail "the RUNTIME index points at the placeholder profile the project renamed" || pass "runtime index carries no placeholder-profile pointer"
+grep -q "user_name.md" "$PP/AIDOCS/automemory/MEMORY.md" && fail "the SEED index points at the placeholder profile" || pass "seed index carries no placeholder-profile pointer"
+grep -q "user_real.md" "$PPRT/MEMORY.md" && pass "the project's own profile pointer survived" || fail "the project's profile pointer was lost"
+grep -q "feedback_code_comments.md" "$PPRT/MEMORY.md" && pass "upstream rule pointers still arrive" || fail "upstream pointers did not arrive"
+node "$PPENG" doctor 2>&1 | grep -q "rule index points at" && fail "doctor reports a dangling index pointer on the clean reconcile" || pass "doctor reads the reconciled index as clean"
+FR="$BASE/freshidx"
+FRENG="$(mk_proj "$FR" FreshIdx)"
+grep -q "user_name.md" "$FR/AIDOCS/automemory/MEMORY.md" && pass "a fresh project keeps its placeholder-profile pointer (the file is there)" || fail "a fresh project lost its placeholder-profile pointer"
+
+echo "=== T120: doctor reports a rule-index pointer to a missing file ==="
+printf -- '- [Ghost](feedback_ghost_rule.md) - points at nothing.\n' >> "$FR/AIDOCS/automemory/MEMORY.md"
+node "$FRENG" doctor 2>&1 | grep -q 'seed rule index points at "feedback_ghost_rule.md"' && pass "a dangling seed index pointer is reported" || fail "a dangling seed index pointer went undetected"

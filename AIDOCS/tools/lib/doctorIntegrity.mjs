@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { hasPrivacyBlock } from "./gitignore.mjs";
 import { findOrphanBullets } from "./mutatorsExtended.mjs";
-import { fromRoot, readRegisteredFile } from "./paths.mjs";
+import { fromHomeRef, fromRoot, isExternalRef, readRegisteredFile } from "./paths.mjs";
 import { isFile } from "./prose.mjs";
 
 const BIG6 = ["Overview", "Stack", "Architecture", "Environment", "Pipeline", "Conventions"];
@@ -28,6 +28,7 @@ export function runIntegrityChecks(index) {
       "Skill bodies":         checkSkillBodies(index),
       "Orphan pairs":         checkOrphans(index),
       "Auto-memory pointers": checkAutoMemory(index),
+      "Auto-memory index":    checkAutoMemoryIndex(index),
       "Privacy gate":         checkPrivacyLeak(index),
       "Upgrade schema":       checkUpgradeSchema(index),
     },
@@ -155,6 +156,30 @@ function checkAutoMemory(index) {
   for (const l of linked) if (!onDisk.includes(l)) issues.push(`AGENTS auto-memory link "${l}" has no rule file`);
   if (index.auto_memory?.agents_mirror !== true) return issues;
   for (const f of onDisk) if (!linked.includes(f)) issues.push(`auto-memory "${f}" has no AGENTS pointer`);
+  return issues;
+}
+
+// The rule index (MEMORY.md in the seed, and in the runtime when the registry can reach
+// it) is a pointer list, and a pointer to a missing file is always a bug: the index
+// reconcile once carried upstream's placeholder-profile line into a project that had
+// renamed the profile, and nothing read the index to notice.
+function checkAutoMemoryIndex(index) {
+  const issues = [];
+  const homes = [];
+  const seedRel = index.auto_memory?.seed ?? index.auto_memory?.source;
+  if (seedRel) homes.push(["seed", fromRoot(seedRel)]);
+  const pathRef = index.auto_memory?.path;
+  if (pathRef && isExternalRef(pathRef)) homes.push(["runtime", fromHomeRef(pathRef)]);
+  for (const [label, dir] of homes) {
+    const md = join(dir, "MEMORY.md");
+    if (!existsSync(md)) continue;
+    for (const line of readFileSync(md, "utf8").split(/\r?\n/)) {
+      const hit = line.match(/\]\(([^)]+\.md)\)/);
+      if (!hit) continue;
+      const target = hit[1].replace(/^\.\//, "");
+      if (!existsSync(join(dir, target))) issues.push(`${label} rule index points at "${target}", which is not there`);
+    }
+  }
   return issues;
 }
 
