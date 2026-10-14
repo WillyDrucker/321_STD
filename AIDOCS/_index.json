@@ -69,7 +69,7 @@
     "backlog_issue": null
   },
   "engine": {
-    "version": "0.1.20",
+    "version": "0.1.21",
     "upstream": "",
     "operations_applied": []
   },
@@ -82,6 +82,11 @@
         "flag": "-AutoPush",
         "body": "./AIDOCS/SKILL/SKILL_AUTO-PUSH.md",
         "description": "Commit and push the project's work to its anchored remote, with .gitignore as the public/private gate. The skill is thin - it loads the auto-push file (autopush.config) and runs it. The generic capture / commit / push baseline and the project's release steps (version, CHANGELOG, build, deploy) live in that file, enriched at -Setup / reconcile."
+      },
+      "codewatcher": {
+        "flag": "-CodeWatcher",
+        "body": "./AIDOCS/SKILL/SKILL_CODE-WATCHER.md",
+        "description": "Hold the conversation on the user's code page while they are away from the terminal. Registers this project's channel, picks up anything already waiting, then watches the channel in the background and wakes when their input lands, answers there in plain text and watches again. -STOP ends the watch."
       },
       "compact": {
         "flag": "-Compact",

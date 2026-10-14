@@ -11,7 +11,7 @@ Every file in a 321 project falls into one of four classes by lifecycle ownershi
 The engine-class paths refresh from upstream on every `-UpdateSync`. They hold no project data, so the engine owns them outright. The set is defined in `lib/paths.mjs` as `ENGINE_CLASS`:
 
 - `AIDOCS/tools/` - engine code (the `.mjs` modules and these PATTERN-* references)
-- `AIDOCS/SKILL/` - canonical skill bodies (the 8: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`)
+- `AIDOCS/SKILL/` - canonical skill bodies (the 9: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`, `SKILL_CODE-WATCHER.md`)
 - `AIDOCS/automemory/` - the shared authoring rules, **minus the two project-owned files** (`MEMORY.md`, the rule index, and `user_*.md`, the profile). See `PATTERN-AUTOMEMORY.md` for the ownership table. `syncAutoMemory` extends the copy into the external runtime, which the copy step alone cannot reach.
 - `.claude/skills/321/SKILL.md` - the router
 

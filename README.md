@@ -46,6 +46,7 @@ Runs in the current directory and names the project after the folder. Override t
 - **`/321 -DevAudit`** - code-standards audit against your project's DEV-AUDIT. `-FULL` audits and refactors.
 - **`/321 -AutoPush`** - release pipeline: capture, commit, and push to the anchored remote, with the project's release steps sourced from AUTO-PUSH.
 - **`/321 -Compact`** - emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation.
+- **`/321 -CodeWatcher`** - hold the conversation on a code page you host behind your own sign-in while away from the terminal: one channel per session, a watcher that wakes the session when your input lands, answers in plain text. The first run in a project registers it in the page's dropdown on its own, from settings kept once per machine. `-STOP` ends the watch.
 
 ## Documentation
 
@@ -70,3 +71,4 @@ A short reference for day-to-day use. The full command surface is in [the /321 s
 | `/321 -DevAudit` | Audit the source against `DEV-AUDIT.md`. `-FULL` audits and refactors. |
 | `/321 -AutoPush` | Capture, commit, and push to the anchored remote. Composes the CHANGELOG at release time. |
 | `/321 -Compact` | Emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation. |
+| `/321 -CodeWatcher` | Hold the conversation on your code page while away from the terminal. `-STOP` ends the watch. |

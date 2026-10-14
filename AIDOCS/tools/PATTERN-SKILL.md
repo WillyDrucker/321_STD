@@ -28,6 +28,7 @@ Hyphens between domain words exist for readability in the filename only. They di
 | `SKILL_DEV-AUDIT.md` | `-DevAudit` | `devaudit` |
 | `SKILL_SETUP.md` | `-Setup` | `setup` |
 | `SKILL_COMPACT.md` | `-Compact` | `compact` |
+| `SKILL_CODE-WATCHER.md` | `-CodeWatcher` | `codewatcher` |
 
 ### Ordering compound names
 
