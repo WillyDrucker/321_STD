@@ -195,9 +195,13 @@ export function cmdInit(args) {
   const recalledUpstream = explicitUpstream ? "" : recallUpstream(target, name);
   const upstream = explicitUpstream || recalledUpstream;
   const idxObj = { ...source, privacy, auto_memory: { ...source.auto_memory, path: memRef } };
-  if (upstream) {
-    idxObj.engine = { ...(idxObj.engine || {}), upstream };
-  }
+  // A fresh scaffold already embodies every structural change the manifest records, so the
+  // journal starts full. Otherwise the first `compare` on a current tree reports every op
+  // as pending and the first upgrade replays them all as no-ops.
+  const manifestPath = join(SOURCE_ROOT, "AIDOCS", "MANIFEST.json");
+  const journal = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, "utf8")).operations || []).map((o) => o.name) : [];
+  idxObj.engine = { ...(idxObj.engine || {}), operations_applied: journal };
+  if (upstream) idxObj.engine.upstream = upstream;
   scaffolds.push({ dst: join(target, "AIDOCS", "_index.json"), body: sub(`${JSON.stringify(idxObj, null, 2)}\n`) });
   scaffolds.push({ dst: join(target, ".gitignore"), body: buildGitignore(privacy) });
   // Skip the data-doc scaffolds during a bootstrap rename (see `renaming` above): an
@@ -245,7 +249,7 @@ export function cmdInit(args) {
   // assistant driving the install continues into INSTALL/setup.md directly (install.md
   // step 7, install.sh step 7). Migration is non-destructive - it archives (move, not
   // delete) and parks at the reconcile gate - so the continuation is safe to auto-run.
-  // The earlier "Next: /321 -Setup" wording made an AI-agent install stop and ask.
+  // history: a "Next: /321 -Setup" wording made an AI-agent install stop and ask.
   if (kind === "fresh") {
     console.log(`  fresh project. Next: continue into setup - execute INSTALL/setup.md to fill the Big 6 from your code.`);
   } else if (kind === "existing-321") {

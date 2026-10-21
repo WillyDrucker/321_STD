@@ -85,10 +85,10 @@ export function dropBullet(content, heading, match) {
 
 // Overwrite Current State. OVERWRITE MEANS OVERWRITE - the outgoing snapshot is
 // discarded, never demoted into LIFO. Current State is operational reality, replaced
-// each pass. Demoting it turned a snapshot into permanent history, so every fact that
-// was ever true became a claim the file made forever (SESSION asserted a dead stack
-// through an entire framework migration). A state snapshot is not an event. When a
-// fact genuinely BECAME one, the skill emits it as a lifo_insert by judgment.
+// each pass. A state snapshot is not an event. When a fact genuinely BECAME one, the
+// skill emits it as a lifo_insert by judgment. history: an engine that demoted the
+// snapshot turned every fact that was ever true into a claim the file made forever
+// (SESSION asserted a dead stack through an entire framework migration).
 export function overwriteCurrentState(content, body) {
   return overwriteSection(content, "Current State", body);
 }

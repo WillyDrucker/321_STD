@@ -14,7 +14,9 @@ import { ENGINE_CLASS, repoRoot } from "./paths.mjs";
 // the copy step refreshes, plus AIDOCS/_index.json (where engine.version itself lives).
 const WATCHED_PATHS = [...ENGINE_CLASS, "AIDOCS/_index.json"];
 
-function git(root, args) {
+// Run a read-only git command at root and return its stdout, throwing when git is absent
+// or the directory is not a repository. Shared with the context command.
+export function gitRead(root, args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
@@ -23,7 +25,7 @@ function git(root, args) {
 // or a subdir of a larger repo.
 function committedEngineVersion(root) {
   try {
-    return JSON.parse(git(root, ["show", "HEAD:./AIDOCS/_index.json"])).engine?.version ?? null;
+    return JSON.parse(gitRead(root, ["show", "HEAD:./AIDOCS/_index.json"])).engine?.version ?? null;
   } catch {
     return null;
   }
@@ -33,7 +35,7 @@ function committedEngineVersion(root) {
 // Best-effort: a git failure returns 0 so the note still prints its version halves.
 function dirtyEngineFileCount(root) {
   try {
-    const out = git(root, ["status", "--porcelain", "--", ...WATCHED_PATHS]).trim();
+    const out = gitRead(root, ["status", "--porcelain", "--", ...WATCHED_PATHS]).trim();
     return out ? out.split("\n").length : 0;
   } catch {
     return 0;

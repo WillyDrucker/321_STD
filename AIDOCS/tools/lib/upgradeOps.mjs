@@ -1,4 +1,4 @@
-// upgradeOperations.mjs - the dispatch table for the named manifest operations the
+// upgradeOps.mjs - the dispatch table for the named manifest operations the
 // upgrade command applies. Each handler takes the uniform (op, index, source, root,
 // dryRun) shape and returns { applied, deferred?, note }: applied=true did the change,
 // deferred=true is a customization-skip that stays in missing[] for the next run, and

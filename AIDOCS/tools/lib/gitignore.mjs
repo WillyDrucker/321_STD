@@ -102,7 +102,9 @@ AIDOCS/*_DEV-AUDIT.md
 AIDOCS/*_AUTO-PUSH.md
 # Pruned LIFO overflow: auto-prune writes <doc>_<LANE>_ARCHIVE/<datestamp>_*.md as the
 # recovery net (the legacy flat-file *_ARCHIVE.md pattern is kept ignored for backcompat).
-AIDOCS/*_ARCHIVE/
+# Contents, not the folder, so the setup archive's .gitkeep stays publishable.
+AIDOCS/*_ARCHIVE/*
+!AIDOCS/*_SETUP_ARCHIVE/.gitkeep
 AIDOCS/*_ARCHIVE.md
 AIDOCS/automemory/*
 !AIDOCS/automemory/.gitkeep

@@ -49,13 +49,13 @@ SESSION captures events as they happen. MEMORY captures the timeless state event
 - **Current State** - operational snapshot, overwritten each pass. Branch, deploy / gate status, active focus, stack, local dev. Flat bullets or short prose.
 - **LIFO** - running history of project-significant events, newest first.
 
-## Step 0: Gather context (watermark scopes the read)
+## Step 0: Gather context (one command, the watermark scopes the read)
 
 The conversation is the source of truth. SESSION.md is a write target and the dedupe reference. **The watermark is your starting point. Do NOT re-read the conversation prefix before it unless `-FULL` was passed.**
 
+- `node AIDOCS/tools/engine.mjs context --skill updatesession` prints the branch, the short status, and the last ten subjects (or `repository: none`), then `last_committed_at` and `recent_captured`, the slugs of the last few commits' bullets. One call, in place of the git trio and the watermark read.
 - `AIDOCS/<PROJECT>_SESSION.md` (the live file, the dedupe reference)
-- Git: `git branch --show-current`, `git status --short`, `git log --oneline -10`
-- `node AIDOCS/tools/engine.mjs watermark --skill updatesession` (prints `last_committed_at` plus `recent_captured`, a rolling window of the slugs from the last few commits, on demand)
+- A project that is not a repository has no branch line. Its Current State measures from the project's own instruments (its gate command, its scan), and `repository: none` is not a finding.
 - **MEASURE, do not remember.** Every number in Current State that a command can produce comes from the command on THIS run - never carried forward from the prior snapshot and never retyped from memory. Suite and case counts, file counts, the largest file, and the doctor score all drift at once precisely when they are hand-maintained. Where the project has them: its audit scan for the static census, its gate command for the real pass/fail, its doctor for the dependency verdict. A number you did not measure this run does not go in the snapshot.
 
 The watermark answers "did I capture this arc in the last few runs?" The live SESSION.md shows the captured arcs as content. Both let you skip events the previous passes already logged.
@@ -70,7 +70,7 @@ The watermark answers "did I capture this arc in the last few runs?" The live SE
 | A user-facing change the project's users would notice (a new verb, a changed face, a fix they felt) | CHANGELOG, the newest block's Added, Changed, or Fixed | `changelog_insert` |
 | Forward-looking work, durable rule, code-applicable pattern | DROP - belongs in `-UpdateMemory` / `-DevAudit` | (n/a) |
 
-**Migration exception (Setup-driven capture only, never on a graduated project):** capture additively (the DROP row and arc-level aggregation are routine-run rules), route ambiguous content to SESSION LIFO, and do not re-derive the SESSION_EXTENDED entries `migrate-import` already scavenged - add only Current State and the bullets the import missed. Full steps in `INSTALL/setup.md`.
+A Setup-driven capture follows the migration exception in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`, never a graduated project.
 
 ## Step 2: Stage
 
@@ -91,24 +91,18 @@ The skill-specific notes:
 node AIDOCS/tools/engine.mjs commit --skill updatesession
 ```
 
-`commit` validates, simulates, persists, stamps the watermark (timestamp + this run's bullet fingerprints), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
+`commit` validates, simulates, persists, stamps the watermark (timestamp plus this run's bullet slugs), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
 
 ## Lean execution path (one pass, no extra machinery)
 
 1. Skim the conversation tail since the watermark. Do **not** re-read the prefix. Read this skill body plus the live `<PROJECT>_SESSION.md`. The PATTERN-STAGING reference loads on demand if you need the staging contract.
 2. **Do NOT read SESSION_EXTENDED unless an op is `drop` / `replace` against an existing sub-section.** An `add` carries the heading, anchor, and body, so it needs no prior read.
 3. Author the staging JSON directly at `AIDOCS/tools/staging/updatesession.json`. The staging file IS the artifact.
-4. `commit` once. Skip standalone `validate`. Target: read 2 files, write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
+4. `commit` once. Skip standalone `validate`. Target: read 2 files, run 1 command, write 1 staging file, commit 1. Zero engine source, zero scratch scripts.
 
 ## -FULL mode
 
-`-UpdateSession -FULL` widens the read past the watermark, but **uses the existing SESSION.md bullets as a starting reference, not a discard.** Most arcs are already captured. Walk the conversation against the existing bullets and look for: gaps (an arc that did not land), drift (a bullet whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
-
-- Re-derive Current State from current operational reality, the prior snapshot is suspect under `-FULL`.
-- Add missing arcs with `lifo_insert` as the lean default would. A main-LIFO bullet that drifted takes `amend_bullet` (one bullet, in place), and `overwrite_section` rewrites the whole LIFO. Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
-- For depth drift (`### sub-section` body bloated or stale) and over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section by anchor (this is where `replace` belongs - EXTENDED only). A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
-
-Use `-FULL` when SESSION has drifted (a long pause, a context switch, an interrupted prior pass). The lean default appends from the conversation tail and trusts the prior snapshot.
+`-UpdateSession -FULL` widens the read past the watermark and re-judges the existing bullets instead of trusting the prior snapshot. The pass lives in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`, loaded only on a `-FULL` run.
 
 ## Rules
 

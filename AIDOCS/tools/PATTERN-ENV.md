@@ -47,13 +47,13 @@ Keep flat (no subfolder) when:
 
 ## Privacy gates
 
-ENV/ docs frequently carry secrets (account IDs, server hostnames, credentials patterns). The privacy mode in `_index.json` controls inclusion:
+ENV/ docs frequently carry secrets (account IDs, server hostnames, credential patterns). No privacy mode in `_index.json` tracks them:
 
-- **`private`** - `AIDOCS/ENV/` is gitignored. Docs live on the dev workstation only.
+- **`private`** - `AIDOCS/ENV/` contents are gitignored. Docs live on the dev workstation only.
 - **`public`** - same gate as private. Never commit env docs from a public repo.
-- **`full`** - ENV/ is tracked. Use only when the project genuinely needs ENV/ in version control (a public framework, an open-source bootstrap doc).
+- **`full`** - the template repository's own hand-maintained mode, refused for a project. ENV/ contents stay ignored there too.
 
-A doc that names a real account ID, a real API endpoint, or a real password should not ship in a public repo. The `privacy: private` default plus the `.gitignore` rule on `AIDOCS/ENV/` is the gate.
+A doc that names a real account ID, a real API endpoint, or a real password never ships. The `.gitignore` rule on `AIDOCS/ENV/` is the gate in every mode, and `doctor` reports an ENV doc that git tracks or would add anyway.
 
 ## What kinds of docs belong here
 

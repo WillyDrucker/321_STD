@@ -1,11 +1,13 @@
 // doctor.mjs - validate a 321 project against its registry. Pulls results from
-// doctorIntegrity (structure matches the spec?) and doctorContent (content within
-// bounds?), prints them as tier-grouped sections, and exits by worst error class:
-// 20 for a structural break (a sync must stop), 10 for content-only debt (banned
-// prose / shape, structure intact) so a wrapper tells the two apart, 0 otherwise.
-// The rules live in the two check modules - this file owns the run and report shape.
+// doctorIntegrity (structure matches the spec?), doctorExposure (git publishes only what
+// the privacy mode allows?) and doctorContent (content within bounds?), prints them as
+// tier-grouped sections, and exits by worst error class: 20 for a structural break or a
+// leak (a sync or a push must stop), 10 for content-only debt (banned prose / shape,
+// structure intact) so a wrapper tells the two apart, 0 otherwise. The rules live in the
+// check modules - this file owns the run and report shape.
 
 import { runContentChecks } from "./doctorContent.mjs";
+import { runExposureChecks } from "./doctorExposure.mjs";
 import { runIntegrityChecks } from "./doctorIntegrity.mjs";
 import { engineDriftNote } from "./gitDrift.mjs";
 
@@ -17,14 +19,15 @@ const RECONCILE_WARN = new Set(["Size caps", "Import residue", "Banned prose in 
 
 export function cmdDoctor(index) {
   const integrity = runIntegrityChecks(index);
+  const exposure = runExposureChecks(index);
   const content = runContentChecks(index);
-  const warnChecks = { ...integrity.warns, ...content.warns };
+  const warnChecks = { ...integrity.warns, ...exposure.warns, ...content.warns };
 
-  // Count structural (integrity) and content errors apart, but print both tiers in the
-  // same grouped report (integrity first, then content) so the operator's view is
-  // unchanged. The split feeds the exit code: 20 for a structural break, 10 for content-
-  // only debt with the structure intact, so a sync wrapper can tell the two apart.
-  const integrityErrors = printErrorTier(integrity.errors);
+  // Count structural (integrity plus exposure) and content errors apart, but print both
+  // tiers in the same grouped report (integrity first, then content) so the operator's
+  // view is unchanged. The split feeds the exit code: 20 for a structural break or a leak,
+  // 10 for content-only debt with the structure intact, so a sync wrapper can tell the two apart.
+  const integrityErrors = printErrorTier({ ...integrity.errors, ...exposure.errors });
   const contentErrors = printErrorTier(content.errors);
   const errors = integrityErrors + contentErrors;
 
@@ -73,7 +76,7 @@ export function cmdDoctor(index) {
   process.exit(10);
 }
 
-// Print one error-tier check group, return its total issue count. Errors fail the run; the
+// Print one error-tier check group, return its total issue count. Errors fail the run, and the
 // caller maps the structural vs content split onto the exit code (20 vs 10).
 function printErrorTier(checks) {
   let count = 0;

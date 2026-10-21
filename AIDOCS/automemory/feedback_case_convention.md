@@ -7,7 +7,8 @@ metadata:
 
 - **Framework and established names win first.** Framework routes, config files, language conventions, and any path already written by a script or read by a tool (`package.json`, `tsconfig.json`, `app.json`). **Never rename one of these to fit a convention**, and never rename a path a script writes to, which silently breaks the script.
 - **In the space that leaves open:** UPPERCASE for human-facing documentation, lowercase for code and code-adjacent files.
-- **No generic files.** Never a bare `README.md` in a subfolder and never a `utils.ts`. Every file owns its purpose in its own name, or carries its parent's (`ENV/<PROJECT>_ENV_METRO.md`). Prefer no folder doc at all. The root `README.md` is the single exception, and only because the host renders it by that exact name.
+- **No generic files.** Never a bare `README.md` in a subfolder and never a `utils.ts`. Every file owns its purpose in its own name, or carries its parent's. Prefer no folder doc at all. The root `README.md` is the single exception, and only because the host renders it by that exact name.
+- **A documentation folder names its files after itself.** `<PROJECT>_<FOLDER>_<TOPIC>.md`: `WDDOCS/DESIGN/<PROJECT>_DESIGN_UI.md`, `AIDOCS/ENV/<PROJECT>_ENV_DEVELOPMENT.md`. A topic subfolder is the bare topic, `<SUB>/`, and its files carry the whole chain, `<PROJECT>_<FOLDER>_<SUB>_<TOPIC>.md`, so the file says where it lives without the folder reading it twice. A rename moves every reference in the same pass.
 
 **Why:** case becomes a free signal, so a glance at a directory says what is documentation and what is code. A generic name says the concept was never sharpened, and it hides the real home.
 

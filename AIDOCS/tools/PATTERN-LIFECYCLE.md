@@ -11,7 +11,7 @@ Every file in a 321 project falls into one of four classes by lifecycle ownershi
 The engine-class paths refresh from upstream on every `-UpdateSync`. They hold no project data, so the engine owns them outright. The set is defined in `lib/paths.mjs` as `ENGINE_CLASS`:
 
 - `AIDOCS/tools/` - engine code (the `.mjs` modules and these PATTERN-* references)
-- `AIDOCS/SKILL/` - canonical skill bodies (the 9: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`, `SKILL_CODE-WATCHER.md`)
+- `AIDOCS/SKILL/` - canonical skill bodies (the 10: `SKILL_UPDATE.md`, `SKILL_UPDATE-SESSION.md`, `SKILL_UPDATE-MEMORY.md`, `SKILL_UPDATE-SYNC.md`, `SKILL_SETUP.md`, `SKILL_DEV-AUDIT.md`, `SKILL_AUTO-PUSH.md`, `SKILL_COMPACT.md`, `SKILL_START-WATCHER.md`, `SKILL_STOP-WATCHER.md`)
 - `AIDOCS/automemory/` - the shared authoring rules, **minus the two project-owned files** (`MEMORY.md`, the rule index, and `user_*.md`, the profile). See `PATTERN-AUTOMEMORY.md` for the ownership table. `syncAutoMemory` extends the copy into the external runtime, which the copy step alone cannot reach.
 - `.claude/skills/321/SKILL.md` - the router
 
@@ -42,9 +42,9 @@ Auto-memory has two homes: the canonical seed in `AIDOCS/automemory/` (rides in 
 
 `init` records the external path in `_index.json` and seeds the canonical rules into it write-if-missing, so a project's live custom rules survive.
 
-**`upgrade` is what keeps a project's rules current.** The seed is engine-class (class 1 above), so the copy step overwrites the shared rule bodies, and `syncAutoMemory` mirrors them into the runtime and reconciles the rule index. Both homes land in one pass. A rule the project authored itself survives by absence, and the two project-owned files (`MEMORY.md`, `user_*.md`) are never overwritten. **Nothing is ever deleted.** The legacy `automemory_add` manifest op still applies (write-if-missing in both homes) and remains valid for a project on an older engine.
+**`upgrade` is what keeps a project's rules current.** The seed is engine-class (class 1 above), so the copy step overwrites the shared rule bodies, and `syncAutoMemory` mirrors them into the runtime and reconciles the rule index. Both homes land in one pass. A rule the project authored itself is promoted from the runtime into the seed, and the two project-owned files (`MEMORY.md`, `user_*.md`) are reconciled and promoted, never overwritten by the copy. **Nothing is ever deleted** except the seed's profile placeholder behind a filled profile. The legacy `automemory_add` manifest op still applies (write-if-missing in both homes) and remains valid for a project on an older engine.
 
-`migrate-archive` snapshots the external memory into the archive at re-install. The reconcile pass merges back the profile plus any unique guidance summarized into a canonical rule, default drop. The `AGENTS.md` mirror is **opt-in and off by default** (`auto_memory.agents_mirror: true`), because a restated rule drifts. A dangling AGENTS link is reported either way.
+`migrate-archive` snapshots the external memory into the archive at re-install. The reconcile pass merges back the profile, and any genuinely uncovered guidance becomes its own rule file, default drop. The `AGENTS.md` mirror is **opt-in and off by default** (`auto_memory.agents_mirror: true`), because a restated rule drifts. A dangling AGENTS link is reported either way.
 
 ### 4. User-owned (verbatim or in-place)
 

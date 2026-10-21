@@ -32,7 +32,7 @@ Default is no change - most sessions produce project work, not memory-track work
 
 Always run `/321 -UpdateSession` first, so SESSION is current before this skill reads it. If it fails, stop and report.
 
-**Migration exception (Setup-driven capture only, never on a graduated project):** skip this Step 1 (Setup already captured SESSION this pass), fill the Big 6 from code plus the archive, add observations `migrate-import` did not scavenge, and leave BACKLOG (`migrate-restore` carried it, reconcile sweeps it). Full steps in `INSTALL/setup.md`.
+A Setup-driven capture skips this step and follows the migration exception in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`, never a graduated project.
 
 ## Step 2: Gather context (watermark scopes the read)
 
@@ -92,21 +92,15 @@ The skill-specific notes:
 node AIDOCS/tools/engine.mjs commit --skill updatememory
 ```
 
-`commit` validates, simulates, persists, stamps the watermark (timestamp + this run's bullet fingerprints), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
+`commit` validates, simulates, persists, stamps the watermark (timestamp plus this run's bullet slugs), and clears staging. A standalone `validate` is optional - use it only while iterating on a draft you expect to fail.
 
-## Step 7: Mirror BACKLOG to a tracker issue (opt-in, off by default)
+## Step 7: Mirror BACKLOG to a tracker issue (only when the project set one)
 
 ```bash
 node AIDOCS/tools/engine.mjs sync-backlog
 ```
 
-**Inert until the project declares an issue.** With no `integrations.backlog_issue` in `_index.json` this is a clean no-op that prints one line and exits 0, so a project with no tracker workflow simply never turns it on. **Do not invent an issue number** - the user sets it, or the mirror stays off.
-
-Once configured, run it **after** `commit`, unconditionally, even when this pass added nothing. It is idempotent, so a no-change run is a no-op.
-
-It regenerates the issue body wholesale from `<PROJECT>_BACKLOG.md`. **The file is the source of truth, the issue is a generated copy.** Mirroring wholesale is deliberate: LIFO ordering is already the file's shape, so the copy inherits it and there is no diffing or merging to drift. Never hand-edit the issue body - the next run overwrites it. To change an entry, change the file.
-
-It **fails soft.** A missing or unauthenticated `gh` warns and exits 0 rather than failing the run, because `commit` has already persisted the real artifact.
+Inert until `integrations.backlog_issue` is set in `_index.json`, and never invent the number. Once set, run it after `commit` on every pass. It is idempotent and fails soft. The mirror's rules live in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`.
 
 ## Lean execution path (one pass, no extra machinery)
 
@@ -118,21 +112,7 @@ It **fails soft.** A missing or unauthenticated `gh` warns and exits 0 rather th
 
 ## -FULL mode
 
-`-UpdateMemory -FULL` widens the read past the watermark and re-derives populated Big-6 sections, but **uses the existing MEMORY.md bullets and Big-6 prose as a starting reference, not a discard.** Most observations are already captured. Walk the codebase plus conversation plus SESSION against the existing bullets and look for: gaps (an observation that did not land), drift (a bullet or Big-6 line whose framing is now stale), and over-cap EXTENDED bodies (a sub-section that grew past the cap and needs re-summarizing).
-
-- Re-walk every Big-6 section against current evidence. The lean default only fills placeholders. `-FULL` may `overwrite_section` a populated one when the prose has drifted.
-- Add missing LIFO observations with `lifo_insert` as the lean default would. A main-LIFO bullet that drifted takes `amend_bullet` (one bullet, in place), and `overwrite_section` rewrites the whole LIFO. Reach for `overwrite_section` only when the LIFO has genuinely diverged enough to justify the full rewrite. Otherwise leave drifted bullets alone, since the depth content is where `-FULL`'s real value lands.
-- For depth drift (`### sub-section` body bloated or stale) and over-cap EXTENDED entries, re-derive under cap and `replace` the sub-section by anchor (this is where `replace` belongs - EXTENDED only). A genuinely load-bearing entry marks itself `<!-- LOAD_BEARING -->` and rides the warning forever.
-
-Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section needs fresh derivation. The lean default appends from the conversation tail and only fills empty Big-6 sections.
-
-### The Big-6 blind spot, and the guard that closes it
-
-**The lean pass only fills an EMPTY Big-6 section. It never re-derives a populated one.** So a Big-6 that is populated and WRONG is invisible to every routine run, forever. Only `-FULL` re-walks it. This is not hypothetical: a project's MEMORY described its pre-migration framework through an entire rebuild, and because the true facts had nowhere to live they climbed up into AGENTS.md, which is exactly what AGENTS.md must never hold.
-
-`doctor` now catches it. **`[Big-6 drift]` fingerprints the dependency-NAME set that Stack / Architecture / Environment / Pipeline were last written against, and warns when the project's dependency manifest has since added or removed a package.** Names not versions, so a routine version bump is correctly silent while a swapped framework is loud.
-
-**A `[Big-6 drift]` warning is the trigger to run `-UpdateMemory -FULL`.** Committing a code-bound Big-6 section re-stamps the mark and clears the warning. Nothing else does, and nothing else should.
+`-UpdateMemory -FULL` re-walks every Big-6 section and the LIFO against current evidence, where the lean pass only fills an empty section and never re-derives a populated one. A `[Big-6 drift]` warning from `doctor` is the trigger, and the run stages all four code-bound sections even when a body came back unchanged, since the commit is what lays the mark. The pass, and the blind spot the guard closes, live in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`, loaded on a `-FULL` run or a drift warning.
 
 ## Rules
 
@@ -143,7 +123,3 @@ Use `-FULL` when MEMORY has drifted, after a long pause, or when a Big-6 section
 - **AGENTS / auto-memory stay user-scoped** - surface them as suggestive LIFO bullets, never auto-write them.
 - **BACKLOG is written only on an Update run**, only by this skill, one bullet per item. Never ad-hoc, never a dumping ground.
 - **Never hand-edit the mirrored issue.** It is a generated copy of the BACKLOG file. Step 7 overwrites it. Edit the file.
-
-## Deferred
-
-The LIFO-to-static promotion heuristic (taking a stabilized LIFO entry and folding it into a Big-6 section's prose) is not yet built. The lean default writes new observations to LIFO. Promotion of mature LIFO entries into Big-6 prose remains a future capability.

@@ -4,7 +4,7 @@
 // (canonical section replace). Every target passes resolveContained or
 // requireSkillBasename, so a hostile or typo'd manifest cannot reach outside the
 // project root. customizations[] defers the destructive ops (deferred=true keeps them
-// out of the journal so the reversal path retries). Contract: upgradeOperations.mjs.
+// out of the journal so the reversal path retries). Contract: upgradeOps.mjs.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
@@ -160,19 +160,35 @@ export function applyAutoMemoryAdd(op, index, source, root, dryRun) {
   return { applied: true, note: `seeded automemory/${op.file} (${parts.join(" + ")})` };
 }
 
+// The path and the body carry the PROJECTNAME placeholder, as file_add_template does, so
+// one op reaches every project's own data file (<NAME>_DEV-AUDIT.md). Containment runs on
+// the resolved path, and customizations[] is matched on it too. A missing file or heading
+// defers rather than journals, so the op stays pending until the target exists or the user
+// opts out, and the prior body lands in the pre-upgrade snapshot, which the engine-class
+// snapshot does not cover for a project data file.
 export function applySectionTextDiff(op, index, _source, root, dryRun) {
-  const target = resolveContained("section_text_diff", root, op.file);
-  if (!existsSync(target)) return { applied: false, note: `${op.file} absent, project may need init` };
-  if ((index.customizations || []).includes(op.file)) {
-    return { applied: false, deferred: true, note: `${op.file} deferred (customizations[]) - section preserved, remove from customizations[] to apply` };
+  const name = index.project_name || "PROJECTNAME";
+  const file = (op.file || "").replace(/PROJECTNAME/g, name);
+  const target = resolveContained("section_text_diff", root, file);
+  if (!existsSync(target)) return { applied: false, deferred: true, note: `${file} absent - the op waits until the file exists (init lays it)` };
+  if ((index.customizations || []).includes(file)) {
+    return { applied: false, deferred: true, note: `${file} deferred (customizations[]) - section preserved, remove from customizations[] to apply` };
   }
   const content = readFileSync(target, "utf8");
   let updated;
   try {
-    updated = overwriteSection(content, op.section, op.body || "");
+    updated = overwriteSection(content, op.section, (op.body || "").replace(/PROJECTNAME/g, name));
   } catch {
-    return { applied: false, note: `section "${op.section}" not found in ${op.file}` };
+    return { applied: false, deferred: true, note: `section "${op.section}" not found in ${file} - the op waits until the heading exists, or list the file in customizations[] to opt out` };
   }
-  if (!dryRun) writeFileSync(target, updated, "utf8");
-  return { applied: true, note: `replaced "${op.section}" in ${op.file}` };
+  if (updated === content) return { applied: false, note: `"${op.section}" in ${file} already matches` };
+  if (!dryRun) {
+    try {
+      const snapshot = join(root, "TEMP", "engine-backup-pre-upgrade", file);
+      mkdirSync(dirname(snapshot), { recursive: true });
+      cpSync(target, snapshot);
+    } catch { /* best-effort */ }
+    writeFileSync(target, updated, "utf8");
+  }
+  return { applied: true, note: `replaced "${op.section}" in ${file}` };
 }

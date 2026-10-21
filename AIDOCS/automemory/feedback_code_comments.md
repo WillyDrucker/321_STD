@@ -9,7 +9,7 @@ A comment earns its space by stating what the code cannot show: a responsibility
 
 - **Module header** on every nontrivial file. Its job in present tense, plus the load-bearing invariants.
 - **Prefer the why.** State the fact or constraint that made the code this way, rather than what the line does. A nudge, not a requirement - some comments are pure fact and that is fine.
-- **Never narrate.** No history ("was previously", "replaced X"), no activity ("refactored", "cleaned up"), no restating the next line.
+- **Never narrate.** No history ("was previously", "replaced X"), no activity ("refactored", "cleaned up"), no restating the next line. The one exception is friction worth a warning, a trap a passing suite does not catch, kept as a clause that opens with `history:` so a scan can tell it from narration.
 
 **A comment earns more than four lines only by stating a constraint that is still TRUE and that the code cannot show.** It never earns them by recording how the code got here, which git already owns. **Never mechanically truncate to hit the number.** The longest headers are usually the ones documenting the trap a passing test suite does not catch, and an automated trim deletes exactly those.
 

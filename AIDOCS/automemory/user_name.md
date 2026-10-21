@@ -1,5 +1,5 @@
 ---
-name: user-profile-name
+name: user-name
 description: One-line summary of the user (role, scope, working style).
 metadata:
   type: user

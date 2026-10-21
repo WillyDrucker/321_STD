@@ -18,9 +18,9 @@ Replace `MY_PROJECT` (omit `as ...` to use the folder name). Claude reads `321do
 
 ### What the install writes
 
-The install runs locally. The engine source is a normal git clone of the public repo (or used in place if you already have it), and `init` then writes only inside the target folder and executes no fetched code. The engine (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`, and the shared authoring rules in `AIDOCS/automemory`) and the `INSTALL/` runbooks always refresh. Your data files (`AGENTS.md`, `_index.json`, MEMORY / SESSION / BACKLOG / DEV-AUDIT / AUTO-PUSH) are written only if missing, so a re-install never clobbers content. A direct `init ... --force` rewrites the scaffold anyway (a recovery flag the install scripts do not expose).
+The install runs locally. The engine source is a normal git clone of the public repo (or used in place if you already have it). The install runs that clone's `init`, which writes the target folder and the project's runtime memory folder under your Claude home (recorded as `auto_memory.path`), and runs nothing from the target. The engine (the `/321` router, `AIDOCS/SKILL`, `AIDOCS/tools`, and the shared authoring rules in `AIDOCS/automemory`) and the `INSTALL/` runbooks always refresh. Your data files (`AGENTS.md`, `_index.json`, MEMORY / SESSION / BACKLOG / DEV-AUDIT / AUTO-PUSH) are written only if missing, so a re-install never clobbers content. A direct `init ... --force` rewrites the scaffold anyway (a recovery flag the install scripts do not expose).
 
-The authoring rules (comment discipline, naming, house voice) ship in-project at `AIDOCS/automemory` and are mirrored into the agent's runtime memory. Upstream owns the shared rules and refreshes them on every sync. Two files stay yours and are never overwritten: `MEMORY.md`, the rule index, and `user_*.md`, your profile. A rule you write yourself has no upstream counterpart, so it survives untouched. `AGENTS.md` carries a pointer to the rule index rather than a copy of it, because a restated rule drifts from its original.
+The authoring rules (comment discipline, naming, house voice) ship in-project at `AIDOCS/automemory` and are mirrored into the agent's runtime memory. Upstream owns the shared rules and refreshes them on every sync. Two files stay yours: `MEMORY.md`, the rule index, and `user_*.md`, your profile. A rule you write yourself has no upstream counterpart, so upstream never touches it, and the sync carries it from the runtime into the seed so git versions it. `AGENTS.md` carries a pointer to the rule index rather than a copy of it, because a restated rule drifts from its original.
 
 ### No AI
 
@@ -34,7 +34,7 @@ iwr -useb https://raw.githubusercontent.com/WillyDrucker/321_STD/main/install.ps
 curl -fsSL https://raw.githubusercontent.com/WillyDrucker/321_STD/main/install.sh | bash
 ```
 
-Runs in the current directory and names the project after the folder. Override the name with `STD321_NAME` (or `-Name` / `--name`), the location with `STD321_TARGET` (or `-Target` / `--target`), and the tracking mode with `STD321_PRIVACY` (or `-Privacy` / `--privacy`) - `private` (default) tracks the project's own knowledge, `public` gates it local so only the framework ships. The script runs `init` + `sync` + `doctor`, runs `git init` on a fresh project, then points you to setup - an assistant runs `INSTALL/setup.md` to finish onboarding (fresh fill or migration).
+Runs in the current directory and names the project after the folder. Override the name with `STD321_NAME` (or `-Name` / `--name`), the location with `STD321_TARGET` (or `-Target` / `--target`), and the tracking mode with `STD321_PRIVACY` (or `-Privacy` / `--privacy`) - `private` (default) tracks the project's own knowledge, `public` gates it local so only the framework ships, and `doctor` checks what git actually tracks against that gate on every run. The script runs `init` + `sync` + `doctor`, runs `git init` on a fresh project, then points you to setup - an assistant runs `INSTALL/setup.md` to finish onboarding (fresh fill or migration).
 
 ## The /321 skills
 
@@ -46,7 +46,8 @@ Runs in the current directory and names the project after the folder. Override t
 - **`/321 -DevAudit`** - code-standards audit against your project's DEV-AUDIT. `-FULL` audits and refactors.
 - **`/321 -AutoPush`** - release pipeline: capture, commit, and push to the anchored remote, with the project's release steps sourced from AUTO-PUSH.
 - **`/321 -Compact`** - emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation.
-- **`/321 -CodeWatcher`** - hold the conversation on a code page you host behind your own sign-in while away from the terminal: one channel per session, a watcher that wakes the session when your input lands, answers in plain text. The first run in a project registers it in the page's dropdown on its own, from settings kept once per machine. `-STOP` ends the watch.
+- **`/321 -StartWatcher`** - hold the conversation on a code page you host behind your own sign-in while away from the terminal: one channel per session, a watcher that wakes the session when your input lands, answers in plain text. `-INSTALL` puts the project on the page from settings kept once per machine and registers it in the dropdown, and the first run does that on its own.
+- **`/321 -StopWatcher`** - end the watch and leave the page as it is. `-DELETE` also takes the answer down.
 
 ## Documentation
 
@@ -71,4 +72,5 @@ A short reference for day-to-day use. The full command surface is in [the /321 s
 | `/321 -DevAudit` | Audit the source against `DEV-AUDIT.md`. `-FULL` audits and refactors. |
 | `/321 -AutoPush` | Capture, commit, and push to the anchored remote. Composes the CHANGELOG at release time. |
 | `/321 -Compact` | Emit a ready-to-paste `/compact` block carrying the session's load-bearing state into the next conversation. |
-| `/321 -CodeWatcher` | Hold the conversation on your code page while away from the terminal. `-STOP` ends the watch. |
+| `/321 -StartWatcher` | Hold the conversation on your code page while away from the terminal. `-INSTALL` puts the project on the page. |
+| `/321 -StopWatcher` | End the watch, the page stays as it is. `-DELETE` takes the answer down. |

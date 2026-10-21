@@ -42,7 +42,7 @@ export function reconcilePending() {
   return loadState().reconcile_pending === true;
 }
 
-// The rolling fingerprint window for a skill's state entry, with the legacy key
+// The rolling slug window for a skill's state entry, with the legacy key
 // honored: an older state.json carries last_captured, the current schema
 // recent_captured. Readers treat them as one field through this accessor, and the
 // next commit writes the canonical key, so the legacy name migrates forward on its own.
@@ -134,7 +134,7 @@ export function cmdState(_index, args) {
     // commit's watermark stamp. Stamp both lanes current, and reduce to the canonical
     // shape so a legacy migration's pre-rebuild watermark keys (session_update /
     // memory_update) do not linger beside the new ones. Preserve recent_captured if a
-    // commit had stamped fingerprints before the reconcile pass, so the AI's "did I
+    // commit had stamped slugs before the reconcile pass, so the AI's "did I
     // capture this arc?" lookup survives the gate flip. Fall back to the legacy
     // last_captured key so an older state.json still carries forward.
     const now = new Date().toISOString();

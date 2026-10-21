@@ -1,8 +1,9 @@
 # 04-upgrade-ops.sh - the upgrade command's manifest operation APPLY surface, one
 # isolated project per operation kind: registry_extend + file_add_template (T31),
 # re-run idempotency (T32), the manifest-less engine fallback (T34), registry_rename
-# (T38/T39), the action-first rename manifest end-to-end (T40), and file_delete (T41,
-# which keeps its containment rejection for self-containment). The safety perimeter
+# (T38/T39), the action-first rename manifest end-to-end (T40), file_delete (T41,
+# which keeps its containment rejection for self-containment), and section_text_diff
+# with the project name (T124) plus its deferral and snapshot (T136). The safety perimeter
 # (dry-run, fail-fast, reconcile gate, containment, customizations[] deferral) lives
 # in 06-upgrade-guards.sh; the AI merge / orphan punch lists in 07-sync-judgment.sh.
 
@@ -48,8 +49,8 @@ echo "$NMOUT" | grep -q '0 applied' && pass "upgrade reports 0 applied on a mani
 echo "=== T38: registry_rename moves a dotted-path key and is idempotent on re-run ==="
 RN38="$BASE/rename"
 RNENG="$(mk_proj "$RN38" RnProj)"
-# Project carries the legacy auto_memory.source field (the WAT321 case).
-node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={source:"./AIDOCS/automemory",path:""};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RN38/AIDOCS/_index.json"
+# Project carries the legacy auto_memory.source field (a project laid by an older engine).
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.auto_memory={source:"./AIDOCS/automemory",path:""};j.engine.operations_applied=(j.engine.operations_applied||[]).filter(n=>n!=="rename_auto_memory_source_to_seed");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RN38/AIDOCS/_index.json"
 RNSRC="$BASE/renamesrc"
 mk_src "$RNSRC"
 cat > "$RNSRC/AIDOCS/MANIFEST.json" <<'EOF'
@@ -74,7 +75,7 @@ echo "=== T39: registry_rename no-ops when from is absent and to is absent ==="
 RNAB="$BASE/renameabsent"
 RNABENG="$(mk_proj "$RNAB" RnAbProj)"
 # Strip auto_memory entirely so both from and to are absent.
-node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));delete j.auto_memory;fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RNAB/AIDOCS/_index.json"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));delete j.auto_memory;j.engine.operations_applied=(j.engine.operations_applied||[]).filter(n=>n!=="rename_auto_memory_source_to_seed");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$RNAB/AIDOCS/_index.json"
 node "$RNABENG" fetch-engine --from "$RNSRC" >/dev/null 2>&1
 RNABOUT="$(node "$RNABENG" upgrade 2>&1)"; RNABCC=$?
 [ "$RNABCC" = "0" ] && pass "registry_rename with both keys absent exits 0" || fail "upgrade failed on both-absent (exit $RNABCC): $RNABOUT"
@@ -162,3 +163,60 @@ node "$FDENG" fetch-engine --from "$FDSRC" >/dev/null 2>&1
 FD3OUT="$(node "$FDENG" upgrade 2>&1)"; FD3CC=$?
 [ "$FD3CC" = "20" ] && pass "file_delete rejects ../ escape with exit 20" || fail "file_delete accepted ../ escape (exit $FD3CC)"
 echo "$FD3OUT" | grep -q 'escapes the project root' && pass "containment rejection names the cause" || fail "no 'escapes the project root' in output"
+
+echo "=== T124: section_text_diff substitutes PROJECTNAME in the path and the body, honors customizations[] on the resolved path, stays contained ==="
+SD="$BASE/sectiondiff"
+SDENG="$(mk_proj "$SD" SdProj)"
+SDSRC="$BASE/sectiondiffsrc"
+mk_src "$SDSRC"
+cat > "$SDSRC/AIDOCS/MANIFEST.json" <<'MANIFEST'
+{
+  "operations": [
+    { "name": "diff_open_findings", "type": "section_text_diff", "file": "AIDOCS/PROJECTNAME_DEV-AUDIT.md", "section": "Open findings", "body": "PROJECTNAME has no open findings." }
+  ]
+}
+MANIFEST
+node "$SDENG" fetch-engine --from "$SDSRC" >/dev/null 2>&1
+SDOUT="$(node "$SDENG" upgrade 2>&1)"; SDCC=$?
+[ "$SDCC" = "0" ] && pass "section_text_diff upgrade exits 0" || fail "upgrade failed (exit $SDCC): $SDOUT"
+grep -q "SdProj has no open findings" "$SD/AIDOCS/SdProj_DEV-AUDIT.md" && pass "the project-named data file took the section, path and body substituted" || fail "PROJECTNAME was not substituted on the section op"
+echo "$SDOUT" | grep -q 'replaced "Open findings" in AIDOCS/SdProj_DEV-AUDIT.md' && pass "the note names the resolved path" || fail "the note did not name the resolved path (output: $SDOUT)"
+# customizations[] lists the RESOLVED path, so the deferral matches on it.
+set_custom "$SD" "AIDOCS/SdProj_DEV-AUDIT.md"
+node -e 'const f=process.argv[1],fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.engine.operations_applied=j.engine.operations_applied.filter(n=>n!=="diff_open_findings");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SD/AIDOCS/_index.json"
+node "$SDENG" fetch-engine --from "$SDSRC" >/dev/null 2>&1
+node "$SDENG" upgrade 2>&1 | grep -q "SdProj_DEV-AUDIT.md deferred (customizations\[\])" && pass "a customized project data file defers the section op" || fail "customizations[] on the resolved path did not defer"
+cat > "$SDSRC/AIDOCS/MANIFEST.json" <<'MANIFEST'
+{
+  "operations": [
+    { "name": "diff_escape_attempt", "type": "section_text_diff", "file": "../PROJECTNAME_ESCAPE.md", "section": "x", "body": "y" }
+  ]
+}
+MANIFEST
+node "$SDENG" fetch-engine --from "$SDSRC" >/dev/null 2>&1
+node "$SDENG" upgrade >/dev/null 2>&1; SDESC=$?
+[ "$SDESC" = "20" ] && pass "a section op that escapes the root is refused (exit 20)" || fail "the section op escaped containment (exit $SDESC)"
+
+echo "=== T136: a section op with no matching heading or file defers instead of journaling, and the replaced body is snapshotted ==="
+SM="$BASE/sectionmissing"
+SMENG="$(mk_proj "$SM" SmProj)"
+SMSRC="$BASE/sectionmissingsrc"
+mk_src "$SMSRC"
+cat > "$SMSRC/AIDOCS/MANIFEST.json" <<'MANIFEST'
+{
+  "operations": [
+    { "name": "diff_absent_heading", "type": "section_text_diff", "file": "AIDOCS/PROJECTNAME_DEV-AUDIT.md", "section": "No such heading", "body": "x" },
+    { "name": "diff_absent_file", "type": "section_text_diff", "file": "AIDOCS/PROJECTNAME_NOWHERE.md", "section": "Open findings", "body": "x" },
+    { "name": "diff_real_section", "type": "section_text_diff", "file": "AIDOCS/PROJECTNAME_DEV-AUDIT.md", "section": "Open findings", "body": "PROJECTNAME keeps none open." }
+  ]
+}
+MANIFEST
+node "$SMENG" fetch-engine --from "$SMSRC" >/dev/null 2>&1
+SMOUT="$(node "$SMENG" upgrade 2>&1)"; SMCC=$?
+[ "$SMCC" = "0" ] && pass "a deferred section op does not fail the upgrade" || fail "upgrade failed (exit $SMCC): $SMOUT"
+echo "$SMOUT" | grep -q "DEFER diff_absent_heading" && pass "a missing heading defers the op" || fail "a missing heading did not defer (output: $SMOUT)"
+echo "$SMOUT" | grep -q "DEFER diff_absent_file" && pass "a missing file defers the op" || fail "a missing file did not defer (output: $SMOUT)"
+reg_get "$SM" engine.operations_applied | grep -q "diff_absent_heading\|diff_absent_file" && fail "a deferred section op was journaled, so it would never retry" || pass "neither deferred op is in the journal, so the next run retries them"
+reg_get "$SM" engine.operations_applied | grep -q "diff_real_section" && pass "the op that applied is journaled" || fail "the applied op was not journaled"
+grep -q "(none yet)" "$SM/TEMP/engine-backup-pre-upgrade/AIDOCS/SmProj_DEV-AUDIT.md" && pass "the prior body of the data file is in the pre-upgrade snapshot" || fail "the replaced data-file body was not snapshotted"
+grep -q "SmProj keeps none open." "$SM/AIDOCS/SmProj_DEV-AUDIT.md" && pass "the real section took the body" || fail "the real section was not replaced"

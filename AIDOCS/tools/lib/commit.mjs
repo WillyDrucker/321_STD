@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { flag } from "./args.mjs";
-import { depFingerprint, touchesCodeBoundBigSix } from "./bigsixDrift.mjs";
+import { depNames, touchesCodeBoundBigSix } from "./bigsixDrift.mjs";
 import { bulletExtendedAnchor, slugify } from "./markdown.mjs";
 import { amendBullet, dropBullet, lifoInsert, overwriteCurrentState, overwriteSection } from "./mutators.mjs";
 import { changelogInsert } from "./mutatorsChangelog.mjs";
@@ -18,7 +18,7 @@ import { validateStaging } from "./validate.mjs";
 
 // recent_captured rolling-window size. The AI uses it to answer "did I capture
 // this arc?" - a handful of recent slugs is enough, more would just bloat state.json.
-const FINGERPRINT_LIMIT = 8;
+const RECENT_CAPTURED_LIMIT = 8;
 
 const EXTENDED_OPS = ["add", "drop", "replace"];
 
@@ -98,8 +98,8 @@ export function cmdCommit(index, args) {
     process.exit(17);
   }
 
-  // Phase 2: persist, stamp the watermark, record this run's bullet fingerprints,
-  // clear staging. recent_captured is a rolling window of the last FINGERPRINT_LIMIT
+  // Phase 2: persist, stamp the watermark, record this run's bullet slugs, clear
+  // staging. recent_captured is a rolling window of the last RECENT_CAPTURED_LIMIT
   // lifo_insert slugs across recent commits (newest first). The AI reads them via
   // `watermark` to answer "did I capture this arc?" without re-reading SESSION /
   // MEMORY. recentCaptured honors the legacy last_captured key, so a state.json
@@ -108,20 +108,22 @@ export function cmdCommit(index, args) {
   const state = loadState();
   const captured = [];
   for (const a of staging.actions) if (a.op === "lifo_insert" || a.op === "amend_bullet") captured.push(slugify(a.bullet));
-  const merged = [...captured.reverse(), ...recentCaptured(state[skill])].slice(0, FINGERPRINT_LIMIT);
+  const merged = [...captured.reverse(), ...recentCaptured(state[skill])].slice(0, RECENT_CAPTURED_LIMIT);
   state[skill] = {
     runs: (state[skill]?.runs || 0) + 1,
     last_committed_at: new Date().toISOString(),
     recent_captured: merged,
-    // Carry the Big-6 mark across runs that did not touch it.
-    ...(state[skill]?.bigsix ? { bigsix: state[skill].bigsix } : {}),
+    // Carry the Big-6 mark across runs that did not touch it, names and date only, so a
+    // mark laid by an older engine sheds any other field it carried.
+    ...(state[skill]?.bigsix ? { bigsix: { names: state[skill].bigsix.names, derived_at: state[skill].bigsix.derived_at } } : {}),
   };
   // Re-stamp only when this run actually re-derived a code-bound Big-6 section. That is
   // what makes doctor's drift check meaningful: the mark records the dependency set the
-  // Big-6 was last WRITTEN against, so a later dep change reads as genuine drift.
+  // Big-6 was last WRITTEN against, so a later dep change reads as genuine drift. An empty
+  // set is a real mark (the project declares no dependencies), null means no manifest.
   if (touchesCodeBoundBigSix(staging.actions)) {
-    const fp = depFingerprint(index);
-    if (fp) state[skill].bigsix = { hash: fp.hash, names: fp.names, derived_at: new Date().toISOString() };
+    const names = depNames(index);
+    if (names !== null) state[skill].bigsix = { names, derived_at: new Date().toISOString() };
   }
   saveState(state);
   clearStaging(skill);

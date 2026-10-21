@@ -76,15 +76,15 @@ node AIDOCS/tools/engine.mjs commit --skill updatesession
 node AIDOCS/tools/engine.mjs commit --skill updatememory
 ```
 
-`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional. Skip it on a confident draft. Use `validate --skill <name>` only while iterating on a draft you expect to fail. The two-phase commit persists, stamps the watermark, records the run's bullet fingerprints, and clears staging.
+`commit` runs the validator AND simulates every op first, aborting before any write on failure. So a standalone `validate` is optional. Skip it on a confident draft. Use `validate --skill <name>` only while iterating on a draft you expect to fail. The two-phase commit persists, stamps the watermark, records the run's bullet slugs, and clears staging.
 
 ## What the watermark gives you
 
-`AIDOCS/tools/state.json` carries `<skill>.last_committed_at` (the timestamp of the last commit) and `<skill>.recent_captured` (a rolling window of the slugs of recent `lifo_insert` bullets, newest first, up to 8 entries). `engine.mjs watermark --skill <name>` prints both on demand.
+`AIDOCS/tools/state.json` carries `<skill>.last_committed_at` (the timestamp of the last commit) and `<skill>.recent_captured` (a rolling window of the slugs of recent `lifo_insert` bullets, newest first, up to 8 entries). `engine.mjs watermark --skill <name>` prints both on demand, and `context --skill <name>` prints them after the repository's branch, status, and recent subjects, the one read the session lane makes.
 
 Use them this way:
 
 - The timestamp scopes the routine refresh to "conversation tail since the watermark."
-- The fingerprints answer "did I capture this arc in the last few runs?" without re-reading SESSION / MEMORY. The rolling window accumulates across runs, so an arc captured two passes ago is still visible. Most useful after a pruning run or when SESSION / MEMORY itself has been archived.
+- The slugs answer "did I capture this arc in the last few runs?" without re-reading SESSION / MEMORY. The rolling window accumulates across runs, so an arc captured two passes ago is still visible. Most useful after a pruning run or when SESSION / MEMORY itself has been archived.
 
 The watermark is a script-internal marker. It is never written into SESSION / MEMORY content.

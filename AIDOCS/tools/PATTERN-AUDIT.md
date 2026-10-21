@@ -2,7 +2,7 @@
 
 **Purpose:** Optional sub-section shapes that earn their place under `## Project specifics` in `<PROJECT>_DEV-AUDIT.md`. Loaded on demand when a project's audit notes grow beyond the baseline. Not loaded at session start.
 
-The baseline DEV-AUDIT template ships with the split, anchor principles, contracts, sanctioned exceptions, audit dimensions, and a `## Project specifics` placeholder. The four patterns below cover the recurring shapes projects add under that placeholder. Each is optional. A project earns the section by having something concrete to say.
+The baseline DEV-AUDIT template ships with the steering block, anchor principles, contracts, sanctioned exceptions, audit dimensions, the docs section, and a `## Project specifics` placeholder. The three patterns below cover the recurring shapes projects add under that placeholder. Each is optional. A project earns the section by having something concrete to say. The file-size ceiling is not one of them: a file that must stay whole is a sanctioned exception with its reason, never a project-wide override.
 
 ## Pattern 1: Change impact map
 
@@ -59,19 +59,3 @@ Files that look like split / refactor candidates but have constraints (runtime b
 ### When to add
 
 When at least one file in the project would be a natural refactor target but has a constraint that makes refactoring it wrong. Without this section, every `-DevAudit` pass re-proposes the same refactor.
-
-## Pattern 4: File-size posture override
-
-Project-specific override of the baseline file-size cap with rationale. The baseline anchor principle leans toward smaller files (~300 lines target). A project where the natural code grain runs larger (single cohesive state machines, generated code, complex parsers) can override with a documented reason.
-
-### Shape
-
-```markdown
-### File-size posture
-
-Files at 400-550 LoC are typically single cohesive state machines (statusBarItem, phaseParser, usageServiceBase, turnMonitor, appServerClient). Default to leaving them above that threshold unless a genuinely new concern emerges.
-```
-
-### When to add
-
-When a project has documented exceptions to the anchor principle. Empty otherwise. This formalizes that anchor principles are defaults projects can refine with cause, not absolute rules.

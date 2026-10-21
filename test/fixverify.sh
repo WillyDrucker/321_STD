@@ -6,7 +6,8 @@
 # isolated projects live under $BASE in each case file. Run from the repo root:
 # bash test/fixverify.sh
 # Each case file owns one cohesion lane:
-#   01-migration.sh      - bootstrap rename, archive lanes, restore, 1:1 import + audit
+#   01-migration-archive.sh - bootstrap rename, archive lanes, restore, the first 1:1 import
+#   01-migration-import.sh  - migrate-import audit, placeholder no-op, sub-label fold
 #   02-doctor-state.sh   - doctor dimensions, state machine, discovery sweep, bigsix
 #   03-privacy-init.sh   - privacy tiers + flips, init guards, auto-prune, auto-memory, validName
 #   04-upgrade-ops.sh    - upgrade manifest operations: the APPLY surface + idempotency
@@ -18,13 +19,15 @@
 #                             the runtime, dispatch-description drift
 #   10-targeted-ops.sh      - amend_bullet, drop_bullet with its archive and pairing gate,
 #                             changelog_insert, the dictionary_extend manifest op
+#   11-exposure.sh         - the publish gate: secrets and gated paths, tracked or unignored, home paths
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/lib/runner.sh"
 . "$HERE/lib/upgrade-fixture.sh"
 . "$HERE/lib/legacy-fixture.sh"
 
-. "$HERE/cases/01-migration.sh"
+. "$HERE/cases/01-migration-archive.sh"
+. "$HERE/cases/01-migration-import.sh"
 . "$HERE/cases/02-doctor-state.sh"
 . "$HERE/cases/03-privacy-init.sh"
 . "$HERE/cases/04-upgrade-ops.sh"
@@ -34,6 +37,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/cases/08-commit-drift-copy.sh"
 . "$HERE/cases/09-state-automemory.sh"
 . "$HERE/cases/10-targeted-ops.sh"
+. "$HERE/cases/11-exposure.sh"
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi

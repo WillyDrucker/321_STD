@@ -1,5 +1,5 @@
 ---
-name: aidocs-update-cadence
+name: feedback-aidocs-update-cadence
 description: SESSION, MEMORY, BACKLOG, and CHANGELOG are written only by a /321 -Update or -AutoPush pass, never ad hoc after a change. WDDOCS are different and move with the work.
 metadata:
   type: feedback

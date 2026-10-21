@@ -1,0 +1,14 @@
+{
+  "name": "321-std",
+  "private": true,
+  "description": "The 321 standard: the engine, the skill bodies, and the authoring rules a project installs and keeps in sync. The engine version lives in AIDOCS/_index.json.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "bash test/fixverify.sh",
+    "doctor": "node AIDOCS/tools/engine.mjs doctor",
+    "scrub": "node AIDOCS/tools/engine.mjs scrub --check"
+  }
+}

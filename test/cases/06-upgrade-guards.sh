@@ -151,7 +151,7 @@ node "$SEENG_44" fetch-engine --from "$SESRC" >/dev/null 2>&1
 SE3OUT="$(node "$SEENG_44" upgrade 2>&1)"; SE3CC=$?
 [ "$SE3CC" = "20" ] && pass "skill_delete rejects non-SKILL_*.md basename" || fail "skill_delete accepted non-SKILL basename (exit $SE3CC)"
 
-echo "=== T64: file_delete skips a path listed in customizations[] (GLP321-web finding) ==="
+echo "=== T64: file_delete skips a path listed in customizations[] (downstream finding) ==="
 # An upstream cleanup op should not blow away a project's local work in a file the
 # customizations[] entry was meant to preserve. The op no-ops with a clear note; user
 # removes the path from customizations[] to apply.
@@ -236,3 +236,35 @@ node "$DEFENG" fetch-engine --from "$DEFSRC" >/dev/null 2>&1
 DEFOUT2="$(node "$DEFENG" upgrade 2>&1)"
 [ ! -f "$DEF/AIDOCS/tools/staging/SCHEMA.json" ] && pass "after removing customization, the deferred op retries and applies on the next run (no manual journal reset)" || fail "deferred op did not retry after customization removal"
 reg_get "$DEF" engine.operations_applied | grep -q "delete_deferred_schema" && pass "op IS journaled into operations_applied[] after the successful retry" || fail "op missing from operations_applied[] after successful apply"
+
+echo "=== T129: a registry path with a prototype segment is refused, so a manifest cannot pollute the process ==="
+PP="$BASE/protopath"
+PPENG="$(mk_proj "$PP" ProtoPath)"
+PPSRC="$BASE/protopathsrc"
+mk_src "$PPSRC"
+cat > "$PPSRC/AIDOCS/MANIFEST.json" <<'MANIFEST'
+{ "operations": [ { "name": "extend_proto", "type": "registry_extend", "path": "__proto__.polluted", "value": true } ] }
+MANIFEST
+node "$PPENG" fetch-engine --from "$PPSRC" >/dev/null 2>&1
+PPOUT="$(node "$PPENG" upgrade 2>&1)"; PPX=$?
+[ "$PPX" = "20" ] && pass "upgrade refuses the op (exit 20)" || fail "upgrade exit was $PPX (output: $PPOUT)"
+echo "$PPOUT" | grep -q "prototype segment" && pass "the refusal names the cause" || fail "no cause named (output: $PPOUT)"
+grep -q "polluted" "$PP/AIDOCS/_index.json" && fail "the registry took the key" || pass "the registry is untouched"
+
+echo "=== T138: the other prototype routes are refused too, a constructor segment and a literal dictionary key ==="
+PQ="$BASE/protoroutes"
+PQENG="$(mk_proj "$PQ" ProtoRoutes)"
+PQSRC="$BASE/protoroutessrc"
+mk_src "$PQSRC"
+cat > "$PQSRC/AIDOCS/MANIFEST.json" <<'MANIFEST'
+{ "operations": [
+  { "name": "extend_constructor", "type": "registry_extend", "path": "constructor.prototype.polluted", "value": true },
+  { "name": "dict_proto_key", "type": "dictionary_extend", "dictionary": "files", "key": "__proto__", "value": "./x.md" }
+] }
+MANIFEST
+node "$PQENG" fetch-engine --from "$PQSRC" >/dev/null 2>&1
+PQOUT="$(node "$PQENG" upgrade 2>&1)"; PQX=$?
+[ "$PQX" = "20" ] && pass "upgrade refuses both ops (exit 20)" || fail "upgrade exit was $PQX (output: $PQOUT)"
+echo "$PQOUT" | grep -q 'prototype segment ("constructor")' && pass "the constructor segment is named" || fail "constructor route not refused (output: $PQOUT)"
+echo "$PQOUT" | grep -q 'registry key "__proto__" is a prototype segment' && pass "the literal dictionary key is refused" || fail "literal-key route not refused (output: $PQOUT)"
+grep -q "polluted" "$PQ/AIDOCS/_index.json" && fail "the registry took the constructor key" || pass "the registry is untouched"

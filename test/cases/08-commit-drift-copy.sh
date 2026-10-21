@@ -100,3 +100,23 @@ dc_set_version "$SUB" 9.9.9
 # HEAD:./AIDOCS/_index.json and the status pathspec relative to the subdir within PARENT.
 SUBOUT="$(node "$SUBENG" doctor 2>&1)"
 echo "$SUBOUT" | grep -q "engine version mismatch" && pass "drift advisory fires for a project nested in a larger repo (subdir HEAD:./ resolution)" || fail "drift advisory failed on a subdir-of-larger-repo project (output: $SUBOUT)"
+
+echo "=== T123: context reads the repository facts and the lane watermark in one call, and says none off a repository ==="
+CX="$BASE/cdContext"
+CXENG="$(mk_proj "$CX" CdContextProj)"
+# The scratch tree sits inside the engine's own checkout, so a ceiling at $BASE keeps git
+# from discovering that parent repository and proves the off-repository branch.
+CEIL="$BASE"; command -v cygpath >/dev/null 2>&1 && CEIL="$(cygpath -m "$BASE")"
+CXOUT0="$(GIT_CEILING_DIRECTORIES="$CEIL" node "$CXENG" context 2>&1)"
+echo "$CXOUT0" | grep -q "repository: none" && pass "a project that is not a repository reads 'repository: none'" || fail "no 'repository: none' off a repository (output: $CXOUT0)"
+echo "$CXOUT0" | grep -q "updatesession: never committed" && pass "the lane watermark rides along" || fail "the watermark did not print with the context"
+dc_git_commit "$CX"
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"Context slug lands"}]}\n' > "$CX/AIDOCS/tools/staging/updatesession.json"
+node "$CXENG" commit --skill updatesession >/dev/null 2>&1
+CXOUT1="$(node "$CXENG" context --skill updatesession 2>&1)"
+echo "$CXOUT1" | grep -q "repository: branch" && pass "the branch is named" || fail "no branch line (output: $CXOUT1)"
+echo "$CXOUT1" | grep -q "baseline" && pass "the recent subjects print" || fail "the commit subject did not print"
+echo "$CXOUT1" | grep -q "context-slug-lands" && pass "the committed slug prints under the lane" || fail "the slug did not print"
+echo "$CXOUT1" | grep -q "updatememory:" && fail "--skill leaked the other lane" || pass "--skill restricts the watermark to the named lane"
+node "$CXENG" context --skill bogus >/dev/null 2>&1; CXBAD=$?
+[ "$CXBAD" = "11" ] && pass "context rejects a bad --skill with exit 11" || fail "context bad-skill exit was $CXBAD (expected 11)"

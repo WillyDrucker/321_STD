@@ -38,7 +38,7 @@ Lead with one short sentence telling the user to type `/compact` and paste the b
     - Discussed, not decided: <concerns raised, ideas parked, offers pending>
     - Do not lose: <constraints confirmed this session>
 
-The user copies the whole box and pastes it after `/compact` in the prompt. Nothing follows the box: no recap, no second copy of its content.
+The user copies the whole box and pastes it after `/compact` in the prompt. Nothing follows the box: no recap, no second copy of its content. When the machine has a clipboard command (`clip` on Windows, `pbcopy` on macOS), also put the block on the clipboard from a scratch file, and say so in the one leading sentence, so the paste is a single keystroke.
 
 ## Rules
 

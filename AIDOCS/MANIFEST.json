@@ -227,6 +227,45 @@
       "dictionary": "files",
       "key": "updatesession.changelog",
       "value": "./CHANGELOG.md"
+    },
+    {
+      "name": "rename_skill_body_code_watcher_start",
+      "type": "skill_rename",
+      "from": "SKILL_CODE-WATCHER.md",
+      "to": "SKILL_START-WATCHER.md",
+      "flag_to": "-StartWatcher"
+    },
+    {
+      "name": "delete_pre_engine_memory_cli",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/memory.mjs"
+    },
+    {
+      "name": "delete_pre_engine_lib_cli",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/cli.mjs"
+    },
+    {
+      "name": "delete_pre_engine_lib_lint",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/lint.mjs"
+    },
+    {
+      "name": "delete_pre_engine_lib_prune_selection",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/pruneSelection.mjs"
+    },
+    {
+      "name": "delete_lib_upgrade_operations_renamed_upgrade_ops",
+      "type": "file_delete",
+      "file": "AIDOCS/tools/lib/upgradeOperations.mjs"
+    },
+    {
+      "name": "autopush_review_runs_doctor",
+      "type": "section_text_diff",
+      "file": "AIDOCS/PROJECTNAME_AUTO-PUSH.md",
+      "section": "Step 2: Review and stage",
+      "body": "```bash\nnode AIDOCS/tools/engine.mjs doctor\ngit status --short\ngit add -A\ngit status --short\n```\n\n`doctor` runs first because it reads what git actually tracks: a secret-shaped string, or a privacy-gated path that is tracked anyway, exits 20 and the push stops there. `git add -A` honors `.gitignore`, so transient / secret / machine files stay out. Confirm the staged set is what you expect. If anything sensitive appears staged, stop and fix `.gitignore` before committing - never commit around it."
     }
   ]
 }

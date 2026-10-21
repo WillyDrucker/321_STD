@@ -113,7 +113,7 @@ echo "$DOUT" | grep -q "advisory warning" && pass "sub-section budget is advisor
 # Body-line counting (the user-facing metric is non-blank body lines, not heading + blanks + body)
 echo "$DOUT" | grep -q "body has 15 lines" && pass "doctor reports body-line count (15), not total-line count" || fail "doctor not using body-line count in message"
 
-echo "=== T66: <!-- LOAD_BEARING --> marker exempts a sub-section from the body cap (GLP321-web finding) ==="
+echo "=== T66: <!-- LOAD_BEARING --> marker exempts a sub-section from the body cap (downstream finding) ==="
 LB="$BASE/loadbearing"
 node "$RENG" init "$LB" --name LbProj >/dev/null 2>&1
 LBENG="$LB/AIDOCS/tools/engine.mjs"
@@ -205,18 +205,18 @@ WMOUT0="$(node "$WMENG" watermark 2>&1)"
 echo "$WMOUT0" | grep -q "updatesession: never committed" && pass "watermark reports never-committed for updatesession on fresh init" || fail "watermark did not report never-committed (output: $WMOUT0)"
 echo "$WMOUT0" | grep -q "updatememory: never committed" && pass "watermark reports never-committed for updatememory on fresh init" || fail "watermark did not report never-committed for memory"
 # Stage and commit a lifo_insert; watermark should now print the timestamp + the slug
-printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"First watermark fingerprint"}]}\n' > "$WM/AIDOCS/tools/staging/updatesession.json"
+printf '{"actions":[{"op":"lifo_insert","file":"updatesession.session","section":"LIFO","bullet":"First watermark slug"}]}\n' > "$WM/AIDOCS/tools/staging/updatesession.json"
 node "$WMENG" commit --skill updatesession >/dev/null 2>&1
 WMOUT1="$(node "$WMENG" watermark --skill updatesession 2>&1)"
 echo "$WMOUT1" | grep -q "last_committed_at:" && pass "watermark prints last_committed_at after a commit" || fail "watermark missing last_committed_at (output: $WMOUT1)"
-echo "$WMOUT1" | grep -q "first-watermark-fingerprint" && pass "watermark surfaces the slug of the committed lifo bullet" || fail "watermark missing the bullet slug (output: $WMOUT1)"
+echo "$WMOUT1" | grep -q "first-watermark-slug" && pass "watermark surfaces the slug of the committed lifo bullet" || fail "watermark missing the bullet slug (output: $WMOUT1)"
 # --skill filter restricts output
 echo "$WMOUT1" | grep -q "updatememory:" && fail "watermark --skill updatesession leaked updatememory output" || pass "watermark --skill restricts output to the named lane"
 # Bad --skill rejects
 node "$WMENG" watermark --skill bogus >/dev/null 2>&1; WMBAD=$?
 [ "$WMBAD" = "11" ] && pass "watermark rejects bad --skill with exit 11" || fail "watermark bad-skill exit was $WMBAD (expected 11)"
 
-echo "=== T70: commit stamps recent_captured (newest first, rolling window), older fingerprints survive a second run ==="
+echo "=== T70: commit stamps recent_captured (newest first, rolling window), older slugs survive a second run ==="
 FP="$BASE/fingerprints"
 node "$RENG" init "$FP" --name FpProj >/dev/null 2>&1
 FPENG="$FP/AIDOCS/tools/engine.mjs"
@@ -232,7 +232,7 @@ FP_STATE="$(node "$FPENG" state 2>&1)"
 # Newer slug ordered before the older one
 NEWPOS=$(echo "$FP_STATE" | grep -n 'beta-event' | head -1 | cut -d: -f1)
 OLDPOS=$(echo "$FP_STATE" | grep -n 'alpha-entry' | head -1 | cut -d: -f1)
-[ -n "$NEWPOS" ] && [ -n "$OLDPOS" ] && [ "$NEWPOS" -lt "$OLDPOS" ] && pass "second commit prepends the new slug (newest first), older slug survives" || fail "fingerprint ordering wrong (alpha at $OLDPOS, beta at $NEWPOS)"
+[ -n "$NEWPOS" ] && [ -n "$OLDPOS" ] && [ "$NEWPOS" -lt "$OLDPOS" ] && pass "second commit prepends the new slug (newest first), older slug survives" || fail "slug ordering wrong (alpha at $OLDPOS, beta at $NEWPOS)"
 
 echo "=== T71: state --clear-reconcile preserves recent_captured across the gate flip ==="
 CR="$BASE/clearreconcile"

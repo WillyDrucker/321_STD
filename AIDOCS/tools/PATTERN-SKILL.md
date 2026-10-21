@@ -28,7 +28,8 @@ Hyphens between domain words exist for readability in the filename only. They di
 | `SKILL_DEV-AUDIT.md` | `-DevAudit` | `devaudit` |
 | `SKILL_SETUP.md` | `-Setup` | `setup` |
 | `SKILL_COMPACT.md` | `-Compact` | `compact` |
-| `SKILL_CODE-WATCHER.md` | `-CodeWatcher` | `codewatcher` |
+| `SKILL_START-WATCHER.md` | `-StartWatcher` | `startwatcher` |
+| `SKILL_STOP-WATCHER.md` | `-StopWatcher` | `stopwatcher` |
 
 ### Ordering compound names
 
@@ -74,7 +75,7 @@ A legacy body the table does not cover is a project-custom skill the user named 
 
 ## Pattern 1: Thin body, fat data file (registered)
 
-When a skill's substance is too large for the body and lives near the code it documents, register a data file in `_index.json` under `paths.files` with a dotted key `<skillname>.<role>` and point the skill body at it. The body becomes a thin loader: load the registered file, run what it says.
+When a skill's substance is too large for the body and lives near the code it documents, register a data file in `_index.json` under `files` with a dotted key `<skillname>.<role>` and point the skill body at it. The body becomes a thin loader: load the registered file, run what it says.
 
 ### Registry shape
 
@@ -96,7 +97,7 @@ The path can point anywhere in the project tree, not just `./AIDOCS/`. A referen
 
 **Purpose:** <one line>.
 
-When invoked, load the `myskill.reference` file (per `_index.json` paths.files) and run it.
+When invoked, load the `myskill.reference` file (per `_index.json` `files`) and run it.
 ```
 
 The body is short on purpose. The substance is in the reference, where the AI can read it once at invocation rather than carrying it in context at session start.
@@ -117,7 +118,7 @@ This applies to every registered thin wrapper, `-DevAudit` and `-AutoPush` inclu
 
 ### Example in the wild
 
-GLP321-web registers `scrapeprovider.reference: ./apps/scraper/GLP321-web_SCRAPE-PROVIDER.md`. The skill body is short, the reference file is 200+ lines covering modeling scope, modes, the process at a glance, and AI direction. The reference lives with the scraper code it documents, not in `AIDOCS/`.
+A web project registers `scrapeprovider.reference: ./apps/scraper/<PROJECT>_SCRAPE-PROVIDER.md`. The skill body is short, the reference file runs a few hundred lines covering modeling scope, modes, the process at a glance, and AI direction. The reference lives with the scraper code it documents, not in `AIDOCS/`.
 
 ## Pattern 2: "When called from X" composition
 

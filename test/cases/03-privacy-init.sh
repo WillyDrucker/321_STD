@@ -22,6 +22,11 @@ grep -q '"privacy": "private"' "$PRIV/AIDOCS/_index.json" && pass "private insta
 grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && fail "private .gitignore wrongly carries the gate" || pass "private .gitignore has no gate"
 grep -qE '^TEMP/$' "$PRIV/.gitignore" && pass "private still ignores TEMP (Tier C)" || fail "private dropped the Tier C TEMP ignore"
 grep -qE '/WDDOCS/RELEASES/\*' "$PRIV/.gitignore" && pass "private keeps RELEASES always-local" || fail "private dropped the always-local RELEASES ignore"
+# The pruned-archive rule ignores contents, not the folder, so the setup archive's skeleton
+# .gitkeep (re-included one line later) stays publishable. A folder rule would swallow it.
+git -C "$PUB" init -q
+git -C "$PUB" check-ignore -q --no-index AIDOCS/PubProj_SETUP_ARCHIVE/.gitkeep && fail "the public gate swallows the setup archive's .gitkeep (folder rule, not contents)" || pass "the setup archive's .gitkeep publishes under the public gate"
+git -C "$PUB" check-ignore -q --no-index AIDOCS/PubProj_SESSION_ARCHIVE/20260101-0000_PubProj_SESSION.md && pass "a pruned archive file is gated public" || fail "a pruned archive file is not gated"
 
 echo "=== T14b: init with no --privacy defaults to private ==="
 DEF="$BASE/def"

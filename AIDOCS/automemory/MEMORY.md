@@ -1,12 +1,12 @@
 - [Code comments](feedback_code_comments.md) - four lines is the default, module headers included. Rewrite a long comment in place. Never truncate mechanically, never hand-file into the memory track.
 - [Naming](feedback_naming.md) - name it before you write it. A name states what the thing owns. Renames move the name and every reference in one atomic pass.
-- [Case convention](feedback_case_convention.md) - framework and established names win first. Otherwise UPPERCASE is documentation, lowercase is code. No generic files.
+- [Case convention](feedback_case_convention.md) - framework and established names win first. Otherwise UPPERCASE is documentation, lowercase is code. No generic files, and a doc folder names its files after itself.
 - [No em dashes](feedback_no_em_dashes.md) - no em dashes, no clause-joining semicolons, in any prose we author. Hyphens or a rewrite.
 - [No versions in code](feedback_no_versions_in_code.md) - no release stamps in source. Schema versions and the project's single version source are exempt.
 - [No dates in memory](feedback_no_dates_in_memory.md) - no freshness stamps on entries. Live Current State versions are REQUIRED, not stamps.
 - [Doc purpose header](feedback_doc_purpose_header.md) - every project MD file we author gets a **Purpose:** callout after the H1.
 - [Lean docs](feedback_lean_docs.md) - detail cascades one tier down. AGENTS.md owns the read order. A rule lives in exactly one tier.
-- [No subagents for review](feedback_no_subagents_for_review.md) - review stays with the lead. A cross-model bridge is NOT a subagent and is encouraged.
+- [No subagents for review](feedback_no_subagents_for_review.md) - review stays with the lead. A cross-model bridge is NOT a subagent and is encouraged. Fan-out workflows only when the user asks.
 - [No background processes](feedback_no_background_processes.md) - everything runs foreground in the main lane. Never background on your own initiative.
 - [TEMP folder usage](feedback_temp_folder_usage.md) - scratch goes in TEMP/ when writes are authorized. Never creates it during read-only work.
 - [Loop arming](feedback_loop_arming.md) - unattended runs go through /loop. Arm as the terminal action and emit nothing after it.
@@ -16,5 +16,10 @@
 - [Reports carry discussions](feedback_reports_carry_discussions.md) - compact blocks and session reports include concerns and parked ideas, not just code state.
 - [AskUserQuestion usage](feedback_askuserquestion_usage.md) - forms only for straight questions. Reasoning and alternatives iterate in prose first.
 - [Line target is informational](feedback_line_target_informational.md) - the size target and the census never block or slow a change. Report, keep building.
-- [Long scripts via Write tool](reference_long_scripts_via_write_tool.md) - patch and log scripts go through Write into the scratchpad, never an inline heredoc.
+- [Docs and code independent](feedback_docs_code_independent.md) - design and reference docs never name code, and code never names them. Either side changes alone.
+- [No auto-compact notes](feedback_no_autocompact_notes.md) - never mention the compaction point or plan around it. Memory writes batch to the session end.
+- [Research a challenged theory](feedback_research_challenged_theory.md) - when the user says a theory sounds wrong, research the documented behaviour first and take the cheapest direct read.
+- [Version numbers are not gates](feedback_version_numbers_not_gates.md) - a version labels what shipped. A decided change lands in the open version now.
+- [No hashing](feedback_no_hashing.md) - no recorded checksums or fingerprints anywhere. Git, the pinned source, or a direct byte comparison carry identity.
+- [Long scripts via Write tool](reference_long_scripts_via_write_tool.md) - patch scripts go through Write into the scratchpad, assert their anchor count, and keep each file's line ending.
 - [User profile](user_name.md) - one-line summary (role, scope, working style). Rename file on use.

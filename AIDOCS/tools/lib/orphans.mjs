@@ -74,7 +74,7 @@ function classify(index) {
   const projectSeed = (index.auto_memory?.seed || `./${CANONICAL_SEED}`).replace(/^\.\//, "");
 
   // A project file is an orphan when its key is absent upstream and the path is not
-  // customization-guarded. The key defaults to the rel path; review-automemory keys on
+  // customization-guarded. The key defaults to the rel path, and review-automemory keys on
   // basename so a project's customized seed path does not cause spurious diffs against
   // the canonical upstream layout.
   const orphansIn = (project, upstreamKeys, keyOf = (rel) => rel) =>

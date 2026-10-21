@@ -1,15 +1,15 @@
 ---
-name: codewatcher
-description: Hold the conversation on the user's code page while they are away from the terminal. Registers this project's channel, picks up anything already waiting, then watches the channel in the background and wakes when their input lands, answers there in plain text and watches again. -STOP ends the watch.
+name: startwatcher
+description: Hold the conversation on the user's code page while they are away from the terminal. Registers this project's channel, picks up anything already waiting, then watches the channel in the background and wakes when their input lands, answers there in plain text and watches again. The first run in a project shows the channel and label it will register and waits for a yes. -INSTALL sets the project up on the page from the machine's settings. /321 -StopWatcher ends the watch.
 ---
 
-# /321 -CodeWatcher
+# /321 -StartWatcher
 
-**Purpose:** Let the user talk with this session from a phone or a machine that cannot reach the terminal, through a code page they host behind their own sign-in, with no message in the terminal to say they sent something. The page and its scripts live outside this project. Where they are on this machine, and the channel this project holds, is the project's code page ENV doc, `<PROJECT>_ENV_CODE.md` under the `env` path in `AIDOCS/_index.json`. It is local only, since it names machine paths and an address. The first run in a project writes it from the machine's settings, below, and this body says how to drive it.
+**Purpose:** Let the user talk with this session from a phone or a machine that cannot reach the terminal, through a code page they host behind their own sign-in, with no message in the terminal to say they sent something. The page and its scripts live outside this project. Where they are on this machine, and the channel this project holds, is the project's code page ENV doc, `<PROJECT>_ENV_CODE.md` under the `env` path in `AIDOCS/_index.json`. It is local only, since it names machine paths and an address. `-INSTALL` writes it from the machine's settings, below, and the default run drives the loop. `/321 -StopWatcher` ends the watch.
 
 ## The scripts
 
-The code page ships five session scripts, run by absolute path from anywhere, each taking the channel first. They reach the page's API with a key kept beside them, never in this project, so a session never signs in.
+The code page ships six session scripts, run by absolute path from anywhere, each taking the channel first. They reach the page's API with a key kept beside them, never in this project, so a session never signs in.
 
 | Script | Does |
 |---|---|
@@ -17,11 +17,14 @@ The code page ships five session scripts, run by absolute path from anywhere, ea
 | `code-pickup.mjs <channel>` | Opens every waiting message, oldest first, into the channel's pickup folder, then deletes it from the page. Exit 2 when nothing new waits |
 | `code-watch.mjs <channel> [minutes]` | Polls the channel and runs the pickup when input lands, exiting with its code. Exit 3 after the limit |
 | `code-stop.mjs <channel> [--clear]` | Exit 0 when the user pressed Stop after the newest message collected, 1 when not. `--clear` removes the flag |
-| `code-post.mjs <channel> <file> [transcript folder]` | Posts the answer for an hour. The transcript folder adds the session's context figure. `<channel> --delete` takes the answer down |
+| `code-post.mjs <channel> <file> [transcript folder] [--label <label>] [--image <png>]...` | Posts the answer for an hour. The transcript folder adds the session's context figure, `--label` shows a label with the answer, `--image` attaches a screenshot, four at most. `<channel> --delete` takes the answer down |
+| `code-unregister.mjs <channel>` | Takes the channel out of the dropdown with its answers, waiting input and stop flag. `/321 -StopWatcher -UNREGISTER` runs it |
 
-## First run in a project
+## -INSTALL: set the project up on the page
 
-When the ENV doc is missing, the project sets itself up and registers with no questions, from the machine's code page settings in `~/.321/code-page.json`. That file is written once per machine and serves every project on it:
+The install puts this project on the page and writes the ENV doc the loop reads. The default run does it on its own when the ENV doc is missing. `-INSTALL` by hand runs it again when the channel, the label, the scripts folder or the page's address changes, and rewrites the ENV doc. It asks for the scripts folder and the page's address only when the machine has no settings yet, and the first run in a project confirms the channel and label before anything leaves the machine.
+
+The machine's code page settings live in `~/.321/code-page.json`, written once per machine and serving every project on it:
 
 ```json
 {
@@ -34,13 +37,14 @@ When the ENV doc is missing, the project sets itself up and registers with no qu
 1. **Read the machine settings.** When the file is missing, ask the user once for the scripts folder and the page's address, and write it. Every later project on the machine then needs nothing.
 2. **Name the channel and label.** An entry under `projects` for this project's folder name wins. Otherwise the channel is the folder name in lower case, every run of other characters turned into one hyphen, 24 at most, and the label is the folder name as written, letters, digits, spaces, dots, underscores and hyphens, 32 at most.
 3. **Check the label.** It shows in the page's dropdown, so it never names an employer, a host or a person. When this project's rules say its own name is one of those, do not register: ask the user once for a neutral channel and label, and add them under `projects` so the question never comes back.
-4. **Write the ENV doc** with the page's address, each script's full command for this channel, the label, the pickup folder the scripts write and this project's transcript folder, the one holding this project's auto-memory under `~/.claude/projects/`. Then run the loop, which registers the channel in step 1.
+4. **Write the ENV doc** with the page's address, each script's full command for this channel, the label, the pickup folder the scripts write and this project's transcript folder, the one holding this project's auto-memory under `~/.claude/projects/`. An ENV doc already there is rewritten from the settings.
+5. **Register, after a yes.** The first run in a project prints the channel, the label and the page's address it is about to register and waits for the user's yes, so a stray invocation never puts a project on the page unasked. A `projects` entry the user wrote for this project counts as that yes. Then run the register command. It adds the channel to the dropdown, or leaves it as it was. One line in the terminal says the channel and label. The install ends here, and the watch starts with the default run.
 
 - **The channel** is lower-case letters, digits and hyphens, 24 at most, unique among the sessions on the page. A clash with another project's channel takes a `projects` entry.
 
 ## The loop
 
-1. **Register.** Run the register command from the ENV doc.
+1. **Register.** When the ENV doc is missing, run `-INSTALL` first. Then run the register command from the ENV doc.
 2. **Collect what is waiting.** Anything collected is answered first, as in step 6.
 3. **Watch.** Start the watch command with `run_in_background`, one watcher per channel. When new input lands it collects it itself and exits, which wakes the session.
 4. **Read.** Every message in the pickup's `reply.txt`, oldest first, each screenshot with the Read tool, and the files it names. A later message steers an earlier one, the way a second chat message would.
@@ -51,7 +55,8 @@ When the ENV doc is missing, the project sets itself up and registers with no qu
 ## Variants
 
 - **Default.** The loop above.
-- **`-STOP`.** Stop the running watcher with TaskStop and leave the page as it is.
+- **`-INSTALL`.** The install above, then stop. Nothing is watched until the default run.
+- **Ending the watch** is `/321 -StopWatcher`, which stops the watcher and leaves the page as it is.
 
 ## How sessions share the page
 

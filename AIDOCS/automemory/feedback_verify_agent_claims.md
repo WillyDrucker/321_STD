@@ -1,5 +1,5 @@
 ---
-name: verify-agent-claims
+name: feedback-verify-agent-claims
 description: Agent and reviewer findings are candidates, not facts. Re-verify any non-obvious claim against the source yourself before acting on it or reporting it.
 metadata:
   type: feedback

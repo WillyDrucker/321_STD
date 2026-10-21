@@ -21,7 +21,7 @@ description: Audit the source against DEV-AUDIT.md. The skill is thin - the file
 
 ## A second opinion (optional)
 
-A pass may go out to a second reader through a cross-model bridge (not a subagent, and encouraged), and it need not. When it does: paste the scan output as the preamble and ask only for the layer no scan reaches (real defects, invariant drift, a rule living in two places, and anything you got wrong), name the sanctioned exceptions, and hand over the change list. Audit-only means the prompt names the ONE file it may write, under `TEMP/devaudit/`, created first and appended one `## ` section per area so a cut keeps the work, ending on `## Done`. Watch that file's headings, reuse the thread for a continuation, never re-issue a prompt after an abort, and read two payload-less turns as out of tokens. Its findings come back as CANDIDATES: one direct look at the primary source before acting on any.
+A pass may go out to a second reader through a cross-model bridge (not a subagent, and encouraged), and it need not. The reader shares the working tree, so it runs after the lead's edits are in or in its own worktree, and a long audit lands a file under `TEMP/devaudit/` appended one `## ` section per area, so partial work survives a cut call. The audit adds its own asks: paste the scan output as the preamble, ask only for the layer no scan reaches (real defects, invariant drift, a rule living in two places, and anything you got wrong), name the sanctioned exceptions, and hand over the change list. Its findings come back as CANDIDATES: one direct look at the primary source before acting on any.
 
 ## The trail
 

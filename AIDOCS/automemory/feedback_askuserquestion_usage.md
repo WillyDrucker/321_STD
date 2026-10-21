@@ -1,5 +1,5 @@
 ---
-name: askuserquestion-usage
+name: feedback-askuserquestion-usage
 description: Question forms only for straight questions. Discussion and reasoning happen in prose first.
 metadata:
   type: feedback

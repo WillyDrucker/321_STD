@@ -90,6 +90,17 @@ FEEOUT="$(node "$FEEENG" fetch-engine 2>&1)"; FEECC=$?
 [ "$FEECC" = "5" ] && pass "fetch-engine still errors when no upstream is recorded and no flag given" || fail "fetch-engine wrongly succeeded with empty registry and no flag (exit $FEECC)"
 echo "$FEEOUT" | grep -q "needs --from <dir> or --repo <url>" && pass "fetch-engine empty-registry error message preserved" || fail "fetch-engine missing-args message changed"
 
+echo "=== T121: init journals every manifest op the fresh scaffold already embodies, so compare reads current ==="
+JN="$BASE/journal"
+JNENG="$(mk_proj "$JN" JournalProj)"
+JN_HAVE="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((j.engine.operations_applied||[]).length))' "$JN/AIDOCS/_index.json")"
+JN_WANT="$(node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(m.operations.length))' "$REAL/AIDOCS/MANIFEST.json")"
+[ "$JN_HAVE" = "$JN_WANT" ] && [ "$JN_WANT" != "0" ] && pass "a fresh init journals all $JN_WANT manifest ops" || fail "fresh journal holds $JN_HAVE of $JN_WANT ops"
+JNSRC="$BASE/journalsrc"
+mk_src "$JNSRC" --real-manifest
+node "$JNENG" fetch-engine --from "$JNSRC" >/dev/null 2>&1
+node "$JNENG" compare 2>&1 | grep -q "up to date - no operations pending" && pass "compare on a fresh project at the source version reads current, nothing pending" || fail "compare reported pending ops on a fresh current project"
+
 echo "=== T57: upgrade prints command flag renames from skill_rename ops applied this run (W1) ==="
 RN57="$BASE/renamesummary"
 RNENG_57="$(mk_proj "$RN57" RnSummary)"
@@ -221,3 +232,14 @@ node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
 node "$WMKENG" fetch-engine --from "$WMKSRC" >/dev/null 2>&1
 WMKOUT2="$(node "$WMKENG" upgrade 2>&1)"
 echo "$WMKOUT2" | grep -q "migrated legacy watermark key" && fail "second upgrade still reports a watermark migration (not idempotent)" || pass "second upgrade no-ops the watermark migration (idempotent)"
+
+echo "=== T139: a local fetch carries only what an engine command reads, never the user's docs or the machine-local MCP config ==="
+FX="$BASE/fetchscope"
+FXENG="$(mk_proj "$FX" FetchScope)"
+FXSRC="$BASE/fetchscopesrc"
+mk_src "$FXSRC" --empty-manifest
+mkdir -p "$FXSRC/WDDOCS"; printf 'local status\n' > "$FXSRC/WDDOCS/SESSION_HANDOFF.md"; printf '{}\n' > "$FXSRC/.mcp.json"
+node "$FXENG" fetch-engine --from "$FXSRC" >/dev/null 2>&1; FXE=$?
+[ "$FXE" = "0" ] && [ -f "$FX/INSTALL/engine/AIDOCS/tools/engine.mjs" ] && pass "the fetch lands the engine" || fail "fetch-engine failed or landed no engine (exit $FXE)"
+[ ! -e "$FX/INSTALL/engine/WDDOCS" ] && pass "WDDOCS stays behind" || fail "the user's docs travelled into INSTALL/engine"
+[ ! -e "$FX/INSTALL/engine/.mcp.json" ] && pass "the MCP config stays behind" || fail "the machine-local MCP config travelled into INSTALL/engine"

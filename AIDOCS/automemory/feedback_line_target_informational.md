@@ -1,5 +1,5 @@
 ---
-name: line-target-informational
+name: feedback-line-target-informational
 description: The file-size target and the audit census are information, never a gate that slows a change.
 metadata:
   type: feedback

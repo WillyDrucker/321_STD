@@ -160,9 +160,9 @@ function checkAutoMemory(index) {
 }
 
 // The rule index (MEMORY.md in the seed, and in the runtime when the registry can reach
-// it) is a pointer list, and a pointer to a missing file is always a bug: the index
-// reconcile once carried upstream's placeholder-profile line into a project that had
-// renamed the profile, and nothing read the index to notice.
+// it) is a pointer list, and a pointer to a missing file is always a bug. history: the
+// index reconcile once carried upstream's placeholder-profile line into a project that
+// had renamed the profile, and nothing read the index to notice.
 function checkAutoMemoryIndex(index) {
   const issues = [];
   const homes = [];
@@ -185,8 +185,8 @@ function checkAutoMemoryIndex(index) {
 
 // The registry's skills.dispatch.<key>.description is a hand-maintained copy of each skill
 // body's frontmatter description:. When a body changes, the registry silently keeps the old
-// text - ours drifted and nothing caught it. `sync` repairs it, but nothing tells you to run
-// `sync`, so this is the thing that tells you.
+// text. `sync` repairs it, but nothing tells you to run `sync`, so this is the thing that
+// tells you. history: the template's own dispatch drifted this way and nothing caught it.
 function checkDispatchDescriptions(index) {
   const issues = [];
   const dispatch = index.skills?.dispatch || {};

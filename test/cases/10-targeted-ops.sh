@@ -1,4 +1,4 @@
-# 10-targeted-ops.sh - the 0.1.19 targeted ops absorbed from LIFT321-app.
+# 10-targeted-ops.sh - the targeted staging ops absorbed from a downstream app.
 #
 #   T111-T112 amend_bullet rewrites ONE bullet in place (seat and marker kept), and an
 #             ambiguous or missing match refuses before any write.
@@ -24,7 +24,7 @@ grep -q "Tests: 12 across 3 suites" "$TO/AIDOCS/Targeted_SESSION.md" && pass "th
 grep -q "Tests: 10" "$TO/AIDOCS/Targeted_SESSION.md" && fail "the old bullet survived" || pass "the old text is gone"
 sed -n '/## Current State/,/^---/p' "$TO/AIDOCS/Targeted_SESSION.md" | grep "^- " | sed -n '2p' | grep -q "Tests: 12" && pass "the amended bullet kept its seat" || fail "the amended bullet moved"
 sed -n '/## LIFO/,$p' "$TO/AIDOCS/Targeted_SESSION.md" | grep "^- " | sed -n '2p' | grep -q "middle event, corrected" && pass "the LIFO bullet was amended in place (not prepended)" || fail "the LIFO amend did not land in its seat"
-grep -q "middle-event-corrected" "$TO/AIDOCS/tools/state.json" && pass "an amended bullet counts as captured in the watermark" || fail "amend_bullet left no watermark fingerprint"
+grep -q "middle-event-corrected" "$TO/AIDOCS/tools/state.json" && pass "an amended bullet counts as captured in the watermark" || fail "amend_bullet left no watermark slug"
 
 echo "=== T112: an ambiguous or missing match refuses before any write ==="
 printf '# Targeted - BACKLOG\n\n**Purpose:** t.\n\n## Features\n\n- **Fix A.** one _(source: user)_\n- **Fix B.** two _(source: user)_\n\n## Ideas\n\n- an idea\n' > "$TO/AIDOCS/Targeted_BACKLOG.md"

@@ -4,7 +4,21 @@
 // and a flat key add where the key names themselves contain dots). Pure, no I/O.
 // The driver persists the index at its single commit point (skipped in dry-run),
 // so mutating in-memory during dry-run keeps later ops reading a consistent view.
-// Handler contract and dispatch live in upgradeOperations.mjs.
+// Handler contract and dispatch live in upgradeOps.mjs.
+
+// A dotted path never walks a prototype segment. The manifest is trusted, but a typo or
+// a hostile fork must not reach Object.prototype through the in-memory registry.
+const PROTOTYPE_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+function segments(dottedPath) {
+  const parts = String(dottedPath).split(".");
+  const bad = parts.find((p) => PROTOTYPE_SEGMENTS.has(p));
+  if (bad) throw new Error(`registry path "${dottedPath}" carries a prototype segment ("${bad}")`);
+  return parts;
+}
+// A dictionary key is used literally (it may carry dots), so the whole name is checked.
+function literalKey(name) {
+  if (PROTOTYPE_SEGMENTS.has(String(name))) throw new Error(`registry key "${name}" is a prototype segment`);
+}
 
 export function applyRegistryExtend(op, index, _source, _root, dryRun) {
   // Additive only: never overwrite a present value. Project-tuned numbers (caps,
@@ -13,7 +27,7 @@ export function applyRegistryExtend(op, index, _source, _root, dryRun) {
   // is not persisted unless the caller writes _index.json (which dry-run skips).
   // Skipping the mutation in dry-run would let a later op read a stale view of the
   // index, which would misreport whether that later op would no-op or apply.
-  const parts = op.path.split(".");
+  const parts = segments(op.path);
   let cursor = index;
   for (let i = 0; i < parts.length - 1; i++) {
     if (cursor[parts[i]] === undefined || cursor[parts[i]] === null) cursor[parts[i]] = {};
@@ -70,6 +84,8 @@ export function applyDictionaryRename(op, index, _source, _root, dryRun) {
   if (parent == null || typeof parent !== "object") {
     return { applied: false, note: `${op.dictionary} not found, nothing to rename` };
   }
+  literalKey(op.from);
+  literalKey(op.to);
   const fromPresent = parent[op.from] !== undefined;
   const toPresent = parent[op.to] !== undefined;
   if (!fromPresent && toPresent) return { applied: false, note: `${op.dictionary}.${op.from} -> .${op.to} already migrated` };
@@ -98,6 +114,7 @@ export function applyDictionaryExtend(op, index, _source, _root, dryRun) {
     parent = {};
     writeNestedKey(index, op.dictionary, parent);
   }
+  literalKey(op.key);
   if (parent[op.key] !== undefined) return { applied: false, note: `${op.dictionary}.${op.key} already set, preserved` };
   parent[op.key] = op.value;
   void dryRun;
@@ -108,7 +125,7 @@ export function applyDictionaryExtend(op, index, _source, _root, dryRun) {
 // on any missing segment so the caller can distinguish presence from absent-value cases.
 function readNestedKey(obj, dottedPath) {
   let cursor = obj;
-  for (const p of dottedPath.split(".")) {
+  for (const p of segments(dottedPath)) {
     if (cursor == null || typeof cursor !== "object") return undefined;
     cursor = cursor[p];
   }
@@ -116,7 +133,7 @@ function readNestedKey(obj, dottedPath) {
 }
 
 function writeNestedKey(obj, dottedPath, value) {
-  const parts = dottedPath.split(".");
+  const parts = segments(dottedPath);
   let cursor = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (cursor[parts[i]] == null) cursor[parts[i]] = {};
@@ -126,7 +143,7 @@ function writeNestedKey(obj, dottedPath, value) {
 }
 
 function deleteNestedKey(obj, dottedPath) {
-  const parts = dottedPath.split(".");
+  const parts = segments(dottedPath);
   let cursor = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (cursor == null || typeof cursor !== "object") return;

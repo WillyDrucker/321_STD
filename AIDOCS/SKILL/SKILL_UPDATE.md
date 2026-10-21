@@ -28,9 +28,7 @@ Each lane stages and commits independently through the validate -> commit pipeli
 
 ## -FULL mode
 
-`-Update -FULL` propagates the switch to both lanes. Step 1 runs `-UpdateSession -FULL` (rebuild SESSION from the full conversation, ignore the watermark, do not trust the prior snapshot). Step 2 runs `-UpdateMemory -FULL` (re-derive every Big-6 section against current evidence, re-walk LIFO from durable observations across the whole arc). Use when both halves of the surface have drifted - a long pause, a context switch, an interrupted prior pass. The routing decisions above are unchanged: graduated still skips the gate, the reconciliation gate still takes priority.
-
-A mixed-mode run (one lane `-FULL`, the other default) is not supported here. Run the single lane standalone if that is what you need: `/321 -UpdateSession -FULL` or `/321 -UpdateMemory -FULL`.
+`-Update -FULL` propagates the switch to both lanes, never mixed. The pass itself lives in `AIDOCS/tools/PATTERN-UPDATE-FULL.md`, loaded only on a `-FULL` run.
 
 ## Rules
 

@@ -16,12 +16,13 @@ Run `/321 -Update` first (read `AIDOCS/SKILL/SKILL_UPDATE.md` and execute) so SE
 ## Step 2: Review and stage
 
 ```bash
+node AIDOCS/tools/engine.mjs doctor
 git status --short
 git add -A
 git status --short
 ```
 
-`git add -A` honors `.gitignore`, so transient / secret / machine files stay out. Confirm the staged set is what you expect. If anything sensitive appears staged, stop and fix `.gitignore` before committing - never commit around it.
+`doctor` runs first because it reads what git actually tracks: a secret-shaped string, or a privacy-gated path that is tracked anyway, exits 20 and the push stops there. `git add -A` honors `.gitignore`, so transient / secret / machine files stay out. Confirm the staged set is what you expect. If anything sensitive appears staged, stop and fix `.gitignore` before committing - never commit around it.
 
 ## Step 3: Commit and push
 

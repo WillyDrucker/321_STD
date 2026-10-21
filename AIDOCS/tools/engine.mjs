@@ -7,6 +7,7 @@
 import { cmdBigsix } from "./lib/bigsix.mjs";
 import { cmdCommit } from "./lib/commit.mjs";
 import { cmdCompare } from "./lib/compareEngine.mjs";
+import { cmdContext } from "./lib/context.mjs";
 import { cmdDoctor } from "./lib/doctor.mjs";
 import { cmdFetchEngine } from "./lib/fetchEngine.mjs";
 import { cmdGraduate } from "./lib/graduate.mjs";
@@ -21,13 +22,14 @@ import { cmdPrivacy } from "./lib/privacy.mjs";
 import { cmdScrub } from "./lib/scrub.mjs";
 import { cmdState } from "./lib/state.mjs";
 import { cmdSync } from "./lib/sync.mjs";
+import { cmdSyncAutoMemory } from "./lib/syncAutoMemory.mjs";
 import { cmdSyncBacklog } from "./lib/syncBacklogIssue.mjs";
 import { cmdUpgrade } from "./lib/upgrade.mjs";
 import { cmdValidate } from "./lib/validate.mjs";
 import { cmdVerdict } from "./lib/verdict.mjs";
 import { cmdWatermark } from "./lib/watermark.mjs";
 
-const COMMANDS = ["doctor", "scrub", "sync", "sync-backlog", "upgrade", "compare", "merge-status", "orphans", "validate", "commit", "watermark", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
+const COMMANDS = ["doctor", "scrub", "sync", "sync-automemory", "sync-backlog", "upgrade", "compare", "merge-status", "orphans", "validate", "commit", "watermark", "context", "state", "privacy", "fetch-engine", "migrate-archive", "migrate-restore", "migrate-import", "verdict", "bigsix", "graduate", "init", "help"];
 
 function main() {
   const [, , cmd, ...rawArgs] = process.argv;
@@ -66,6 +68,7 @@ function main() {
     case "privacy":  cmdPrivacy(index, args); break;
     case "sync":     cmdSync(index, args); break;
     case "sync-backlog": cmdSyncBacklog(index); break;
+    case "sync-automemory": cmdSyncAutoMemory(index, args); break;
     case "upgrade":  cmdUpgrade(index, args); break;
     case "compare":  cmdCompare(index); break;
     case "merge-status": cmdMergeStatus(index, args); break;
@@ -73,6 +76,7 @@ function main() {
     case "validate": cmdValidate(index, args); break;
     case "commit":   cmdCommit(index, args); break;
     case "watermark": cmdWatermark(index, args); break;
+    case "context":  cmdContext(index, args); break;
     case "migrate-import": cmdMigrateImport(index, args); break;
     case "graduate": cmdGraduate(index, args); break;
   }
@@ -90,7 +94,9 @@ Global:
 
 Commands:
   doctor    Validate this project against its registry: registry resolves, memory
-            and session shapes, auto-memory pointers, banned prose. Read-only.
+            and session shapes, auto-memory pointers, what git would publish (a
+            secret-shaped string, a privacy-gated path tracked or unignored), banned
+            prose. Read-only.
             Exit: 20 structural break, 10 content-only debt (structure intact), 0 clean.
             In a git repo, also prints a commit-state advisory when the committed
             engine.version and the working tree disagree (applied-but-uncommitted, or a revert).
@@ -106,6 +112,12 @@ Commands:
             source of truth, the issue is a generated copy). OPT-IN: a clean no-op
             unless integrations.backlog_issue is set in _index.json. Fails soft when
             gh is missing or unauthenticated, so it never breaks a commit pipeline.
+  sync-automemory
+            Run the two-way auto-memory step on demand: upstream's rules from the seed
+            into the runtime, the project's own rules and profile from the runtime into
+            the seed, both rule indexes reconciled. upgrade runs the same step after its
+            copy. The fetched engine defines upstream while INSTALL/engine is present,
+            otherwise the project's own seed does. [--dry-run]
   upgrade   Drive the project up to the fetched engine's manifest plus refresh the
             engine-class paths (AIDOCS/tools, AIDOCS/SKILL, AIDOCS/automemory,
             .claude/skills/321/SKILL.md).
@@ -144,14 +156,19 @@ Commands:
   validate  Check a staging file's actions are well-formed. Read-only.
             --skill <updatesession | updatememory>
   commit    Apply a staging file. Two-phase: simulate, then write. Stamps state,
-            records this run's bullet fingerprints, clears staging on success.
+            records this run's bullet slugs, clears staging on success.
             --skill <updatesession | updatememory>
   watermark Print the skill's watermark: last_committed_at plus recent_captured (a
             rolling window of the last ~8 lifo_insert slugs, newest first, accumulated
             across recent commits). Read-only lookup over state.json. The lean -Update
-            path scopes the AI to "conversation since the watermark". The fingerprints
+            path scopes the AI to "conversation since the watermark". The slugs
             answer "did I capture this arc in the last few runs?" without re-reading
             SESSION / MEMORY.
+            [--skill <updatesession | updatememory>] (omit for both)
+  context   One read for the routine -Update pass: the repository's branch, short status
+            and last ten subjects (or "none" when the project is not a repository), then
+            the lane's watermark and recent slugs. One command on the path the prime goal
+            keeps lean. Read-only.
             [--skill <updatesession | updatememory>] (omit for both)
   fetch-engine  Fetch a 321 engine source into INSTALL/engine (for -UpdateSync / re-setup).
             [--from <dir>] copy a local tree, or [--repo <url> --ref <branch>] clone.

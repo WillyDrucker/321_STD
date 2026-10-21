@@ -11,10 +11,12 @@ import { dirname, join, relative, resolve } from "node:path";
 import { flag } from "./args.mjs";
 import { installEngineDir, repoRoot } from "./paths.mjs";
 
-// test/ is excluded because no engine command reads it (the regression suite runs
-// from the source repo via $RENG, not from a fetched copy). Including it would
-// transit ~1.5MB into INSTALL/engine just to have cleanup delete it.
-const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules", "test"]);
+// Only what an engine command reads from the fetched tree travels. test/ is excluded
+// because the suite runs from the source repo, WDDOCS because the user's docs are never
+// templated (init lays the folders itself), and the machine-local MCP config because a
+// fetch is not the place for it. Each would transit into INSTALL/engine just to have
+// cleanup delete it.
+const EXCLUDE = new Set(["INSTALL", ".git", "TEMP", "node_modules", "test", "WDDOCS", ".mcp.json"]);
 
 export function cmdFetchEngine(args) {
   const from = flag(args, "--from");
@@ -49,8 +51,12 @@ export function cmdFetchEngine(args) {
     return;
   }
   if (!repo) { console.error("fetch-engine needs --from <dir> or --repo <url>"); process.exit(5); }
+  // A value that begins with "-" would read as a git option (an --upload-pack=<command>
+  // runs it), and engine.upstream is registry data, so refuse the shape and end the option
+  // list before the URL.
+  if (repo.startsWith("-") || ref.startsWith("-")) { console.error("fetch-engine: --repo and --ref must not begin with '-'"); process.exit(5); }
   try {
-    execFileSync("git", ["clone", "--depth", "1", "--branch", ref, "--quiet", repo, dest], { stdio: ["ignore", "pipe", "ignore"] });
+    execFileSync("git", ["clone", "--depth", "1", "--branch", ref, "--quiet", "--", repo, dest], { stdio: ["ignore", "pipe", "ignore"] });
     console.log(`fetch-engine: cloned ${repo}@${ref} -> ${dest}`);
   } catch (e) {
     console.error(`fetch-engine: clone failed (offline?): ${e.message}`);
