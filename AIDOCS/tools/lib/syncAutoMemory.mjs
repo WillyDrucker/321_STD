@@ -47,15 +47,17 @@ function snapshotRuntimeFile(file) {
   } catch { /* best-effort */ }
 }
 
-// Rebuild an index in upstream order (upstream's hook text wins for the rules it ships),
-// then the project's own lines: those already in this home's index, plus any from the
-// other home whose file now sits here, so a promoted or mirrored rule brings its pointer
-// along. Deduped by target, nothing dropped. An upstream pointer whose target is absent
-// is left out: the placeholder profile is project-owned and never copied, so on a project
-// that renamed it the line would dangle beside the real profile's own pointer.
-function reconcileIndex(upstreamMd, ownMd, otherMd, eol, dir) {
+// Rebuild an index in upstream order (upstream's hook text wins for the rules it ships,
+// except a rule whose seed path sits in customizations[]: the copy step kept its body, so
+// the seed's own line stands in for upstream's in both homes), then the project's own
+// lines: those already in this home's index, plus any from the other home whose file now
+// sits here, so a promoted or mirrored rule brings its pointer along. Deduped by target,
+// nothing dropped. An upstream pointer whose target is absent is left out: the placeholder
+// profile is project-owned and never copied, so on a project that renamed it the line
+// would dangle beside the real profile's own pointer.
+function reconcileIndex(upstreamMd, ownMd, otherMd, eol, dir, customizedHooks) {
   const here = (l) => { const t = linkTarget(l); return !t || existsSync(join(dir, t)); };
-  const upstream = bullets(upstreamMd).filter(here);
+  const upstream = bullets(upstreamMd).filter(here).map((l) => customizedHooks.get(linkTarget(l)) ?? l);
   const shipped = new Set(bullets(upstreamMd).map(linkTarget).filter(Boolean));
   const seen = new Set();
   const own = [];
@@ -175,12 +177,14 @@ export function syncAutoMemory(source, index, dryRun) {
   let indexes = 0;
   if (existsSync(srcIndex)) {
     const upstreamMd = readFileSync(srcIndex, "utf8");
+    const customized = new Set((index.customizations || []).filter((p) => p.startsWith(`${seedRel}/`)).map((p) => p.slice(seedRel.length + 1)));
+    const customizedHooks = new Map(bullets(read(join(seedDir, "MEMORY.md"))).filter((l) => customized.has(linkTarget(l))).map((l) => [linkTarget(l), l]));
     for (const [dir, other] of [[seedDir, runtimeDir], [runtimeDir, seedDir]]) {
       if (!dir) continue;
       const target = join(dir, "MEMORY.md");
       const current = read(target);
       const eol = current.includes("\r\n") ? "\r\n" : "\n"; // do not churn a CRLF project
-      const next = reconcileIndex(upstreamMd, current, other ? read(join(other, "MEMORY.md")) : "", eol, dir);
+      const next = reconcileIndex(upstreamMd, current, other ? read(join(other, "MEMORY.md")) : "", eol, dir, customizedHooks);
       if (next === current) continue;
       if (!dryRun) writeFileSync(target, next, "utf8");
       indexes++;

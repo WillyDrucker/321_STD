@@ -17,6 +17,8 @@
 #             drift, and a legacy mark as what it is.
 #   T137      A seed at a registry path of its own is refreshed from upstream with the
 #             customizations[] opt-out, and a pyproject optional group names its packages.
+#   T140      A shipped rule listed in customizations[] keeps the seed's own index line in
+#             both homes, as the copy step keeps its body.
 #
 # Sourced after 08.
 
@@ -260,3 +262,23 @@ printf '[project]\nname = "pysix"\nversion = "0.1.0"\ndependencies = [\n  "reque
 PYOUT="$(node "$PYENG" doctor 2>&1)"
 echo "$PYOUT" | grep -q "added: coverage, pytest" && pass "an optional group names its packages, sorted" || fail "the optional group's packages were not seen (output: $PYOUT)"
 echo "$PYOUT" | grep -q "added: .*\btest\b" && fail "the group name was read as a package" || pass "the group name is not a package"
+
+echo "=== T140: a shipped rule listed in customizations[] keeps the seed's own index line in both homes ==="
+CH="$BASE/customhook"
+CHENG="$(mk_proj "$CH" CustomHook)"
+CHRT="$BASE/customhook-runtime"; mkdir -p "$CHRT"
+node -e 'const fs=require("fs"),f=process.argv[1];const j=JSON.parse(fs.readFileSync(f));j.auto_memory={seed:"./AIDOCS/automemory",path:process.argv[2]};j.customizations=["AIDOCS/automemory/feedback_case_convention.md"];fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$CH/AIDOCS/_index.json" "$CHRT"
+printf -- '---\nname: feedback-case-convention\ndescription: ours\n---\n\nOUR CASE RULE\n' > "$CH/AIDOCS/automemory/feedback_case_convention.md"
+cp "$CH/AIDOCS/automemory/feedback_case_convention.md" "$CHRT/feedback_case_convention.md"
+sed -i 's#^- \[Case convention\](feedback_case_convention.md) - .*#- [Case convention](feedback_case_convention.md) - OUR HOOK.#' "$CH/AIDOCS/automemory/MEMORY.md"
+grep -q "OUR HOOK" "$CH/AIDOCS/automemory/MEMORY.md" || fail "fixture: the seed index did not take the project hook"
+cp "$REAL/AIDOCS/automemory/MEMORY.md" "$CHRT/MEMORY.md"
+SRC_CH="$BASE/customhook-src"
+mk_src "$SRC_CH" --version 9.9.9 --empty-manifest >/dev/null 2>&1
+mkdir -p "$CH/INSTALL"; cp -r "$SRC_CH" "$CH/INSTALL/engine"
+node "$CHENG" upgrade >/dev/null 2>&1; CHX=$?
+[ "$CHX" = "0" ] || fail "upgrade failed (exit $CHX)"
+grep -q "OUR CASE RULE" "$CH/AIDOCS/automemory/feedback_case_convention.md" && pass "the customized body survived the copy" || fail "the copy step overwrote a customized rule"
+grep -q "OUR HOOK" "$CH/AIDOCS/automemory/MEMORY.md" && pass "the seed index kept the project's own hook line" || fail "the seed index reverted to upstream's hook text"
+grep -q "OUR HOOK" "$CHRT/MEMORY.md" && pass "the runtime index took the seed's line for the customized rule" || fail "the runtime index kept upstream's hook text for a customized rule"
+[ "$(grep -c "feedback_case_convention.md" "$CHRT/MEMORY.md")" = "1" ] && pass "one line per rule in the runtime index" || fail "the runtime index carries two lines for the customized rule"

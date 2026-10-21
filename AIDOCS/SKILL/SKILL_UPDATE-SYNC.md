@@ -142,7 +142,7 @@ A file in any of these is replaced if:
 - Its project-relative path is NOT listed in `customizations[]`, AND
 - Its path is not **project-owned** (`AIDOCS/automemory/MEMORY.md`, the rule index, and `AIDOCS/automemory/user_*.md`, the profile). These live inside an engine-class directory but belong to the project, so the copy step skips them and reports them apart from `customizations[]`.
 
-**Auto-memory gets a second step the copy cannot do.** The rules the model actually loads live OUTSIDE the project root (`auto_memory.path`), and the copy step resolves every path against the root. So `syncAutoMemory` mirrors the freshly-copied seed into the runtime and reconciles the rule index (upstream's hook text wins for the rules it ships, the project's pointers to its own rules are preserved). Without it an upstream rule fix would land in the repo and change nothing the AI reads. A rule the project authored itself survives by absence, and nothing is deleted.
+**Auto-memory gets a second step the copy cannot do.** The rules the model actually loads live OUTSIDE the project root (`auto_memory.path`), and the copy step resolves every path against the root. So `syncAutoMemory` mirrors the freshly-copied seed into the runtime and reconciles the rule index (upstream's hook text wins for the rules it ships, a rule listed in `customizations[]` keeps the seed's own line, and the project's pointers to its own rules are preserved). Without it an upstream rule fix would land in the repo and change nothing the AI reads. A rule the project authored itself survives by absence, and nothing is deleted.
 
 A graduated project keeps `-Setup` deregistered. If the copy lands `SKILL_SETUP.md`, delete it after the copy.
 

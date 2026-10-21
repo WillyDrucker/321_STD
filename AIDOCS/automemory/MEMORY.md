@@ -1,5 +1,5 @@
 - [Code comments](feedback_code_comments.md) - four lines is the default, module headers included. Rewrite a long comment in place. Never truncate mechanically, never hand-file into the memory track.
-- [Naming](feedback_naming.md) - name it before you write it. A name states what the thing owns. Renames move the name and every reference in one atomic pass.
+- [Naming](feedback_naming.md) - name it before you write it. A name states what the thing owns. Renames move the name and every reference in one atomic pass. No shim for the old name.
 - [Case convention](feedback_case_convention.md) - framework and established names win first. Otherwise UPPERCASE is documentation, lowercase is code. No generic files, and a doc folder names its files after itself.
 - [No em dashes](feedback_no_em_dashes.md) - no em dashes, no clause-joining semicolons, in any prose we author. Hyphens or a rewrite.
 - [No versions in code](feedback_no_versions_in_code.md) - no release stamps in source. Schema versions and the project's single version source are exempt.
