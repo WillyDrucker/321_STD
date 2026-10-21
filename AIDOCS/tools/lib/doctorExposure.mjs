@@ -16,14 +16,17 @@ const MAX_BYTES = 512 * 1024;
 
 // The shapes a leaked credential takes. Every prefix is followed by a class bracket in this
 // source, so the scan never matches its own definitions. A vendor shape is exempt only when
-// the match reads as a documented example. An assignment's value is exempt when it reads as
-// a placeholder, so a tracked .env.example passes, and a real value that happens to carry a
-// placeholder word or a dollar sign is accepted as the price of that.
+// the match reads as a documented example. A shape whose prefix is an everyday syllable
+// (sk-) also needs a non-word left boundary and both a digit and a capital in the match, so
+// a kebab-case slug ending a word in sk never reads as a key. An assignment's value is
+// exempt when it reads as a placeholder, so a tracked .env.example passes, and a real value
+// that happens to carry a placeholder word or a dollar sign is accepted as the price of that.
+const MIXED = true;
 const VENDOR_SHAPES = [
   ["an AWS access key", /AKIA[0-9A-Z]{16}/],
   ["a GitHub token", /gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}/],
   ["a Slack token", /xox[baprs]-[A-Za-z0-9-]{10,}/],
-  ["an API key", /sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}/],
+  ["an API key", /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}/, MIXED],
   ["a private key", /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
   ["a JWT", /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/],
 ];
@@ -52,7 +55,7 @@ const ALWAYS_LOCAL = [
   [/^WDDOCS\/RELEASES\/(?!\.gitkeep$)/, "a release runbook"],
   [/^INSTALL\/engine\//, "the fetched engine"],
   [/^TEMP\//, "a scratch file"],
-  [/(?:^|\/)\.env(?!\.(?:example|sample|template)$)(?:\..+)?$/, "a .env file"],
+  [/(?:^|\/)\.env(?!(?:\..+)?\.(?:example|sample|template)$)(?:\..+)?$/, "a .env file"],
   [/(?:^|\/)\.mcp\.json$/, "the MCP config"],
   [/(?:^|\/)\.claude\/settings\.local\.json$/, "the local settings"],
 ];
@@ -88,9 +91,11 @@ function textLines(abs) {
 }
 
 function secretShape(line) {
-  for (const [label, re] of VENDOR_SHAPES) {
+  for (const [label, re, mixed] of VENDOR_SHAPES) {
     const m = re.exec(line);
-    if (m && !EXAMPLE.test(m[0])) return label;
+    if (!m || EXAMPLE.test(m[0])) continue;
+    if (mixed && !(/[A-Z]/.test(m[0]) && /[0-9]/.test(m[0]))) continue;
+    return label;
   }
   for (const [label, re] of ASSIGNMENT_SHAPES) {
     const m = re.exec(line);

@@ -10,6 +10,8 @@
 #   T131  the dotfile gates match at any depth, and a tracked path that became a folder is
 #         skipped rather than read
 #   T128  off a repository the gate is silent, and a dash-led clone target is refused
+#   T141  a kebab-case slug is not an API key, a mixed-case sk- token is, and a
+#         .env.<name>.example is an example, not a gated .env
 #
 # Sourced after 10.
 
@@ -104,3 +106,20 @@ NRCEIL="$BASE"; command -v cygpath >/dev/null 2>&1 && NRCEIL="$(cygpath -m "$BAS
 GIT_CEILING_DIRECTORIES="$NRCEIL" node "$NRENG" doctor 2>&1 | grep -A1 "\[Exposure\]" | grep -q "ok" && pass "no repository, nothing published, the gate reads ok" || fail "the gate did not read ok off a repository"
 node "$NRENG" fetch-engine --repo --upload-pack=x >/dev/null 2>&1; NRX=$?
 [ "$NRX" = "5" ] && pass "a --repo that begins with a dash is refused before git sees it (exit 5)" || fail "dash-led --repo exit was $NRX (expected 5)"
+
+echo "=== T141: a kebab-case slug is not an API key, a mixed-case sk- token is, and a .env.<name>.example is an example ==="
+printf 'the-desk-sync-landed-the-watcher-on-the-page-for-the-session\n' > "$EX/SLUGS.md"
+git -C "$EX" add SLUGS.md
+EXK="$(node "$EXENG" doctor 2>&1)"; EXKE=$?
+echo "$EXK" | grep -q 'SLUGS.md" line 1 looks like' && fail "a kebab slug was read as an API key (output: $EXK)" || pass "a kebab-case slug is not a key"
+[ "$EXKE" = "0" ] && pass "and the exit stays clean" || fail "exit was $EXKE on the slug file (output: $EXK)"
+KEY="sk-$(printf 'Ab9%.0s' $(seq 1 8))"
+printf 'OPENAI=%s\n' "$KEY" > "$EX/SLUGS.md"
+node "$EXENG" doctor 2>&1 | grep -q 'SLUGS.md" line 1 looks like an API key' && pass "a mixed-case sk- token is still a key" || fail "a real-shaped sk- token was missed"
+git -C "$EX" rm -q --cached SLUGS.md; rm -f "$EX/SLUGS.md"
+printf 'TOKEN=replace-me\n' > "$EX/.env.scripts.example"
+git -C "$EX" add .env.scripts.example
+EXE="$(node "$EXENG" doctor 2>&1)"; EXEE=$?
+echo "$EXE" | grep -q 'tracked a .env file ".env.scripts.example"' && fail "a .env.<name>.example was gated as a .env file" || pass "a .env.<name>.example is an example, not a gated .env"
+[ "$EXEE" = "0" ] && pass "and the exit stays clean" || fail "exit was $EXEE with the example tracked (output: $EXE)"
+git -C "$EX" rm -q --cached .env.scripts.example; rm -f "$EX/.env.scripts.example"
