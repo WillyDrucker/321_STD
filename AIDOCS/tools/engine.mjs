@@ -96,7 +96,8 @@ Commands:
   doctor    Validate this project against its registry: registry resolves, memory
             and session shapes, auto-memory pointers, what git would publish (a
             secret-shaped string, a privacy-gated path tracked or unignored), banned
-            prose. Read-only.
+            prose. Read-only. exposure.skip_secret_scan in the registry lists path
+            globs of third-party content (scraped pages) the secret scan skips.
             Exit: 20 structural break, 10 content-only debt (structure intact), 0 clean.
             In a git repo, also prints a commit-state advisory when the committed
             engine.version and the working tree disagree (applied-but-uncommitted, or a revert).

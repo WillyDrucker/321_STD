@@ -12,6 +12,8 @@
 #   T128  off a repository the gate is silent, and a dash-led clone target is refused
 #   T141  a kebab-case slug is not an API key, a mixed-case sk- token is, and a
 #         .env.<name>.example is an example, not a gated .env
+#   T143  a path on exposure.skip_secret_scan skips the secret scan and nothing else, and
+#         a list git cannot resolve is reported while the scan covers every file
 #
 # Sourced after 10.
 
@@ -40,19 +42,23 @@ printf 'METRO_PORT=8081\n' > "$EX/AIDOCS/ENV/Exposure_ENV_DEV.md"
 git -C "$EX" add -f AIDOCS/ENV/Exposure_ENV_DEV.md
 printf 'X=1\n' > "$EX/.env"
 git -C "$EX" add -f .env
+printf 'node code-watch.mjs exposure\n' > "$EX/AIDOCS/ENV/Exposure_ENV_CODE.md"
+git -C "$EX" add -f AIDOCS/ENV/Exposure_ENV_CODE.md
 EXG="$(node "$EXENG" doctor 2>&1)"
-echo "$EXG" | grep -q 'tracked an ENV doc "AIDOCS/ENV/Exposure_ENV_DEV.md"' && pass "a force-added ENV doc is caught (the ignore text was right, the leak was live)" || fail "tracked ENV doc not reported (output: $EXG)"
+echo "$EXG" | grep -q 'tracked an ENV doc' && fail "private mode flagged its own tracked ENV doc (output: $EXG)" || pass "private mode tracks its ENV docs without complaint"
+echo "$EXG" | grep -q 'tracked the code page ENV doc "AIDOCS/ENV/Exposure_ENV_CODE.md"' && pass "the code page ENV doc stays local in private mode too" || fail "tracked code page ENV doc not reported (output: $EXG)"
 echo "$EXG" | grep -q 'tracked a .env file ".env"' && pass "a tracked .env is caught in every mode" || fail "tracked .env not reported"
 echo "$EXG" | grep -q 'tracked a rule or profile' && fail "private mode flagged its own tracked rules" || pass "private mode tracks the rules and the profile without complaint"
-git -C "$EX" rm -q --cached AIDOCS/ENV/Exposure_ENV_DEV.md .env; rm -f "$EX/AIDOCS/ENV/Exposure_ENV_DEV.md" "$EX/.env"
+git -C "$EX" rm -q --cached AIDOCS/ENV/Exposure_ENV_CODE.md .env; rm -f "$EX/AIDOCS/ENV/Exposure_ENV_CODE.md" "$EX/.env"
 node "$EXENG" privacy --set public >/dev/null 2>&1
 node "$EXENG" doctor >/dev/null 2>&1; EXP=$?
-[ "$EXP" = "0" ] && pass "privacy --set public untracked the gated content, so the gate reads clean" || fail "the public flip left gated content tracked (exit $EXP)"
-git -C "$EX" add -f AIDOCS/automemory/user_name.md AIDOCS/Exposure_MEMORY.md
+[ "$EXP" = "0" ] && pass "privacy --set public untracked the gated content, the ENV doc included, so the gate reads clean" || fail "the public flip left gated content tracked (exit $EXP)"
+git -C "$EX" add -f AIDOCS/automemory/user_name.md AIDOCS/Exposure_MEMORY.md AIDOCS/ENV/Exposure_ENV_DEV.md
 EXPUB="$(node "$EXENG" doctor 2>&1)"
 echo "$EXPUB" | grep -q 'tracked a rule or profile "AIDOCS/automemory/user_name.md"' && pass "public mode reports a tracked profile" || fail "public mode missed a tracked profile (output: $EXPUB)"
 echo "$EXPUB" | grep -q 'tracked project knowledge "AIDOCS/Exposure_MEMORY.md"' && pass "public mode reports tracked project knowledge" || fail "public mode missed tracked knowledge"
-git -C "$EX" rm -q --cached AIDOCS/automemory/user_name.md AIDOCS/Exposure_MEMORY.md
+echo "$EXPUB" | grep -q 'tracked an ENV doc "AIDOCS/ENV/Exposure_ENV_DEV.md"' && pass "public mode reports a force-added ENV doc (the ignore text was right, the leak was live)" || fail "public mode missed a tracked ENV doc (output: $EXPUB)"
+git -C "$EX" rm -q --cached AIDOCS/automemory/user_name.md AIDOCS/Exposure_MEMORY.md AIDOCS/ENV/Exposure_ENV_DEV.md; rm -f "$EX/AIDOCS/ENV/Exposure_ENV_DEV.md"
 
 echo "=== T127: a user home path in a published doc is an advisory warning, a fixture path is not ==="
 HP="C:"'\'"Users"'\'"someone"'\'"logs"
@@ -123,3 +129,24 @@ EXE="$(node "$EXENG" doctor 2>&1)"; EXEE=$?
 echo "$EXE" | grep -q 'tracked a .env file ".env.scripts.example"' && fail "a .env.<name>.example was gated as a .env file" || pass "a .env.<name>.example is an example, not a gated .env"
 [ "$EXEE" = "0" ] && pass "and the exit stays clean" || fail "exit was $EXEE with the example tracked (output: $EXE)"
 git -C "$EX" rm -q --cached .env.scripts.example; rm -f "$EX/.env.scripts.example"
+
+echo "=== T143: a path on exposure.skip_secret_scan skips the secret scan and nothing else ==="
+setskip() { node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f));const v=process.argv[2];if(v==="-")delete j.exposure;else j.exposure={skip_secret_scan:JSON.parse(v)};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$EX/AIDOCS/_index.json" "$1"; }
+mkdir -p "$EX/vendor/capture"
+TOKEN3="AKIA$(printf 'Z%.0s' $(seq 1 16))"
+printf 'Their page ships %s.\n' "$TOKEN3" > "$EX/vendor/capture/page.txt"
+printf 'Ours leaks %s.\n' "$TOKEN3" > "$EX/OURS.md"
+printf 'X=1\n' > "$EX/vendor/capture/.env"
+git -C "$EX" add -f vendor/capture/page.txt vendor/capture/.env OURS.md
+setskip '["vendor/capture/**"]'
+EXSK="$(node "$EXENG" doctor 2>&1)"
+echo "$EXSK" | grep -q 'page.txt" line 1 looks like' && fail "a path on the skip list was still scanned (output: $EXSK)" || pass "a path on the skip list is not scanned for secrets"
+echo "$EXSK" | grep -q 'OURS.md" line 1 looks like an AWS access key' && pass "a path off the list is still scanned" || fail "the skip list reached past its paths (output: $EXSK)"
+echo "$EXSK" | grep -q 'tracked a .env file "vendor/capture/.env"' && pass "the skip list never lifts the privacy gate" || fail "a gated path on the skip list escaped the gate (output: $EXSK)"
+setskip '["../outside/**", 42]'
+EXBAD="$(node "$EXENG" doctor 2>&1)"
+echo "$EXBAD" | grep -q 'did not resolve as git pathspecs' && pass "a list git cannot resolve is reported" || fail "an unresolvable skip list was silent (output: $EXBAD)"
+echo "$EXBAD" | grep -q 'holds an entry that is not a path glob' && pass "a non-text entry is reported and ignored" || fail "a non-text entry was silent (output: $EXBAD)"
+echo "$EXBAD" | grep -q 'page.txt" line 1 looks like an AWS access key' && pass "and the scan then covers every file" || fail "an unresolvable skip list still skipped paths (output: $EXBAD)"
+setskip -
+git -C "$EX" rm -q --cached vendor/capture/page.txt vendor/capture/.env OURS.md; rm -rf "$EX/vendor" "$EX/OURS.md"

@@ -19,6 +19,8 @@
 #             customizations[] opt-out, and a pyproject optional group names its packages.
 #   T140      A shipped rule listed in customizations[] keeps the seed's own index line in
 #             both homes, as the copy step keeps its body.
+#   T142      A dry upgrade reports the auto-memory step the real one makes. It measured
+#             against the seed before the copy, so it undercounted every rule the copy refreshes.
 #
 # Sourced after 08.
 
@@ -282,3 +284,30 @@ grep -q "OUR CASE RULE" "$CH/AIDOCS/automemory/feedback_case_convention.md" && p
 grep -q "OUR HOOK" "$CH/AIDOCS/automemory/MEMORY.md" && pass "the seed index kept the project's own hook line" || fail "the seed index reverted to upstream's hook text"
 grep -q "OUR HOOK" "$CHRT/MEMORY.md" && pass "the runtime index took the seed's line for the customized rule" || fail "the runtime index kept upstream's hook text for a customized rule"
 [ "$(grep -c "feedback_case_convention.md" "$CHRT/MEMORY.md")" = "1" ] && pass "one line per rule in the runtime index" || fail "the runtime index carries two lines for the customized rule"
+
+echo "=== T142: a dry upgrade reports the auto-memory step the real upgrade makes, and writes nothing ==="
+DA="$BASE/dryautomem"
+DAENG="$(mk_proj "$DA" DryAutoMem)"
+DART="$BASE/dryautomem-runtime"; mkdir -p "$DART"
+node -e 'const fs=require("fs"),f=process.argv[1];const j=JSON.parse(fs.readFileSync(f));j.auto_memory={seed:"./AIDOCS/automemory",path:process.argv[2]};fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$DA/AIDOCS/_index.json" "$DART"
+# A seed and a runtime both behind upstream: two stale shipped rules the copy refreshes, the
+# rest of upstream's rules missing from the runtime, one project rule only the runtime holds.
+for r in feedback_code_comments.md feedback_naming.md; do
+  printf -- '---\nname: stale\ndescription: stale\n---\n\nSTALE\n' > "$DA/AIDOCS/automemory/$r"
+  cp "$DA/AIDOCS/automemory/$r" "$DART/$r"
+done
+printf -- '---\nname: reference-own\ndescription: ours\n---\n\nOWN\n' > "$DART/reference_own.md"
+printf -- '- [Own](reference_own.md) - ours.\n' > "$DART/MEMORY.md"
+SRC_DA="$BASE/dryautomem-src"
+mk_src "$SRC_DA" --version 9.9.9 --empty-manifest >/dev/null 2>&1
+mkdir -p "$DA/INSTALL"; cp -r "$SRC_DA" "$DA/INSTALL/engine"
+dahash() { (cd "$1" && find . -type f -exec md5sum {} + | sort); }
+DABEFORE="$(dahash "$DA/AIDOCS/automemory"; dahash "$DART")"
+DADRY="$(node "$DAENG" upgrade --dry-run 2>&1 | grep 'auto-memory:' | sed 's/ (dry-run)$//')"
+DAAFTER="$(dahash "$DA/AIDOCS/automemory"; dahash "$DART")"
+[ "$DABEFORE" = "$DAAFTER" ] && pass "the dry run wrote nothing to either home" || fail "the dry run changed a file in the seed or the runtime"
+rm -rf "$DA/INSTALL"; mkdir -p "$DA/INSTALL"; cp -r "$SRC_DA" "$DA/INSTALL/engine"
+DAREAL="$(node "$DAENG" upgrade 2>&1 | grep 'auto-memory:')"
+[ -n "$DAREAL" ] || fail "fixture: the real upgrade reported no auto-memory step"
+[ "$DADRY" = "$DAREAL" ] && pass "the dry run's auto-memory report matches the real run's" || fail "dry and real auto-memory reports differ. dry: [$DADRY] real: [$DAREAL]"
+echo "$DAREAL" | grep -q "upstream replaced .*feedback_code_comments.md" && pass "the real run names the replaced runtime rules" || fail "the replaced rules were not named (output: $DAREAL)"

@@ -7,11 +7,12 @@
 //     the absence of an ignore. A public repo still ships the engine so the code is
 //     usable - privacy gates the project's own knowledge, not the framework.
 //   B (privacy-gated) - the project's own memory (AIDOCS/<NAME>_*.md), auto-memory,
-//     and WDDOCS docs. private tracks them, public keeps them local (the folder
-//     skeletons publish via .gitkeep, the content does not).
-//   C (never tracked) - TEMP, ENV, secrets, staging, script state, the fetched
-//     engine, build output, and the always-local WDDOCS lanes (RELEASES deploy
-//     runbooks, SESSION_HANDOFF status). Ignored in every mode.
+//     WDDOCS docs and ENV docs. private tracks them, public keeps them local (the
+//     folder skeletons publish via .gitkeep, the content does not).
+//   C (never tracked) - TEMP, secrets (a credential file in ENV, the code page ENV
+//     doc), staging, script state, the fetched engine, build output, and the
+//     always-local WDDOCS lanes (RELEASES deploy runbooks, SESSION_HANDOFF status).
+//     Ignored in every mode.
 //
 // The 321 template repo's own .gitignore is hand-maintained ("full" mode), not
 // generated here: it ships its memory + auto-memory as the product template, so it
@@ -39,9 +40,17 @@ INSTALL/engine/
 AIDOCS/*_SETUP_ARCHIVE/*
 !AIDOCS/*_SETUP_ARCHIVE/.gitkeep
 
-# Environment docs: keep the folder, ignore contents (may hold secrets - local-only).
-AIDOCS/ENV/*
-!AIDOCS/ENV/.gitkeep
+# Environment docs: private tracks them, public keeps them local (the gate block). A doc
+# never holds a secret, so every mode ignores a credential file dropped into the folder,
+# and the code page channel doc, which names machine paths and the page's address.
+AIDOCS/ENV/**/*.key
+AIDOCS/ENV/**/*.pem
+AIDOCS/ENV/**/*.p12
+AIDOCS/ENV/**/*.pfx
+AIDOCS/ENV/**/id_rsa
+AIDOCS/ENV/**/id_ed25519
+AIDOCS/ENV/**/*.env
+AIDOCS/ENV/*_ENV_CODE.md
 
 # Staging files (transient, written by the engine, cleared on commit). Keep the folder.
 AIDOCS/tools/staging/*
@@ -91,7 +100,7 @@ build/
 
 // The Tier B ignore block, added only for public. Folder skeletons stay (.gitkeep) so
 // the structure publishes without the content.
-const PUBLIC_PATTERNS = `# Project memory + auto-memory + WDDOCS docs stay local. Flip to a private repo with
+const PUBLIC_PATTERNS = `# Project memory + auto-memory + WDDOCS docs + ENV docs stay local. Flip to a private repo with
 # \`node AIDOCS/tools/engine.mjs privacy --set private\` (then \`git add\` what you want tracked).
 AIDOCS/*_MEMORY.md
 AIDOCS/*_MEMORY_EXTENDED.md
@@ -108,6 +117,8 @@ AIDOCS/*_ARCHIVE/*
 AIDOCS/*_ARCHIVE.md
 AIDOCS/automemory/*
 !AIDOCS/automemory/.gitkeep
+AIDOCS/ENV/*
+!AIDOCS/ENV/.gitkeep
 /WDDOCS/ARCHIVE/*
 !/WDDOCS/ARCHIVE/.gitkeep
 /WDDOCS/DESIGN/*
@@ -168,6 +179,7 @@ export const TIER_B_TRACKED = [
   "AIDOCS/*_ARCHIVE",
   "AIDOCS/*_ARCHIVE.md",
   "AIDOCS/automemory",
+  "AIDOCS/ENV",
   "WDDOCS/ARCHIVE",
   "WDDOCS/DESIGN",
   "WDDOCS/IDEAS",

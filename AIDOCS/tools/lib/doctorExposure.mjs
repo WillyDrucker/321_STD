@@ -47,7 +47,8 @@ const HOME_PATH = /[A-Za-z]:[\\/]+Users[\\/]+[A-Za-z0-9_-][A-Za-z0-9_.-]*|\/(?:U
 // gitignore.mjs writes, checked against git's lists instead of the text. The dotfiles match
 // at any depth, as the ignore patterns do.
 const ALWAYS_LOCAL = [
-  [/^AIDOCS\/ENV\/(?!\.gitkeep$)/, "an ENV doc"],
+  [/^AIDOCS\/ENV\/[^/]+_ENV_CODE\.md$/, "the code page ENV doc"],
+  [/^AIDOCS\/ENV\/(?:.+\/)?(?:[^/]+\.(?:key|pem|p12|pfx|env)|id_rsa|id_ed25519)$/, "a credential file"],
   [/^AIDOCS\/tools\/staging\/(?!\.gitkeep$)/, "a staging file"],
   [/^AIDOCS\/tools\/state\.json$/, "the engine state"],
   [/^AIDOCS\/[^/]+_SETUP_ARCHIVE\/(?!\.gitkeep$)/, "a setup archive"],
@@ -63,6 +64,7 @@ const PUBLIC_LOCAL = [
   [/^AIDOCS\/[^/]+_(?:MEMORY|MEMORY_EXTENDED|SESSION|SESSION_EXTENDED|BACKLOG|DEV-AUDIT|AUTO-PUSH)\.md$/, "project knowledge"],
   [/^AIDOCS\/[^/]+_ARCHIVE(?:\/(?!\.gitkeep$)|\.md$)/, "a pruned archive"],
   [/^AIDOCS\/automemory\/(?!\.gitkeep$)/, "a rule or profile"],
+  [/^AIDOCS\/ENV\/(?!\.gitkeep$)/, "an ENV doc"],
   [/^WDDOCS\/(?:ARCHIVE|DESIGN|IDEAS)\/(?!\.gitkeep$)/, "a WDDOCS doc"],
 ];
 
@@ -90,6 +92,24 @@ function textLines(abs) {
   return buf.toString("utf8").split(/\r?\n/);
 }
 
+// exposure.skip_secret_scan: path globs for third-party content, such as scraped pages that
+// ship their own public keys. Git resolves them as pathspecs, so they match as its own rules
+// do. The privacy gate still covers these paths, and a list git cannot resolve is reported
+// and leaves the scan on every file.
+function secretScanSkips(root, index, notes) {
+  const globs = index.exposure?.skip_secret_scan;
+  if (!Array.isArray(globs) || globs.length === 0) return new Set();
+  const specs = globs.filter((g) => typeof g === "string" && g.trim()).map((g) => `:(glob)${g.trim()}`);
+  if (specs.length !== globs.length) notes.push("exposure.skip_secret_scan holds an entry that is not a path glob, which is ignored");
+  if (specs.length === 0) return new Set();
+  try {
+    return new Set(gitRead(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs]).split("\0").filter(Boolean));
+  } catch {
+    notes.push("exposure.skip_secret_scan did not resolve as git pathspecs, so the secret scan covers every file");
+    return new Set();
+  }
+}
+
 function secretShape(line) {
   for (const [label, re, mixed] of VENDOR_SHAPES) {
     const m = re.exec(line);
@@ -109,8 +129,10 @@ export function runExposureChecks(index) {
   const found = publishable(root);
   const errors = [];
   const warns = [];
+  const skipNotes = [];
   if (found) {
     const gated = index.privacy === "public" ? [...ALWAYS_LOCAL, ...PUBLIC_LOCAL] : ALWAYS_LOCAL;
+    const skip = secretScanSkips(root, index, skipNotes);
     for (const rel of found.files) {
       const tracked = found.tracked.has(rel);
       const gate = gated.find(([re]) => re.test(rel));
@@ -122,8 +144,9 @@ export function runExposureChecks(index) {
       const lines = textLines(join(root, rel));
       if (!lines) continue;
       let homePathNamed = false;
+      const scanSecrets = !skip.has(rel);
       lines.forEach((line, i) => {
-        const label = secretShape(line);
+        const label = scanSecrets ? secretShape(line) : null;
         if (label) errors.push(`"${rel}" line ${i + 1} looks like ${label} - rotate it, and if it was ever committed purge the history, a published secret stays in every clone`);
         if (!homePathNamed && HOME_PATH.test(line)) {
           warns.push(`"${rel}" line ${i + 1} carries a user home path`);
@@ -132,5 +155,7 @@ export function runExposureChecks(index) {
       });
     }
   }
-  return { errors: { Exposure: errors }, warns: { "Machine paths": warns } };
+  const warnsOut = { "Machine paths": warns };
+  if (skipNotes.length > 0) warnsOut["Secret scan skips"] = skipNotes;
+  return { errors: { Exposure: errors }, warns: warnsOut };
 }

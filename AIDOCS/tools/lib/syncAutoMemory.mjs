@@ -9,10 +9,10 @@
 // pre-upgrade snapshot first. `upgrade` runs it after the copy, and `sync-automemory` runs
 // it on demand, since the migration lifecycle never runs upgrade.
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
-import { canonicalPath, fromHomeRef, fromRoot, installEngineDir, isContained, isExternalRef, repoRoot } from "./paths.mjs";
+import { canonicalPath, fromHomeRef, fromRoot, installEngineDir, isContained, isExternalRef, isProjectOwned, repoRoot } from "./paths.mjs";
 
 const RULE = /^(feedback_|reference_|project_).+\.md$/;
 const PROFILE = /^user_.+\.md$/;
@@ -29,12 +29,27 @@ function bullets(md) {
   return md.split(/\r?\n/).filter((l) => l.trim().startsWith("- "));
 }
 
-function read(path) {
-  return existsSync(path) ? readFileSync(path, "utf8") : "";
-}
-
-function same(a, b) {
-  return existsSync(a) && existsSync(b) && readFileSync(a, "utf8") === readFileSync(b, "utf8");
+// Every read and write of the two homes goes through this view. A dry run writes nothing,
+// so it records each write it would make and later steps read those records, which keeps
+// its counts equal to the real run's. Without it each step measured the disk as it stood
+// before the steps ahead of it, and a dry upgrade undercounted what the copy step changes.
+function makeView(dryRun) {
+  const over = new Map(); // absolute path -> { text } | { gone: true }
+  const key = (p) => resolve(p);
+  const has = (p) => { const o = over.get(key(p)); return o ? !o.gone : existsSync(p); };
+  const text = (p) => { const o = over.get(key(p)); if (o) return o.gone ? "" : o.text; return existsSync(p) ? readFileSync(p, "utf8") : ""; };
+  const list = (dir) => {
+    const names = new Set(existsSync(dir) ? readdirSync(dir) : []);
+    for (const [p, o] of over) if (dirname(p) === key(dir)) (o.gone ? names.delete(basename(p)) : names.add(basename(p)));
+    return [...names];
+  };
+  return {
+    has, text, list,
+    same: (a, b) => has(a) && has(b) && text(a) === text(b),
+    copy: (from, to) => { if (dryRun) over.set(key(to), { text: text(from) }); else copyFileSync(from, to); },
+    write: (to, t) => { if (dryRun) over.set(key(to), { text: t }); else writeFileSync(to, t, "utf8"); },
+    remove: (p) => { if (dryRun) over.set(key(p), { gone: true }); else rmSync(p, { force: true }); },
+  };
 }
 
 // A runtime body about to be replaced lands in the pre-upgrade snapshot, the same net the
@@ -55,8 +70,8 @@ function snapshotRuntimeFile(file) {
 // nothing dropped. An upstream pointer whose target is absent is left out: the placeholder
 // profile is project-owned and never copied, so on a project that renamed it the line
 // would dangle beside the real profile's own pointer.
-function reconcileIndex(upstreamMd, ownMd, otherMd, eol, dir, customizedHooks) {
-  const here = (l) => { const t = linkTarget(l); return !t || existsSync(join(dir, t)); };
+function reconcileIndex(upstreamMd, ownMd, otherMd, eol, dir, customizedHooks, v) {
+  const here = (l) => { const t = linkTarget(l); return !t || v.has(join(dir, t)); };
   const upstream = bullets(upstreamMd).filter(here).map((l) => customizedHooks.get(linkTarget(l)) ?? l);
   const shipped = new Set(bullets(upstreamMd).map(linkTarget).filter(Boolean));
   const seen = new Set();
@@ -72,17 +87,30 @@ function reconcileIndex(upstreamMd, ownMd, otherMd, eol, dir, customizedHooks) {
   return [...upstream, ...own].join(eol) + eol;
 }
 
+// What the engine-class copy lays into the canonical seed, recorded on a dry upgrade so the
+// sync reads the seed the real run would read. Same skips as the copy: customizations[] and
+// the project-owned files.
+function projectCopyStep(srcDir, seedDir, customizations, v) {
+  for (const f of readdirSync(srcDir)) {
+    const from = join(srcDir, f);
+    if (!statSync(from).isFile()) continue;
+    const rel = `AIDOCS/automemory/${f}`;
+    if (customizations.has(rel) || isProjectOwned(rel)) continue;
+    if (!v.same(from, join(seedDir, f))) v.copy(from, join(seedDir, f));
+  }
+}
+
 // A seed at a non-canonical path is outside the engine-class copy, so upstream's rules
 // land in it here, with the same customizations[] opt-out the copy honors. Returns the
 // count refreshed.
-function refreshCustomSeed(srcDir, seedDir, seedRel, customizations, dryRun) {
+function refreshCustomSeed(srcDir, seedDir, seedRel, customizations, v) {
   let refreshed = 0;
   for (const f of readdirSync(srcDir).filter((n) => RULE.test(n))) {
     if (customizations.has(`${seedRel}/${f}`)) continue;
     const from = join(srcDir, f);
     const to = join(seedDir, f);
-    if (same(from, to)) continue;
-    if (!dryRun) copyFileSync(from, to);
+    if (v.same(from, to)) continue;
+    v.copy(from, to);
     refreshed++;
   }
   return refreshed;
@@ -92,23 +120,23 @@ function refreshCustomSeed(srcDir, seedDir, seedRel, customizations, dryRun) {
 // are named and snapshotted first), a project rule or profile the seed holds but the runtime
 // lacks is laid write-if-missing (the fresh-machine case), and the shipped placeholder
 // profile is laid only into a runtime that has no profile at all (the fresh-runtime case).
-function mirrorToRuntime(srcDir, seedDir, runtimeDir, dryRun) {
+function mirrorToRuntime(srcDir, seedDir, runtimeDir, dryRun, v) {
   let mirrored = 0;
   const overwritten = [];
   if (!dryRun && !existsSync(runtimeDir)) mkdirSync(runtimeDir, { recursive: true });
   const shipped = new Set(readdirSync(srcDir));
-  const runtimeHasProfile = existsSync(runtimeDir) && readdirSync(runtimeDir).some((n) => PROFILE.test(n));
-  for (const f of readdirSync(seedDir).filter((n) => RULE.test(n) || PROFILE.test(n))) {
+  const runtimeHasProfile = v.list(runtimeDir).some((n) => PROFILE.test(n));
+  for (const f of v.list(seedDir).filter((n) => RULE.test(n) || PROFILE.test(n)).sort()) {
     const from = join(seedDir, f);
     const to = join(runtimeDir, f);
-    if (same(from, to)) continue;
+    if (v.same(from, to)) continue;
     if (shipped.has(f)) {
       if (PROFILE.test(f) && runtimeHasProfile) continue;
-      if (existsSync(to)) { overwritten.push(f); if (!dryRun) snapshotRuntimeFile({ name: f, path: to }); }
-    } else if (existsSync(to)) {
+      if (v.has(to)) { overwritten.push(f); if (!dryRun) snapshotRuntimeFile({ name: f, path: to }); }
+    } else if (v.has(to)) {
       continue;                                // a project file the runtime already has: the runtime's body wins
     }
-    if (!dryRun) copyFileSync(from, to);
+    v.copy(from, to);
     mirrored++;
   }
   return { mirrored, overwritten };
@@ -117,31 +145,32 @@ function mirrorToRuntime(srcDir, seedDir, runtimeDir, dryRun) {
 // Runtime to seed. A rule or profile the project wrote that upstream does not ship is
 // unversioned while it lives only in the runtime, so the seed takes a copy, the runtime's
 // body winning. A filled profile retires the seed's placeholder.
-function promoteToSeed(srcDir, seedDir, runtimeDir, dryRun) {
+function promoteToSeed(srcDir, seedDir, runtimeDir, v) {
   let promoted = 0;
   const notes = [];
   if (!existsSync(runtimeDir)) return { promoted, notes };
   const shipped = new Set(readdirSync(srcDir));
-  const own = readdirSync(runtimeDir).filter((n) => (RULE.test(n) || PROFILE.test(n)) && !shipped.has(n));
+  const own = v.list(runtimeDir).filter((n) => (RULE.test(n) || PROFILE.test(n)) && !shipped.has(n));
   for (const f of own) {
     const from = join(runtimeDir, f);
     const to = join(seedDir, f);
-    if (same(from, to)) continue;
-    if (!dryRun) copyFileSync(from, to);
+    if (v.same(from, to)) continue;
+    v.copy(from, to);
     promoted++;
   }
   const placeholder = join(seedDir, PLACEHOLDER_PROFILE);
   const filled = own.some((n) => PROFILE.test(n));
-  if (filled && existsSync(placeholder) && !existsSync(join(runtimeDir, PLACEHOLDER_PROFILE))) {
-    if (!dryRun) rmSync(placeholder, { force: true });
+  if (filled && v.has(placeholder) && !v.has(join(runtimeDir, PLACEHOLDER_PROFILE))) {
+    v.remove(placeholder);
     notes.push(`the seed's ${PLACEHOLDER_PROFILE} placeholder retired, the runtime carries the filled profile`);
   }
   return { promoted, notes };
 }
 
 // Returns a report for the caller's output, or null when there was nothing to do. `source`
-// is the tree whose AIDOCS/automemory defines what upstream ships.
-export function syncAutoMemory(source, index, dryRun) {
+// is the tree whose AIDOCS/automemory defines what upstream ships. `afterCopy` says the
+// engine-class copy ran first, so a dry run lays that copy into its view before measuring.
+export function syncAutoMemory(source, index, dryRun, { afterCopy = false } = {}) {
   const seedRel = (index.auto_memory?.seed || "./AIDOCS/automemory").replace(/^\.\//, "");
   const seedDir = fromRoot(seedRel);
   const srcDir = join(source, "AIDOCS", "automemory");
@@ -149,10 +178,14 @@ export function syncAutoMemory(source, index, dryRun) {
   // A registry value is data. One with a ".." in it would read and write another tree.
   if (!isContained(repoRoot(), seedDir)) return `auto-memory: auto_memory.seed "${seedRel}" escapes the project root, refusing to sync`;
 
+  const v = makeView(dryRun);
+  const customizations = new Set(index.customizations || []);
   const notes = [];
   if (canonicalPath(seedDir) !== canonicalPath(fromRoot("AIDOCS/automemory"))) {
-    const refreshed = refreshCustomSeed(srcDir, seedDir, seedRel, new Set(index.customizations || []), dryRun);
+    const refreshed = refreshCustomSeed(srcDir, seedDir, seedRel, customizations, v);
     if (refreshed) notes.push(`${refreshed} upstream rule(s) refreshed in the seed at ${seedRel}, which the copy step does not reach`);
+  } else if (dryRun && afterCopy) {
+    projectCopyStep(srcDir, seedDir, customizations, v);
   }
 
   const pathRef = index.auto_memory?.path;
@@ -165,8 +198,8 @@ export function syncAutoMemory(source, index, dryRun) {
 
   let mirrored = 0, promoted = 0, overwritten = [];
   if (runtimeDir) {
-    ({ mirrored, overwritten } = mirrorToRuntime(srcDir, seedDir, runtimeDir, dryRun));
-    const up = promoteToSeed(srcDir, seedDir, runtimeDir, dryRun);
+    ({ mirrored, overwritten } = mirrorToRuntime(srcDir, seedDir, runtimeDir, dryRun, v));
+    const up = promoteToSeed(srcDir, seedDir, runtimeDir, v);
     promoted = up.promoted;
     notes.push(...up.notes);
   }
@@ -177,16 +210,16 @@ export function syncAutoMemory(source, index, dryRun) {
   let indexes = 0;
   if (existsSync(srcIndex)) {
     const upstreamMd = readFileSync(srcIndex, "utf8");
-    const customized = new Set((index.customizations || []).filter((p) => p.startsWith(`${seedRel}/`)).map((p) => p.slice(seedRel.length + 1)));
-    const customizedHooks = new Map(bullets(read(join(seedDir, "MEMORY.md"))).filter((l) => customized.has(linkTarget(l))).map((l) => [linkTarget(l), l]));
+    const customized = new Set([...customizations].filter((p) => p.startsWith(`${seedRel}/`)).map((p) => p.slice(seedRel.length + 1)));
+    const customizedHooks = new Map(bullets(v.text(join(seedDir, "MEMORY.md"))).filter((l) => customized.has(linkTarget(l))).map((l) => [linkTarget(l), l]));
     for (const [dir, other] of [[seedDir, runtimeDir], [runtimeDir, seedDir]]) {
       if (!dir) continue;
       const target = join(dir, "MEMORY.md");
-      const current = read(target);
+      const current = v.text(target);
       const eol = current.includes("\r\n") ? "\r\n" : "\n"; // do not churn a CRLF project
-      const next = reconcileIndex(upstreamMd, current, other ? read(join(other, "MEMORY.md")) : "", eol, dir, customizedHooks);
+      const next = reconcileIndex(upstreamMd, current, other ? v.text(join(other, "MEMORY.md")) : "", eol, dir, customizedHooks, v);
       if (next === current) continue;
-      if (!dryRun) writeFileSync(target, next, "utf8");
+      v.write(target, next);
       indexes++;
     }
   }

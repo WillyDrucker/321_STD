@@ -2,7 +2,7 @@
 
 **Purpose:** Reference for organizing `AIDOCS/ENV/` documentation. Loaded on demand when a project's environment docs grow beyond a single install guide. Not loaded at session start.
 
-`AIDOCS/ENV/` holds setup, commands, secrets, and platform notes - operational documentation an AI reads when the question is operational, not when reasoning about code. A fresh project often starts with one install guide and grows from there.
+`AIDOCS/ENV/` holds setup, commands, where each secret lives, and platform notes - operational documentation an AI reads when the question is operational, not when reasoning about code. A fresh project often starts with one install guide and grows from there.
 
 ## Naming convention
 
@@ -47,13 +47,13 @@ Keep flat (no subfolder) when:
 
 ## Privacy gates
 
-ENV/ docs frequently carry secrets (account IDs, server hostnames, credential patterns). No privacy mode in `_index.json` tracks them:
+ENV/ docs carry operational detail (account names, hosts, the commands that reach them), never a secret itself. A password, key or token lives in `.env`, a platform's secret store or a machine-local key file, and the doc names where. Whether git tracks the docs follows the privacy mode in `_index.json`:
 
-- **`private`** - `AIDOCS/ENV/` contents are gitignored. Docs live on the dev workstation only.
-- **`public`** - same gate as private. Never commit env docs from a public repo.
-- **`full`** - the template repository's own hand-maintained mode, refused for a project. ENV/ contents stay ignored there too.
+- **`private`** - `AIDOCS/ENV/` docs are tracked, so they travel with the private repo and recover with it when a workstation dies.
+- **`public`** - `AIDOCS/ENV/` contents are gitignored and live on the dev workstation only. Never commit env docs from a public repo.
+- **`full`** - the template repository's own hand-maintained mode, refused for a project. ENV/ contents stay ignored there.
 
-A doc that names a real account ID, a real API endpoint, or a real password never ships. The `.gitignore` rule on `AIDOCS/ENV/` is the gate in every mode, and `doctor` reports an ENV doc that git tracks or would add anyway.
+Two things stay local in every mode: a credential file dropped into the folder (`.key`, `.pem`, `.p12`, `.pfx`, `.env`, an SSH private key) and the code page channel doc (`<PROJECT>_ENV_CODE.md`), which names machine paths and the page's address. `doctor` reads what git tracks and would add, so it reports a gated path that slipped through and a secret-shaped string in any tracked doc.
 
 ## What kinds of docs belong here
 

@@ -1,5 +1,5 @@
 # 03-privacy-init.sh - privacy modes and the .gitignore tiers they generate (public gates
-# AIDOCS/automemory and pruned *_ARCHIVE.md, private tracks them, full is the template
+# AIDOCS/automemory, ENV docs and pruned *_ARCHIVE.md, private tracks them, full is the template
 # repo exemption), runtime privacy flips with custom-ignore preservation, drift detection
 # (public-without-gate is a leak error, private-with-gate is a drift warning), the init
 # --force data-loss guard, --name validation across the migrate commands, fetch-engine
@@ -17,11 +17,14 @@ grep -q '"privacy": "public"' "$PUB/AIDOCS/_index.json" && pass "public install 
 grep -q 'Privacy gate (public) - BEGIN' "$PUB/.gitignore" && pass "public .gitignore carries the gate" || fail "public .gitignore missing the gate"
 grep -q 'AIDOCS/automemory/\*' "$PUB/.gitignore" && pass "public gates auto-memory" || fail "public does not gate auto-memory"
 grep -q 'AIDOCS/\*_ARCHIVE\.md' "$PUB/.gitignore" && pass "public gates pruned <doc>_ARCHIVE.md" || fail "public does not gate the pruned archive files"
+grep -qE '^AIDOCS/ENV/\*$' "$PUB/.gitignore" && pass "public gates ENV docs" || fail "public does not gate ENV docs"
 [ -f "$PUB/AIDOCS/automemory/.gitkeep" ] && pass "public lays automemory/.gitkeep skeleton" || fail "no automemory/.gitkeep on public"
 grep -q '"privacy": "private"' "$PRIV/AIDOCS/_index.json" && pass "private install records privacy private" || fail "private privacy not recorded"
 grep -q 'Privacy gate (public) - BEGIN' "$PRIV/.gitignore" && fail "private .gitignore wrongly carries the gate" || pass "private .gitignore has no gate"
 grep -qE '^TEMP/$' "$PRIV/.gitignore" && pass "private still ignores TEMP (Tier C)" || fail "private dropped the Tier C TEMP ignore"
 grep -qE '/WDDOCS/RELEASES/\*' "$PRIV/.gitignore" && pass "private keeps RELEASES always-local" || fail "private dropped the always-local RELEASES ignore"
+grep -qE '^AIDOCS/ENV/\*$' "$PRIV/.gitignore" && fail "private ignores its ENV docs" || pass "private tracks its ENV docs (Tier B)"
+grep -qF 'AIDOCS/ENV/*_ENV_CODE.md' "$PRIV/.gitignore" && pass "private still keeps the code page ENV doc local" || fail "private dropped the code page ENV doc ignore"
 # The pruned-archive rule ignores contents, not the folder, so the setup archive's skeleton
 # .gitkeep (re-included one line later) stays publishable. A folder rule would swallow it.
 git -C "$PUB" init -q

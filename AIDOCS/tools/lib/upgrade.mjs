@@ -132,7 +132,7 @@ export function cmdUpgrade(index, args) {
   // outside the root, so without this the corrected rules would land in the repo and change
   // nothing the AI reads. Also reconciles the rule index rather than overwriting it, which
   // would delete the project's pointers to its own rules.
-  const autoMemoryReport = syncAutoMemory(source, index, dryRun);
+  const autoMemoryReport = syncAutoMemory(source, index, dryRun, { afterCopy: true });
 
   // Router quick-ref: the engine-class copy lands the upstream router verbatim, which
   // may advertise -Setup or another flag this project no longer registers (graduated).
@@ -164,7 +164,7 @@ export function cmdUpgrade(index, args) {
   console.log(`copy${tag}: ${copyReport.changed} changed, ${copyReport.identical} identical, ${copyReport.skipped} skipped`);
   for (const n of opNotes) console.log(`  ${n}`);
   for (const s of copyReport.skipList) console.log(`  SKIP ${s}`);
-  if (autoMemoryReport) console.log(`  ${autoMemoryReport}${dryRun ? " (dry-run, measured against the seed before the copy)" : ""}`);
+  if (autoMemoryReport) console.log(`  ${autoMemoryReport}${tag}`);
   if (versionNote) console.log(`  ${versionNote}`);
   if (routerReport && routerReport.dropped.length > 0) {
     console.log(`  router${tag}: pruned ${routerReport.dropped.length} stale quick-ref line(s) (${routerReport.dropped.join(", ")})`);
